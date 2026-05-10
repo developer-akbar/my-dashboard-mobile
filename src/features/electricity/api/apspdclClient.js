@@ -39,7 +39,16 @@ async function postForm(endpoint, serviceNumber) {
     body: new URLSearchParams({ uscno: String(serviceNumber) }).toString(),
   });
   if (!res.ok) throw new Error(`APSPDCL responded with ${res.status}`);
-  return res.json();
+  
+  const text = await res.text();
+  if (!text || text.trim() === '') {
+    return { data: [] };
+  }
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    return { data: [] };
+  }
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -100,7 +109,7 @@ function normalizeBill(row) {
  *                     billing period (prdate between closingDate and now)
  *  - arrearsTotal   : sum of arrears amounts
  */
-function analysePayments(paymentData, bill) {
+function analysePayments(paymentData, bills) {
   const empty = {
     isPaid: false,
     paidDate: null,
@@ -110,10 +119,11 @@ function analysePayments(paymentData, bill) {
     arrearsTotal: 0,
   };
 
-  if (!Array.isArray(paymentData?.data) || !bill) return empty;
+  if (!Array.isArray(paymentData?.data) || !bills || bills.length === 0) return empty;
 
-  const billDate = bill.closingDate; // e.g. 02-MAY-26
-  const billAmount = bill.billAmount; // e.g. 2258
+  const latest = bills[0];
+  const billDate = latest.closingDate; // e.g. 02-MAY-26
+  const billAmount = latest.billAmount; // e.g. 2258
 
   // All payments, parsed
   const payments = paymentData.data
@@ -141,15 +151,23 @@ function analysePayments(paymentData, bill) {
     };
   }
 
-  // Advance / partial payments during current billing period:
-  // prdate between closingDate and today, amount < billAmount
-  const now = new Date();
-  const arrears = payments.filter(
-    (p) =>
-      p.date >= billDate &&
-      p.date <= now &&
-      p.amount < billAmount
-  );
+  // Advance payments (arrears) logic:
+  // "after the last month's payment if there are any payment history till the bill date (closingDate)"
+  let arrears = [];
+  if (bills.length > 1) {
+    const previous = bills[1];
+    
+    // Sort ascending for chronological processing
+    const ascPayments = [...payments].sort((a, b) => a.date - b.date);
+    
+    // Find the first payment on or after previous.closingDate (which is assumed to be the previous bill's payment)
+    const prevPaymentIndex = ascPayments.findIndex(p => p.date >= previous.closingDate);
+    
+    if (prevPaymentIndex !== -1) {
+       // Any payments AFTER this payment, up to current bill's closingDate are advance payments (arrears)
+       arrears = ascPayments.filter((p, i) => i > prevPaymentIndex && p.date <= latest.closingDate);
+    }
+  }
 
   return {
     isPaid: false,
@@ -165,18 +183,17 @@ function analysePayments(paymentData, bill) {
 
 /**
  * Build bill breakup object.
- *
- * grossTotal  = EC + FixChg + CC + ED + FSA  (matches APSPDCL rounding)
- * arrearsTotal = sum of advance payments during this billing period
- * netDue      = grossTotal - arrearsTotal
  */
-function buildBreakup(bill, arrearsTotal, arrears) {
-  const ec = bill.ec;
-  const fixchg = bill.fixchg;
-  const cc = bill.cc;
-  const ed = bill.ed;
-  const fsa = bill.fsa;
-  const grossTotal = bill.billAmount; // use APSPDCL's own rounded total
+function buildBreakup(bill, arrearsTotal) {
+  const ec = bill.ec || 0;
+  const fixchg = bill.fixchg || 0;
+  const cc = bill.cc || 0;
+  const ed = bill.ed || 0;
+  const fsa = bill.fsa || 0;
+  
+  // As per APSPDCL, the raw bill is the sum of these, but we use the API's billAmount
+  const totalBill = bill.billAmount || 0;
+  const currentMonthBill = totalBill; // Before any advance payments/arrears are deducted
 
   return {
     ec,
@@ -184,10 +201,9 @@ function buildBreakup(bill, arrearsTotal, arrears) {
     cc,
     ed,
     fsa,
-    grossTotal,
-    arrears,       // array of {date, amount, receiptNo}
-    arrearsTotal,
-    netDue: Math.max(0, grossTotal - arrearsTotal),
+    totalBill: Math.max(0, totalBill - (arrearsTotal || 0)),
+    currentMonthBill,
+    arrears: arrearsTotal || 0,
   };
 }
 
@@ -232,7 +248,7 @@ export async function fetchApspdclSnapshot(serviceNumber) {
   );
 
   // Payment analysis
-  const payAnalysis = analysePayments(paymentData, latest);
+  const payAnalysis = analysePayments(paymentData, bills);
 
   // Status
   let status;
@@ -247,11 +263,19 @@ export async function fetchApspdclSnapshot(serviceNumber) {
   // Bill breakup with arrears
   const breakup =
     latest && status === STATUS.DUE
-      ? buildBreakup(latest, payAnalysis.arrearsTotal, payAnalysis.arrears)
+      ? buildBreakup(latest, payAnalysis.arrearsTotal)
       : null;
 
   const amountDue =
-    status === STATUS.DUE ? (breakup?.netDue ?? latest.billAmount) : 0;
+    status === STATUS.DUE ? (breakup?.totalBill ?? latest.billAmount) : 0;
+
+  // Parse all payments for matching (sorted ascending to find the first one after closingDate)
+  const ascPayments = Array.isArray(paymentData?.data)
+    ? paymentData.data
+        .map((p) => ({ date: parseDate(p.prdate) }))
+        .filter((p) => p.date)
+        .sort((a, b) => a.date - b.date)
+    : [];
 
   // Last 3 previous bills (excluding current month)
   const previousBills = bills
@@ -263,7 +287,13 @@ export async function fetchApspdclSnapshot(serviceNumber) {
         )
     )
     .slice(0, 3)
-    .map((b) => ({ closingDate: b.closingDate.toISOString(), billAmount: b.billAmount }));
+    .map((b) => {
+      const payment = ascPayments.find(p => p.date >= b.closingDate);
+      return { 
+        closingDate: (payment ? payment.date : b.closingDate).toISOString(), 
+        billAmount: b.billAmount 
+      };
+    });
 
   return {
     serviceNumber,

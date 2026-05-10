@@ -77,10 +77,10 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
             </button>
             {menuOpen && (
               <div className="scard__popover">
-                <button onClick={() => { setMenuOpen(false); onEdit(); }}>
+                <button onMouseDown={() => { setMenuOpen(false); onEdit(); }}>
                   <FiEdit2 size={13} /> Edit
                 </button>
-                <button className="danger" onClick={() => { setMenuOpen(false); onDelete(); }}>
+                <button className="danger" onMouseDown={() => { setMenuOpen(false); onDelete(); }}>
                   <FiTrash2 size={13} /> Move to trash
                 </button>
               </div>
@@ -192,7 +192,7 @@ function BillBreakup({ breakup }) {
       >
         <span>Bill breakup</span>
         <span className="breakup__toggle-right">
-          <strong>{formatInr(breakup.grossTotal)}</strong>
+          <strong>{formatInr(breakup.totalBill || breakup.grossTotal || 0)}</strong>
           <FiChevronDown size={15} className="chevron" />
         </span>
       </button>
@@ -202,45 +202,33 @@ function BillBreakup({ breakup }) {
           {rows.map(({ label, key, value }) => (
             <div key={key} className="breakup__row">
               <span>{label}</span>
-              <b>{formatInr(value)}</b>
+              <b>{formatInr(value || 0)}</b>
             </div>
           ))}
 
           <div className="breakup__row breakup__row--subtotal">
-            <span>Gross Total</span>
-            <b>{formatInr(breakup.grossTotal)}</b>
+            <span>Current Month Bill</span>
+            <b>
+              {formatInr(breakup.currentMonthBill || 0)}
+              {breakup.fsa > 0 && (
+                <span style={{ fontWeight: 'normal', fontSize: '0.85em', color: 'var(--text-2)', marginLeft: '4px' }}>
+                  ({formatInr((breakup.currentMonthBill || 0) - (breakup.fsa || 0))} + {formatInr(breakup.fsa || 0)})
+                </span>
+              )}
+            </b>
           </div>
 
-          {/* Arrears / advance payments */}
-          {breakup.arrearsTotal > 0 && (
-            <>
-              <div className="breakup__divider">Advance Payments (Arrears)</div>
-              {Array.isArray(breakup.arrears) &&
-                breakup.arrears.map((arr, i) => (
-                  <div key={i} className="breakup__row breakup__row--arrear">
-                    <span>
-                      {arr.receiptNo
-                        ? `${arr.receiptNo}`
-                        : `Payment ${i + 1}`}{' '}
-                      <small>
-                        ({typeof arr.date === 'string'
-                          ? formatDate(arr.date)
-                          : formatDate(arr.date?.toISOString?.())})
-                      </small>
-                    </span>
-                    <b className="credit">−{formatInr(arr.amount)}</b>
-                  </div>
-                ))}
-              <div className="breakup__row breakup__row--arrear">
-                <span>Total Arrears</span>
-                <b className="credit">−{formatInr(breakup.arrearsTotal)}</b>
-              </div>
-            </>
+          {/* Arrears */}
+          {breakup.arrears > 0 && (
+            <div className="breakup__row breakup__row--arrear">
+              <span>Arrears (Advance Payments)</span>
+              <b className="credit">−{formatInr(breakup.arrears)}</b>
+            </div>
           )}
 
           <div className="breakup__row breakup__row--net">
-            <span>Net Amount Due</span>
-            <b>{formatInr(breakup.netDue)}</b>
+            <span>Total Amount Due</span>
+            <b>{formatInr(breakup.totalBill || 0)}</b>
           </div>
         </div>
       )}

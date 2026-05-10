@@ -120,10 +120,12 @@ function deserializeRecord(row) {
   if (!row) return null;
   return {
     ...row,
-    lastThreeAmounts: row.lastThreeAmounts
+    lastThreeAmounts: typeof row.lastThreeAmounts === 'string'
       ? JSON.parse(row.lastThreeAmounts)
-      : [],
-    billBreakup: row.billBreakup ? JSON.parse(row.billBreakup) : null,
+      : row.lastThreeAmounts || [],
+    billBreakup: typeof row.billBreakup === 'string'
+      ? JSON.parse(row.billBreakup)
+      : row.billBreakup || null,
     isPaid: Boolean(row.isPaid),
     pinned: Boolean(row.pinned),
     isDeleted: Boolean(row.isDeleted),
