@@ -1,42 +1,92 @@
 import { useState } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
-  FiEdit2, FiTrash2, FiChevronDown
+  FiEdit2, FiTrash2, FiChevronDown, FiChevronUp,
+  FiAlertTriangle, FiTrendingUp, FiTrendingDown, FiZap,
+  FiCalendar, FiCheckCircle, FiActivity,
 } from 'react-icons/fi';
 import { BsPin, BsPinFill } from 'react-icons/bs';
 import toast from 'react-hot-toast';
+import {
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  ReferenceLine, ComposedChart, Area,
+} from 'recharts';
 import {
   formatInr, formatDate, formatDateTime, fromNow,
   getDueTone, getDueCopy,
 } from '../../../shared/utils/index.js';
 
+// ── Chart tooltip ─────────────────────────────────────────────────────────────
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-tip">
+      <p className="chart-tip__label">{label}</p>
+      {payload.map(p => (
+        <p key={p.name} style={{ color: p.color }}>
+          {p.name}: {p.name.includes('Units') ? `${Number(p.value).toLocaleString('en-IN')} u` : formatInr(p.value)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// ── Trend badge ───────────────────────────────────────────────────────────────
+function TrendBadge({ value, unit = '' }) {
+  if (value == null) return null;
+  const up = value > 0;
+  const zero = value === 0;
+  return (
+    <span className={`trend-badge trend-badge--${zero ? 'neutral' : up ? 'up' : 'down'}`}>
+      {zero ? '=' : up ? <FiTrendingUp size={11} /> : <FiTrendingDown size={11} />}
+      {zero ? 'Same' : `${up ? '+' : ''}${unit === '₹' ? formatInr(Math.abs(value)) : `${Math.abs(value).toLocaleString('en-IN')} ${unit}`}`}
+    </span>
+  );
+}
+
+// ── Main card ─────────────────────────────────────────────────────────────────
 export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState('charts'); // charts | payments | breakup
+
   const status = service.lastStatus || 'UNKNOWN';
   const dueTone = getDueTone(service.lastDueDate, service.isPaid);
   const dueCopy = getDueCopy(service.lastDueDate, service.isPaid);
+  const insights = service.insights;
+  const trendData = service.trendData;
+  const hasDetail = !!(trendData?.length || service.billHistory?.length || service.paymentHistory?.length);
 
   async function copyNumber() {
     try {
       await navigator.clipboard.writeText(service.serviceNumber);
       toast.success('Service number copied');
-    } catch {
-      toast.error('Copy failed');
-    }
+    } catch { toast.error('Copy failed'); }
   }
 
   async function payNow() {
     await copyNumber();
-    window.open(
-      'https://payments.billdesk.com/MercOnline/SPDCLController',
-      '_blank',
-      'noopener,noreferrer'
-    );
+    window.open('https://payments.billdesk.com/MercOnline/SPDCLController', '_blank', 'noopener,noreferrer');
   }
 
   return (
-    <article className={`scard scard--${status.toLowerCase()}`}>
-      {/* ── Header ──────────────────────────────────────── */}
+    <article className={`scard scard--${status.toLowerCase()}${detailOpen ? ' scard--expanded' : ''}`}>
+      {/* ── Alert banners ────────────────────────────────────── */}
+      {insights?.amountSpike && (
+        <div className="scard__alert scard__alert--warning">
+          <FiAlertTriangle size={13} />
+          Bill is 25%+ above recent average — possible spike
+        </div>
+      )}
+      {insights?.unitSpike && (
+        <div className="scard__alert scard__alert--info">
+          <FiZap size={13} />
+          Units consumed are unusually high this month
+        </div>
+      )}
+
+      {/* ── Header ──────────────────────────────────────────── */}
       <div className="scard__header">
         <div className="scard__title-col">
           <div className="scard__title-row">
@@ -52,27 +102,18 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         </div>
 
         <div className="scard__actions">
-          <button
-            className="icon-btn"
-            onClick={onTogglePin}
-            title={service.pinned ? 'Unpin' : 'Pin'}
-          >
+          <button className="icon-btn" onClick={onTogglePin} title={service.pinned ? 'Unpin' : 'Pin'}>
             {service.pinned ? <BsPinFill size={16} /> : <BsPin size={16} />}
           </button>
           <button
             className={`icon-btn ${refreshing ? 'icon-btn--spinning' : ''}`}
-            onClick={onRefresh}
-            disabled={refreshing}
-            title="Refresh"
+            onClick={onRefresh} disabled={refreshing} title="Refresh"
           >
             <FiRefreshCw size={16} />
           </button>
           <div className="scard__menu">
-            <button
-              className="icon-btn"
-              onClick={() => setMenuOpen((v) => !v)}
-              onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
-            >
+            <button className="icon-btn" onClick={() => setMenuOpen(v => !v)}
+              onBlur={() => setTimeout(() => setMenuOpen(false), 150)}>
               <FiMoreVertical size={16} />
             </button>
             {menuOpen && (
@@ -89,20 +130,32 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         </div>
       </div>
 
-      {/* ── Amount ──────────────────────────────────────── */}
+      {/* ── Amount box ──────────────────────────────────────── */}
       <div className="scard__amount-box">
         <div>
           <p className="label">Amount due</p>
           <strong className="amount">
             {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
           </strong>
+          {status === 'DUE' && insights?.vsLastMonth && (
+            <div style={{ marginTop: 4 }}>
+              <TrendBadge value={insights.vsLastMonth.amount} unit="₹" />
+              <span className="scard__vs-label"> vs last month</span>
+            </div>
+          )}
         </div>
-        {dueCopy && (
-          <span className={`due-chip due-chip--${dueTone}`}>{dueCopy}</span>
-        )}
+        <div className="scard__amount-right">
+          {dueCopy && <span className={`due-chip due-chip--${dueTone}`}>{dueCopy}</span>}
+          {insights?.predictedNextBill && (
+            <div className="predict-chip">
+              <FiActivity size={11} />
+              Next ~{formatInr(insights.predictedNextBill)}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Metrics ─────────────────────────────────────── */}
+      {/* ── Metrics grid ────────────────────────────────────── */}
       <dl className="scard__metrics">
         <div>
           <dt>Bill date</dt>
@@ -115,69 +168,349 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div>
           <dt>Units</dt>
           <dd>
-            {service.lastBilledUnits == null
-              ? '—'
-              : Number(service.lastBilledUnits).toLocaleString('en-IN')}
+            {service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')}
+            {insights?.vsLastMonth?.units != null && (
+              <TrendBadge value={insights.vsLastMonth.units} unit="u" />
+            )}
           </dd>
         </div>
         <div>
           <dt>Refreshed</dt>
-          <dd title={formatDateTime(service.lastFetchedAt)}>
-            {fromNow(service.lastFetchedAt)}
-          </dd>
+          <dd title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</dd>
         </div>
       </dl>
 
-      {/* ── Bill Breakup ─────────────────────────────────── */}
+      {/* ── Quick insights row ───────────────────────────────── */}
+      {insights && (
+        <div className="scard__insights">
+          <div className="insight-chip">
+            <span className="insight-chip__label">Avg/mo</span>
+            <strong>{formatInr(insights.avgAmount)}</strong>
+          </div>
+          <div className="insight-chip">
+            <span className="insight-chip__label">₹/unit</span>
+            <strong>{insights.avgCostPerUnit}</strong>
+          </div>
+          <div className="insight-chip">
+            <span className="insight-chip__label">Avg units</span>
+            <strong>{insights.avgUnits.toLocaleString('en-IN')}</strong>
+          </div>
+          {insights.vsSameMonthLastYear && (
+            <div className="insight-chip">
+              <span className="insight-chip__label">vs last yr</span>
+              <TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Bill Breakup ─────────────────────────────────────── */}
       {service.billBreakup && (
         <BillBreakup breakup={service.billBreakup} />
       )}
 
-      {/* ── History strip ────────────────────────────────── */}
-      {Array.isArray(service.lastThreeAmounts) &&
-        service.lastThreeAmounts.length > 0 && (
-          <div className="scard__history">
-            {service.lastThreeAmounts.map((b) => {
-              const billedUnits = b.billedUnits ?? b.units ?? null;
-              return (
-                <span key={`${b.closingDate}-${b.billAmount}`}>
-                  {formatDate(b.closingDate)}&nbsp;
-                  <b>{formatInr(b.billAmount)}</b>
-                  {billedUnits != null && (
-                    <small> ({Number(billedUnits).toLocaleString('en-IN')} units)</small>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        )}
-
-      {/* ── Error ────────────────────────────────────────── */}
-      {service.lastError && (
-        <p className="scard__error">{service.lastError}</p>
+      {/* ── History strip ────────────────────────────────────── */}
+      {Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
+        <div className="scard__history">
+          {service.lastThreeAmounts.map((b) => (
+            <span key={`${b.billDate}-${b.billAmount}`}>
+              <span className="history-date">
+                {formatDate(b.paidDate || b.billDate)}
+              </span>
+              <b>{formatInr(b.billAmount)}</b>
+              {b.billedUnits != null && (
+                <small> · {Number(b.billedUnits).toLocaleString('en-IN')}u</small>
+              )}
+            </span>
+          ))}
+        </div>
       )}
 
-      {/* ── Footer ──────────────────────────────────────── */}
+      {/* ── Error ────────────────────────────────────────────── */}
+      {service.lastError && (
+        <p className="scard__error"><FiAlertTriangle size={12} /> {service.lastError}</p>
+      )}
+
+      {/* ── Footer ──────────────────────────────────────────── */}
       <div className="scard__footer">
         {service.isPaid ? (
           <span className="receipt-line">
-            Receipt {service.receiptNumber || '—'} · {formatInr(service.paidAmount)}
+            <FiCheckCircle size={13} />
+            {service.receiptNumber || '—'} · {formatInr(service.paidAmount)}
           </span>
-        ) : (
-          <span />
-        )}
-        {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-          <button className="btn btn--pay" onClick={payNow}>
-            <FiExternalLink size={14} />
-            Pay now
-          </button>
-        )}
+        ) : <span />}
+        <div className="scard__footer-right">
+          {hasDetail && (
+            <button className="btn btn--ghost btn--sm" onClick={() => setDetailOpen(v => !v)}>
+              {detailOpen ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+              {detailOpen ? 'Less' : 'Details'}
+            </button>
+          )}
+          {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
+            <button className="btn btn--pay" onClick={payNow}>
+              <FiExternalLink size={14} /> Pay now
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* ── Detail panel ─────────────────────────────────────── */}
+      {detailOpen && hasDetail && (
+        <DetailPanel
+          service={service}
+          tab={detailTab}
+          onTabChange={setDetailTab}
+        />
+      )}
     </article>
   );
 }
 
-// ── Bill Breakup ──────────────────────────────────────────────────────────────
+// ── Detail Panel ──────────────────────────────────────────────────────────────
+
+function DetailPanel({ service, tab, onTabChange }) {
+  const tabs = [
+    { id: 'charts',   label: 'Trends',   show: !!service.trendData?.length },
+    { id: 'payments', label: 'Payments', show: !!service.paymentHistory?.length },
+    { id: 'breakup',  label: 'Breakup',  show: !!service.billBreakup },
+  ].filter(t => t.show);
+
+  return (
+    <div className="detail">
+      {/* Tab bar */}
+      <div className="detail__tabs">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            className={`detail__tab ${tab === t.id ? 'detail__tab--active' : ''}`}
+            onClick={() => onTabChange(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Charts tab */}
+      {tab === 'charts' && service.trendData?.length > 0 && (
+        <ChartsPanel data={service.trendData} insights={service.insights} />
+      )}
+
+      {/* Payment history tab */}
+      {tab === 'payments' && service.paymentHistory?.length > 0 && (
+        <PaymentHistoryPanel payments={service.paymentHistory} />
+      )}
+
+      {/* Bill breakup tab */}
+      {tab === 'breakup' && service.billBreakup && (
+        <BreakupDetailPanel breakup={service.billBreakup} />
+      )}
+    </div>
+  );
+}
+
+// ── Charts Panel ──────────────────────────────────────────────────────────────
+
+function fmt(v) { return `₹${(v/1000).toFixed(1)}k`; }
+function fmtU(v) { return `${v}u`; }
+
+function ChartsPanel({ data, insights }) {
+  const [view, setView] = useState('amount'); // amount | units | combo
+
+  // Format month label: "2025-04" → "Apr'25"
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const chartData = data.map(d => {
+    const [yr, mo] = d.month.split('-');
+    return {
+      ...d,
+      label: `${MONTHS[parseInt(mo)-1]}'${yr.slice(2)}`,
+    };
+  });
+
+  return (
+    <div className="charts-panel">
+      <div className="charts-panel__header">
+        <span className="detail__section-title">12-Month Trend</span>
+        <div className="seg seg--sm">
+          {[
+            { id: 'amount', label: 'Amount' },
+            { id: 'units',  label: 'Units' },
+            { id: 'combo',  label: 'Both' },
+          ].map(v => (
+            <button
+              key={v.id}
+              className={`seg__btn ${view === v.id ? 'seg__btn--active' : ''}`}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="chart-wrap">
+        {(view === 'amount' || view === 'combo') && (
+          <div className="chart-block">
+            {view === 'combo' && <p className="chart-block__title">Bill Amount (₹)</p>}
+            <ResponsiveContainer width="100%" height={160}>
+              <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={fmt} tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={44} />
+                <Tooltip content={<ChartTooltip />} />
+                <Area type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--accent)" fill="var(--accent-dim)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent)' }} />
+                {insights?.avgAmount && (
+                  <ReferenceLine y={insights.avgAmount} stroke="var(--text-3)" strokeDasharray="4 3" label={{ value: 'avg', fontSize: 9, fill: 'var(--text-3)', position: 'insideTopRight' }} />
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {(view === 'units' || view === 'combo') && (
+          <div className="chart-block">
+            {view === 'combo' && <p className="chart-block__title">Units Consumed</p>}
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={fmtU} tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={44} />
+                <Tooltip content={<ChartTooltip />} />
+                <Bar dataKey="billedUnits" name="Units" fill="var(--info)" radius={[3,3,0,0]} maxBarSize={28} />
+                {insights?.avgUnits && (
+                  <ReferenceLine y={insights.avgUnits} stroke="var(--text-3)" strokeDasharray="4 3" label={{ value: 'avg', fontSize: 9, fill: 'var(--text-3)', position: 'insideTopRight' }} />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Insight cards */}
+      {insights && (
+        <div className="insight-grid">
+          <InsightCard label="Avg monthly bill" value={formatInr(insights.avgAmount)} />
+          <InsightCard label="Highest this year" value={formatInr(insights.maxAmount)} tone="danger" />
+          <InsightCard label="Lowest this year"  value={formatInr(insights.minAmount)} tone="success" />
+          <InsightCard label="Avg cost/unit"     value={`₹${insights.avgCostPerUnit}`} />
+          <InsightCard label="Avg units/month"   value={`${insights.avgUnits.toLocaleString('en-IN')} u`} />
+          {insights.predictedNextBill && (
+            <InsightCard label="Predicted next bill" value={formatInr(insights.predictedNextBill)} tone="info" />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InsightCard({ label, value, tone = 'neutral' }) {
+  return (
+    <div className={`insight-card insight-card--${tone}`}>
+      <span className="insight-card__label">{label}</span>
+      <strong className="insight-card__value">{value}</strong>
+    </div>
+  );
+}
+
+// ── Payment History Panel ─────────────────────────────────────────────────────
+
+function PaymentHistoryPanel({ payments }) {
+  return (
+    <div className="pay-history">
+      <p className="detail__section-title">Payment History <span className="detail__count">{payments.length} records</span></p>
+      <div className="pay-history__table">
+        <div className="pay-history__head">
+          <span>Date</span>
+          <span>Receipt No</span>
+          <span className="right">Amount</span>
+        </div>
+        {payments.map((p, i) => (
+          <div key={`${p.date}-${i}`} className="pay-history__row">
+            <span>
+              <FiCalendar size={11} />
+              {formatDate(p.date)}
+            </span>
+            <span className="mono small">{p.receiptNo || '—'}</span>
+            <b className="right">{formatInr(p.amount)}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Breakup Detail Panel ──────────────────────────────────────────────────────
+
+function BreakupDetailPanel({ breakup }) {
+  const rows = [
+    { label: 'Energy Charges (EC)',      value: breakup.ec,     pct: breakup.grossTotal ? breakup.ec / breakup.grossTotal : 0, color: 'var(--accent)' },
+    { label: 'Fixed Charges',            value: breakup.fixchg, pct: breakup.grossTotal ? breakup.fixchg / breakup.grossTotal : 0, color: 'var(--info)' },
+    { label: 'Customer Charges',         value: breakup.cc,     pct: breakup.grossTotal ? breakup.cc / breakup.grossTotal : 0, color: 'var(--warning)' },
+    { label: 'Electricity Duty (ED)',     value: breakup.ed,     pct: breakup.grossTotal ? breakup.ed / breakup.grossTotal : 0, color: 'var(--success)' },
+    { label: 'Fuel Surcharge (FSA)',      value: breakup.fsa,    pct: breakup.grossTotal ? breakup.fsa / breakup.grossTotal : 0, color: '#a78bfa' },
+  ];
+
+  return (
+    <div className="breakup-detail">
+      <p className="detail__section-title">Charge Breakdown</p>
+
+      {/* Visual bar */}
+      <div className="breakup-bar">
+        {rows.map(r => (
+          <div key={r.label} className="breakup-bar__seg" style={{ width: `${r.pct * 100}%`, background: r.color }} title={`${r.label}: ${formatInr(r.value)}`} />
+        ))}
+      </div>
+
+      {/* Rows with bar */}
+      <div className="breakup-rows">
+        {rows.map(r => (
+          <div key={r.label} className="breakup-row-detail">
+            <div className="breakup-row-detail__info">
+              <span className="breakup-dot" style={{ background: r.color }} />
+              <span>{r.label}</span>
+            </div>
+            <div className="breakup-row-detail__right">
+              <span className="breakup-pct">{(r.pct * 100).toFixed(1)}%</span>
+              <b>{formatInr(r.value)}</b>
+            </div>
+          </div>
+        ))}
+
+        <div className="breakup-row-detail breakup-row-detail--total">
+          <span>Gross Total</span>
+          <b>{formatInr(breakup.grossTotal)}</b>
+        </div>
+
+        {/* Arrears */}
+        {breakup.arrearsTotal > 0 && (
+          <>
+            <div className="breakup-divider">Advance Payments (Arrears)</div>
+            {Array.isArray(breakup.arrearPayments) && breakup.arrearPayments.map((a, i) => (
+              <div key={i} className="breakup-row-detail breakup-row-detail--arrear">
+                <div className="breakup-row-detail__info">
+                  <FiCheckCircle size={12} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                  <span>
+                    {a.receiptNo && <span className="mono small">{a.receiptNo}</span>}
+                    {' '}<small>({formatDate(a.date)})</small>
+                  </span>
+                </div>
+                <b className="credit">−{formatInr(a.amount)}</b>
+              </div>
+            ))}
+            <div className="breakup-row-detail breakup-row-detail--arrear-total">
+              <span>Total Arrears</span>
+              <b className="credit">−{formatInr(breakup.arrearsTotal)}</b>
+            </div>
+          </>
+        )}
+
+        <div className="breakup-row-detail breakup-row-detail--net">
+          <span>Net Amount Due</span>
+          <b>{formatInr(breakup.netDue)}</b>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Inline Bill Breakup (collapsed toggle on card) ───────────────────────────
 
 function BillBreakup({ breakup }) {
   const [open, setOpen] = useState(false);
@@ -192,13 +525,10 @@ function BillBreakup({ breakup }) {
 
   return (
     <div className={`breakup ${open ? 'breakup--open' : ''}`}>
-      <button
-        className="breakup__toggle"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <button className="breakup__toggle" onClick={() => setOpen(v => !v)}>
         <span>Bill breakup</span>
         <span className="breakup__toggle-right">
-          <strong>{formatInr(breakup.totalBill || 0)}</strong>
+          <strong>{formatInr(breakup.netDue ?? breakup.totalBill ?? 0)}</strong>
           <FiChevronDown size={15} className="chevron" />
         </span>
       </button>
@@ -211,30 +541,19 @@ function BillBreakup({ breakup }) {
               <b>{formatInr(value || 0)}</b>
             </div>
           ))}
-
           <div className="breakup__row breakup__row--subtotal">
             <span>Current Month Bill</span>
-            <b>
-              {formatInr(breakup.currentMonthBill || 0)}
-              {breakup.fsa > 0 && (
-                <span style={{ fontWeight: 'normal', fontSize: '0.85em', color: 'var(--text-2)', marginLeft: '4px' }}>
-                  ({formatInr((breakup.currentMonthBill || 0) - (breakup.fsa || 0))} + {formatInr(breakup.fsa || 0)})
-                </span>
-              )}
-            </b>
+            <b>{formatInr(breakup.currentMonthBill || breakup.grossTotal || 0)}</b>
           </div>
-
-          {/* Arrears */}
-          {breakup.arrears > 0 && (
+          {breakup.arrearsTotal > 0 && (
             <div className="breakup__row breakup__row--arrear">
               <span>Arrears (Advance Payments)</span>
-              <b className="credit">−{formatInr(breakup.arrears)}</b>
+              <b className="credit">−{formatInr(breakup.arrearsTotal)}</b>
             </div>
           )}
-
           <div className="breakup__row breakup__row--net">
             <span>Total Amount Due</span>
-            <b>{formatInr(breakup.totalBill || breakup.netDue || 0)}</b>
+            <b>{formatInr(breakup.netDue ?? breakup.totalBill ?? 0)}</b>
           </div>
         </div>
       )}

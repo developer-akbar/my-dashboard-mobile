@@ -15,6 +15,7 @@ import {
   refreshAllServices,
   refreshService,
   restoreService,
+  shouldAutoRefresh,
   updateService,
 } from '../api/servicesApi.js';
 
@@ -60,9 +61,33 @@ export function useElectricityServices() {
   const reload = useCallback(async () => {
     const [services, trash] = await Promise.all([listServices(), listTrash()]);
     dispatch({ type: 'LOAD', services, trash });
+    return services; // return so auto-refresh can inspect them
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  // ── Auto-refresh stale services on first daily load ─────────────────────
+  // Runs once on mount. If any service hasn't been refreshed today, refresh-all.
+  // Uses a ref to prevent double-fire in React StrictMode.
+  const autoRefreshDone = useRef(false);
+
+  useEffect(() => {
+    if (autoRefreshDone.current) return;
+    autoRefreshDone.current = true;
+
+    (async () => {
+      const services = await reload();
+      const stale = services.filter(shouldAutoRefresh);
+      if (stale.length === 0) return;
+
+      // Mark all stale as refreshing
+      stale.forEach(s => dispatch({ type: 'REFRESHING_ADD', id: s.id }));
+      try {
+        await refreshAllServices();
+      } finally {
+        stale.forEach(s => dispatch({ type: 'REFRESHING_REMOVE', id: s.id }));
+        await reload();
+      }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── actions.add ─────────────────────────────────────────────────────────────
   // POST /services

@@ -42,22 +42,49 @@ async function apiPost(path, body) {
 // ── Snapshot → DB patch mapper ────────────────────────────────────────────────
 
 function snapshotToPatch(snapshot) {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   return {
-    customerName:     snapshot.customerName,
-    lastBillDate:     snapshot.billDate,
-    lastDueDate:      snapshot.dueDate,
-    lastAmountDue:    snapshot.amountDue,
-    lastBilledUnits:  snapshot.billedUnits,
-    lastThreeAmounts: snapshot.lastThreeAmounts,
-    lastStatus:       snapshot.status,
-    lastFetchedAt:    snapshot.fetchedAt || new Date().toISOString(),
-    isPaid:           snapshot.isPaid,
-    paidDate:         snapshot.paidDate,
-    receiptNumber:    snapshot.receiptNumber,
-    paidAmount:       snapshot.paidAmount,
-    billBreakup:      snapshot.billBreakup,
-    lastError:        null,
+    customerName:      snapshot.customerName,
+    lastBillDate:      snapshot.billDate,
+    lastDueDate:       snapshot.dueDate,
+    lastAmountDue:     snapshot.amountDue,
+    lastBilledUnits:   snapshot.billedUnits,
+    lastThreeAmounts:  snapshot.lastThreeAmounts,
+    lastStatus:        snapshot.status,
+    lastFetchedAt:     snapshot.fetchedAt || new Date().toISOString(),
+    lastRefreshedDate: today,
+    isPaid:            snapshot.isPaid,
+    paidDate:          snapshot.paidDate,
+    receiptNumber:     snapshot.receiptNumber,
+    paidAmount:        snapshot.paidAmount,
+    billBreakup:       snapshot.billBreakup,
+    billHistory:       snapshot.billHistory    || null,
+    paymentHistory:    snapshot.paymentHistory || null,
+    trendData:         snapshot.trendData      || null,
+    insights:          snapshot.insights       || null,
+    lastError:         null,
   };
+}
+
+/**
+ * shouldAutoRefresh(service)
+ *
+ * Returns true if the service hasn't been refreshed today.
+ * Strategy: refresh on first load of the day (date-level staleness).
+ * This means: open the app in the morning → all services auto-refresh once.
+ * Any subsequent opens on the same calendar day → no auto-refresh (use cached data).
+ *
+ * Why "first load of the day" over "every N hours":
+ *   - Bill data changes once a month, payment status changes when user pays.
+ *   - Time-based (e.g. 6h) would still miss the case where user pays at 2am
+ *     and opens the app at 3am — they'd still see "DUE" for 3 hours.
+ *   - Date-based is simpler, predictable, and matches how users think:
+ *     "I open the app today, I see today's data."
+ */
+export function shouldAutoRefresh(service) {
+  if (!service.lastRefreshedDate) return true;
+  const today = new Date().toISOString().slice(0, 10);
+  return service.lastRefreshedDate < today;
 }
 
 // ── Concurrency queue ─────────────────────────────────────────────────────────

@@ -998,3 +998,370 @@ a { color: var(--accent); text-decoration: none; }
   .summary { grid-template-columns: 1fr; }
   .page__header h1 { font-size: 28px; }
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENHANCEMENTS — Detail panel, charts, insights, alerts
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Alert banners ────────────────────────────────────────────────────────── */
+.scard__alert {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: -4px;
+}
+.scard__alert--warning { background: var(--warning-dim); color: var(--warning); border: 1px solid rgba(227,179,65,0.2); }
+.scard__alert--info    { background: var(--info-dim);    color: var(--info);    border: 1px solid rgba(88,166,255,0.2); }
+
+/* ── Amount right col ─────────────────────────────────────────────────────── */
+.scard__amount-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.scard__vs-label {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* ── Trend badges ─────────────────────────────────────────────────────────── */
+.trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.trend-badge--up      { background: var(--danger-dim);  color: var(--danger);  }
+.trend-badge--down    { background: var(--success-dim); color: var(--success); }
+.trend-badge--neutral { background: var(--neutral-dim); color: var(--text-2);  }
+
+/* ── Predicted next bill chip ─────────────────────────────────────────────── */
+.predict-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* ── Quick insights strip ─────────────────────────────────────────────────── */
+.scard__insights {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.insight-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex: 1;
+  min-width: 70px;
+}
+.insight-chip__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+}
+.insight-chip strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Card footer right ────────────────────────────────────────────────────── */
+.scard__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.receipt-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── Detail panel ─────────────────────────────────────────────────────────── */
+.detail {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 14px;
+}
+
+.detail__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 3px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.detail__tab {
+  flex: 1;
+  min-height: 30px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  transition: background 0.1s, color 0.1s;
+}
+.detail__tab:hover { color: var(--text); }
+.detail__tab--active { background: var(--surface-3); color: var(--text); }
+
+.detail__section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail__count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Charts panel ─────────────────────────────────────────────────────────── */
+.charts-panel {}
+.charts-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.charts-panel__header .detail__section-title { margin-bottom: 0; }
+
+.seg--sm .seg__btn { min-height: 26px; padding: 0 10px; font-size: 12px; }
+
+.chart-wrap { display: flex; flex-direction: column; gap: 12px; }
+.chart-block {}
+.chart-block__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+
+/* Recharts tooltip */
+.chart-tip {
+  background: var(--surface-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.chart-tip__label {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.chart-tip p { color: var(--text-2); margin: 0; }
+
+/* ── Insight grid (in charts panel) ──────────────────────────────────────── */
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+.insight-card {
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+.insight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+}
+.insight-card--neutral::before { background: var(--text-3); }
+.insight-card--danger::before  { background: var(--danger);  }
+.insight-card--success::before { background: var(--success); }
+.insight-card--info::before    { background: var(--info);    }
+.insight-card--warning::before { background: var(--warning); }
+
+.insight-card__label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.insight-card__value {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Payment history table ────────────────────────────────────────────────── */
+.pay-history {}
+.pay-history__table {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.pay-history__head,
+.pay-history__row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr auto;
+  gap: 8px;
+  padding: 8px 12px;
+  align-items: center;
+}
+.pay-history__head {
+  background: var(--surface-2);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+}
+.pay-history__row {
+  font-size: 12px;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.pay-history__row:last-child { border-bottom: none; }
+.pay-history__row:hover { background: var(--surface); }
+.pay-history__row b { color: var(--text); font-size: 13px; font-weight: 700; }
+.pay-history__row span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+}
+.right { text-align: right; }
+.small { font-size: 11px; }
+
+/* ── Breakup detail panel ─────────────────────────────────────────────────── */
+.breakup-detail {}
+.breakup-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 1px;
+  margin-bottom: 14px;
+}
+.breakup-bar__seg {
+  transition: flex-basis 0.3s;
+  min-width: 2px;
+}
+
+.breakup-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.breakup-row-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.breakup-row-detail__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.breakup-row-detail__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.breakup-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.breakup-pct {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 500;
+  min-width: 36px;
+  text-align: right;
+}
+.breakup-row-detail span { color: var(--text-2); }
+.breakup-row-detail b    { color: var(--text); font-weight: 700; }
+
+.breakup-row-detail--total {
+  background: var(--surface-2);
+  font-weight: 700;
+  margin-top: 4px;
+}
+.breakup-row-detail--total span,
+.breakup-row-detail--total b { color: var(--text); }
+
+.breakup-divider {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--warning);
+  padding: 4px 10px 0;
+}
+.breakup-row-detail--arrear {
+  background: rgba(227,179,65,0.06);
+  border: 1px solid rgba(227,179,65,0.12);
+}
+.breakup-row-detail--arrear span { font-size: 12px; }
+.breakup-row-detail--arrear-total {
+  background: rgba(227,179,65,0.10);
+  font-weight: 700;
+}
+.breakup-row-detail--net {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  margin-top: 4px;
+}
+.breakup-row-detail--net span,
+.breakup-row-detail--net b { color: var(--accent); font-weight: 700; }
+
+.credit { color: var(--success) !important; }
+.history-date { color: var(--text-3); font-size: 11px; }
+
+/* ── Responsive tweaks for detail panel ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .insight-grid { grid-template-columns: repeat(2, 1fr); }
+  .pay-history__head,
+  .pay-history__row { grid-template-columns: 1fr 1fr auto; }
+}

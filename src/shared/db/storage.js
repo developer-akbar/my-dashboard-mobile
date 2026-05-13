@@ -7,7 +7,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'my-dashboard';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // bumped: adds billHistory, paymentHistory, trendData, insights, lastRefreshedDate
 const STORE = 'electricity_services';
 
 let _idb = null;
@@ -29,16 +29,15 @@ function isAndroid() {
 async function getIdb() {
   if (_idb) return _idb;
   _idb = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, {
-          keyPath: 'id',
-          autoIncrement: false,
-        });
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: false });
         store.createIndex('serviceNumber', 'serviceNumber', { unique: false });
         store.createIndex('isDeleted', 'isDeleted', { unique: false });
         store.createIndex('pinned', 'pinned', { unique: false });
       }
+      // v2: new fields are plain JS properties — IndexedDB stores them automatically.
+      // No schema change needed; existing records just won't have them until next refresh.
     },
   });
   return _idb;
@@ -73,12 +72,17 @@ async function getSqlite() {
       lastThreeAmounts TEXT,
       lastStatus TEXT DEFAULT 'UNKNOWN',
       lastFetchedAt TEXT,
+      lastRefreshedDate TEXT,
       lastError TEXT,
       isPaid INTEGER DEFAULT 0,
       paidDate TEXT,
       receiptNumber TEXT,
       paidAmount REAL,
       billBreakup TEXT,
+      billHistory TEXT,
+      paymentHistory TEXT,
+      trendData TEXT,
+      insights TEXT,
       pinned INTEGER DEFAULT 0,
       pinnedAt TEXT,
       isDeleted INTEGER DEFAULT 0,
@@ -104,15 +108,15 @@ function generateId() {
 function serializeRecord(record) {
   return {
     ...record,
-    lastThreeAmounts: record.lastThreeAmounts
-      ? JSON.stringify(record.lastThreeAmounts)
-      : '[]',
-    billBreakup: record.billBreakup
-      ? JSON.stringify(record.billBreakup)
-      : null,
-    isPaid: record.isPaid ? 1 : 0,
-    pinned: record.pinned ? 1 : 0,
-    isDeleted: record.isDeleted ? 1 : 0,
+    lastThreeAmounts: record.lastThreeAmounts ? JSON.stringify(record.lastThreeAmounts) : '[]',
+    billBreakup:      record.billBreakup      ? JSON.stringify(record.billBreakup)      : null,
+    billHistory:      record.billHistory      ? JSON.stringify(record.billHistory)      : null,
+    paymentHistory:   record.paymentHistory   ? JSON.stringify(record.paymentHistory)   : null,
+    trendData:        record.trendData        ? JSON.stringify(record.trendData)        : null,
+    insights:         record.insights         ? JSON.stringify(record.insights)         : null,
+    isPaid:     record.isPaid     ? 1 : 0,
+    pinned:     record.pinned     ? 1 : 0,
+    isDeleted:  record.isDeleted  ? 1 : 0,
   };
 }
 
@@ -120,15 +124,15 @@ function deserializeRecord(row) {
   if (!row) return null;
   return {
     ...row,
-    lastThreeAmounts: typeof row.lastThreeAmounts === 'string'
-      ? JSON.parse(row.lastThreeAmounts)
-      : row.lastThreeAmounts || [],
-    billBreakup: typeof row.billBreakup === 'string'
-      ? JSON.parse(row.billBreakup)
-      : row.billBreakup || null,
-    isPaid: Boolean(row.isPaid),
-    pinned: Boolean(row.pinned),
-    isDeleted: Boolean(row.isDeleted),
+    lastThreeAmounts: typeof row.lastThreeAmounts === 'string' ? JSON.parse(row.lastThreeAmounts) : row.lastThreeAmounts || [],
+    billBreakup:      typeof row.billBreakup      === 'string' ? JSON.parse(row.billBreakup)      : row.billBreakup    || null,
+    billHistory:      typeof row.billHistory      === 'string' ? JSON.parse(row.billHistory)      : row.billHistory    || null,
+    paymentHistory:   typeof row.paymentHistory   === 'string' ? JSON.parse(row.paymentHistory)   : row.paymentHistory || null,
+    trendData:        typeof row.trendData        === 'string' ? JSON.parse(row.trendData)        : row.trendData      || null,
+    insights:         typeof row.insights         === 'string' ? JSON.parse(row.insights)         : row.insights       || null,
+    isPaid:     Boolean(row.isPaid),
+    pinned:     Boolean(row.pinned),
+    isDeleted:  Boolean(row.isDeleted),
   };
 }
 
@@ -227,12 +231,17 @@ async function createService(data) {
     lastThreeAmounts: [],
     lastStatus: 'UNKNOWN',
     lastFetchedAt: null,
+    lastRefreshedDate: null,
     lastError: null,
     isPaid: false,
     paidDate: null,
     receiptNumber: null,
     paidAmount: null,
     billBreakup: null,
+    billHistory: null,
+    paymentHistory: null,
+    trendData: null,
+    insights: null,
     pinned: false,
     pinnedAt: null,
     isDeleted: false,
@@ -248,14 +257,16 @@ async function createService(data) {
       `INSERT INTO electricity_services
         (id, serviceNumber, label, customerName, lastBillDate, lastDueDate,
          lastAmountDue, lastBilledUnits, lastThreeAmounts, lastStatus, lastFetchedAt,
-         lastError, isPaid, paidDate, receiptNumber, paidAmount, billBreakup,
+         lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
+         billBreakup, billHistory, paymentHistory, trendData, insights,
          pinned, pinnedAt, isDeleted, deletedAt, createdAt, updatedAt)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         ser.id, ser.serviceNumber, ser.label, ser.customerName,
         ser.lastBillDate, ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits,
-        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.lastError,
-        ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount, ser.billBreakup,
+        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.lastRefreshedDate,
+        ser.lastError, ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
+        ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.createdAt, ser.updatedAt
       ]
     );
@@ -279,16 +290,18 @@ async function updateService(id, patch) {
       `UPDATE electricity_services SET
         serviceNumber=?, label=?, customerName=?, lastBillDate=?, lastDueDate=?,
         lastAmountDue=?, lastBilledUnits=?, lastThreeAmounts=?, lastStatus=?,
-        lastFetchedAt=?, lastError=?, isPaid=?, paidDate=?, receiptNumber=?,
-        paidAmount=?, billBreakup=?, pinned=?, pinnedAt=?, isDeleted=?,
-        deletedAt=?, updatedAt=?
+        lastFetchedAt=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
+        receiptNumber=?, paidAmount=?, billBreakup=?, billHistory=?,
+        paymentHistory=?, trendData=?, insights=?,
+        pinned=?, pinnedAt=?, isDeleted=?, deletedAt=?, updatedAt=?
        WHERE id=?`,
       [
         ser.serviceNumber, ser.label, ser.customerName, ser.lastBillDate,
         ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits, ser.lastThreeAmounts,
-        ser.lastStatus, ser.lastFetchedAt, ser.lastError, ser.isPaid, ser.paidDate,
-        ser.receiptNumber, ser.paidAmount, ser.billBreakup, ser.pinned, ser.pinnedAt,
-        ser.isDeleted, ser.deletedAt, ser.updatedAt, ser.id
+        ser.lastStatus, ser.lastFetchedAt, ser.lastRefreshedDate, ser.lastError,
+        ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
+        ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
+        ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.updatedAt, ser.id
       ]
     );
     return updated;
