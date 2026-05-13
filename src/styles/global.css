@@ -1,7 +1,7 @@
 /* ──────────────────────────────────────────────────────────────────────────────
    My Dashboard — Global Styles
    Aesthetic: Dark industrial dashboard with electric accent
-   Fonts: Syne (headings) + DM Sans (body)
+   Fonts: Standard system fonts for better compatibility
    ────────────────────────────────────────────────────────────────────────────── */
 
 :root {
@@ -42,7 +42,7 @@
   --shadow-sm:    0 2px 12px rgba(0,0,0,0.3);
 
   color-scheme: dark;
-  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   background: var(--bg);
@@ -54,16 +54,23 @@
 html, body, #root { height: 100%; }
 
 h1,h2,h3,h4,h5,h6 {
-  font-family: 'Syne', ui-sans-serif, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-weight: 700;
   line-height: 1.15;
   color: var(--text);
 }
 
+h1 { font-size: 32px; }
+h2 { font-size: 24px; }
+h3 { font-size: 20px; }
+h4 { font-size: 18px; }
+h5 { font-size: 16px; }
+h6 { font-size: 14px; }
+
 button { cursor: pointer; font: inherit; background: none; border: none; }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 input, select { font: inherit; }
-p { color: var(--text-2); }
+p { color: var(--text-2); font-size: 14px; }
 a { color: var(--accent); text-decoration: none; }
 
 /* ── Shell layout ─────────────────────────────────────────────────────────── */
@@ -90,7 +97,7 @@ a { color: var(--accent); text-decoration: none; }
   align-items: center;
   gap: 10px;
   padding: 10px 12px 20px;
-  font-family: 'Syne', sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-weight: 800;
   font-size: 15px;
   color: var(--text);
@@ -269,7 +276,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .summary__value {
-  font-family: 'Syne', sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 22px;
   font-weight: 800;
   color: var(--text);
@@ -538,7 +545,7 @@ a { color: var(--accent); text-decoration: none; }
 /* Amount box */
 .scard__amount-box {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   padding: 14px;
@@ -556,7 +563,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .amount {
-  font-family: 'Syne', sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 28px;
   font-weight: 800;
   color: var(--text);
@@ -609,6 +616,9 @@ a { color: var(--accent); text-decoration: none; }
   font-weight: 600;
   color: var(--text);
   overflow-wrap: anywhere;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 /* Bill breakup */
@@ -706,6 +716,10 @@ a { color: var(--accent); text-decoration: none; }
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.scard__history-label {
+  font-size: 12px;
 }
 
 .scard__history span {
@@ -1196,6 +1210,9 @@ a { color: var(--accent); text-decoration: none; }
   border-radius: var(--radius-sm);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
 }
 .insight-card::before {
   content: '';
@@ -1219,10 +1236,13 @@ a { color: var(--accent); text-decoration: none; }
   margin-bottom: 4px;
 }
 .insight-card__value {
-  font-family: 'Syne', sans-serif;
-  font-size: 15px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text);
+}
+.insight-card__meta {
+  font-size: 11px;
 }
 
 /* ── Payment history table ────────────────────────────────────────────────── */

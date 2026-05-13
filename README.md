@@ -27,7 +27,7 @@ A personal tracking dashboard built with **React 18 + Vite 5 + Capacitor 5**.
 | Android bridge | Capacitor 5 |
 | Android storage | SQLite (`@capacitor-community/sqlite`) |
 | Browser storage | IndexedDB (`idb`) |
-| Fonts | Syne (headings) + DM Sans (body) |
+| Fonts | Arial, Helvetica, sans-serif (standard system fonts) |
 
 ---
 

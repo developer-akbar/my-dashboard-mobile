@@ -265,8 +265,8 @@ async function buildSnapshot(serviceNumber) {
     };
   });
 
-  // full 12-month history for charts & payment history table
-  const billHistory12 = pastBills.slice(0, 12).map((bill, i) => {
+  // full 18-month history for charts & payment history table
+  const billHistory18 = pastBills.slice(0, 18).map((bill, i) => {
     const nextClose = pastBills[i - 1]?.closingDate ?? (hasCurrentMonthBill ? latest.closingDate : null);
     const paidDate = findSettlementDate(bill, nextClose);
     return {
@@ -286,7 +286,7 @@ async function buildSnapshot(serviceNumber) {
     receiptNo: p.receiptNo,
   }));
 
-  // ── Trend data — 12-month monthly series for charts ──────────────────────
+  // ── Trend data — 18-month monthly series for charts ──────────────────────
   // Combine current month + past bills, sorted oldest→newest for chart display
   const trendMonths = [
     ...(hasCurrentMonthBill ? [{
@@ -296,7 +296,7 @@ async function buildSnapshot(serviceNumber) {
       billedUnits: latest.billedUnits,
       status,
     }] : []),
-    ...pastBills.slice(0, hasCurrentMonthBill ? 11 : 12).map(b => ({
+    ...pastBills.slice(0, hasCurrentMonthBill ? 17 : 18).map(b => ({
       month:       `${b.closingDate.getUTCFullYear()}-${String(b.closingDate.getUTCMonth() + 1).padStart(2, '0')}`,
       billAmount:  b.billAmount,
       amountDue:   b.billAmount,
@@ -306,15 +306,21 @@ async function buildSnapshot(serviceNumber) {
   ].reverse(); // oldest first
 
   // ── Insights ──────────────────────────────────────────────────────────────
-  const pastAmounts  = pastBills.slice(0, 12).map(b => b.billAmount);
-  const pastUnits    = pastBills.slice(0, 12).map(b => b.billedUnits);
+  const pastAmounts  = trendMonths.map((m) => m.billAmount);
+  const pastUnits    = trendMonths.map((m) => m.billedUnits);
+  const historicalAmounts = hasCurrentMonthBill ? pastAmounts.slice(0, -1) : pastAmounts;
+  const historicalUnits   = hasCurrentMonthBill ? pastUnits.slice(0, -1) : pastUnits;
 
   function avg(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
   function max(arr) { return arr.length ? Math.max(...arr) : 0; }
   function min(arr) { return arr.length ? Math.min(...arr) : 0; }
 
   const avgAmount   = avg(pastAmounts);
+  const avgAmount6m = avg(historicalAmounts.slice(-6));
+  const avgAmount12m = avg(historicalAmounts.slice(-12));
   const avgUnits    = avg(pastUnits);
+  const avgUnits6m  = avg(historicalUnits.slice(-6));
+  const avgUnits12m = avg(historicalUnits.slice(-12));
   const maxAmount   = max(pastAmounts);
   const minAmount   = min(pastAmounts);
   const maxUnits    = max(pastUnits);
@@ -322,15 +328,64 @@ async function buildSnapshot(serviceNumber) {
   const avgCostPerUnit = avgUnits > 0 ? avgAmount / avgUnits : 0;
 
   // Spike detection: current vs 3-month avg
-  const recent3Avg  = avg(pastAmounts.slice(0, 3));
+  const recent3Avg  = avg(pastAmounts.slice(-3));
   const unitSpike   = avgUnits > 0 && latest.billedUnits > avgUnits * 1.25;
   const amountSpike = recent3Avg > 0 && latest.billAmount > recent3Avg * 1.25;
 
-  // Simple linear prediction of next bill based on last 3 months trend
-  const last3 = pastAmounts.slice(0, 3);
-  const predictedNextBill = last3.length >= 2
-    ? Math.max(0, Math.round(avg(last3) + (last3[0] - last3[last3.length - 1]) / last3.length * 0.3))
-    : null;
+  // Prediction uses same month last year when available, otherwise recent trend
+  const targetMonthNumber = ((currentMonth + 1) % 12) + 1;
+  const targetMonthYear = currentMonth === 11 ? currentYear : currentYear - 1;
+  const sameMonthHistory = trendMonths.filter((m) => {
+    const [yr, mo] = m.month.split('-').map(Number);
+    return mo === targetMonthNumber && yr === targetMonthYear;
+  });
+
+  function rangeFor(values) {
+    if (!values.length) return null;
+    const minValue = Math.round(Math.min(...values));
+    const maxValue = Math.round(Math.max(...values));
+    return minValue === maxValue ? `${minValue}` : `${minValue} - ${maxValue}`;
+  }
+
+  const fallbackMonths = trendMonths.slice(-3);
+  const fallbackBillValues = fallbackMonths.map((m) => m.billAmount).filter((v) => typeof v === 'number');
+  const fallbackUnitValues = fallbackMonths.map((m) => m.billedUnits).filter((v) => typeof v === 'number');
+
+  const predictedNextBill = sameMonthHistory.length
+    ? Math.round(avg(sameMonthHistory.map((m) => m.billAmount)))
+    : fallbackBillValues.length >= 2
+      ? Math.max(0, Math.round(avg(fallbackBillValues)
+        + ((fallbackBillValues[0] - fallbackBillValues[fallbackBillValues.length - 1]) / fallbackBillValues.length) * 0.3))
+      : null;
+
+  const predictedNextUnits = sameMonthHistory.length
+    ? Math.round(avg(sameMonthHistory.map((m) => m.billedUnits)))
+    : fallbackUnitValues.length >= 2
+      ? Math.max(0, Math.round(avg(fallbackUnitValues)))
+      : null;
+
+  const predictedNextBillRange = sameMonthHistory.length
+    ? rangeFor(sameMonthHistory.map((m) => m.billAmount))
+    : fallbackBillValues.length >= 2
+      ? rangeFor(fallbackBillValues)
+      : null;
+
+  const predictedNextUnitsRange = sameMonthHistory.length
+    ? rangeFor(sameMonthHistory.map((m) => m.billedUnits))
+    : fallbackUnitValues.length >= 2
+      ? rangeFor(fallbackUnitValues)
+      : null;
+
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel = `${MONTHS[targetMonthNumber - 1]}-${targetMonthYear}`;
+  const predictedBasis = sameMonthHistory.length
+    ? `based on ${monthLabel} last year`
+    : 'based on recent trend';
+
+  const maxBill = trendMonths.reduce((best, month) => !best || month.billAmount > best.billAmount ? month : best, null);
+  const minBill = trendMonths.reduce((best, month) => !best || month.billAmount < best.billAmount ? month : best, null);
+  const maxAmountMonth = maxBill?.month || null;
+  const minAmountMonth = minBill?.month || null;
 
   // Comparison: current vs previous month vs same month last year
   const prevMonthBill = pastBills[0] || null;
@@ -339,22 +394,47 @@ async function buildSnapshot(serviceNumber) {
     return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear - 1;
   }) || null;
 
+  function pct(change, base) {
+    if (!base || typeof base !== 'number' || base === 0) return null;
+    return Number(((change / base) * 100).toFixed(0));
+  }
+
   const insights = {
     avgAmount:         Math.round(avgAmount),
+    avgAmount6m:       Math.round(avgAmount6m),
+    avgAmount12m:      Math.round(avgAmount12m),
     avgUnits:          Math.round(avgUnits),
+    avgUnits6m:        Math.round(avgUnits6m),
+    avgUnits12m:       Math.round(avgUnits12m),
     maxAmount,
     minAmount,
     maxUnits,
     minUnits,
     avgCostPerUnit:    Number(avgCostPerUnit.toFixed(2)),
     predictedNextBill,
+    predictedNextBillRange,
+    predictedNextUnits,
+    predictedNextUnitsRange,
+    predictedBasis,
+    maxAmountMonth,
+    minAmountMonth,
     unitSpike,
     amountSpike,
     vsLastMonth:       prevMonthBill
-      ? { amount: latest.billAmount - prevMonthBill.billAmount, units: latest.billedUnits - prevMonthBill.billedUnits }
+      ? {
+          amount:  latest.billAmount - prevMonthBill.billAmount,
+          amountPct: pct(latest.billAmount - prevMonthBill.billAmount, prevMonthBill.billAmount),
+          units:   latest.billedUnits - prevMonthBill.billedUnits,
+          unitsPct: pct(latest.billedUnits - prevMonthBill.billedUnits, prevMonthBill.billedUnits),
+        }
       : null,
     vsSameMonthLastYear: sameMonthLastYear
-      ? { amount: latest.billAmount - sameMonthLastYear.billAmount, units: latest.billedUnits - sameMonthLastYear.billedUnits }
+      ? {
+          amount:  latest.billAmount - sameMonthLastYear.billAmount,
+          amountPct: pct(latest.billAmount - sameMonthLastYear.billAmount, sameMonthLastYear.billAmount),
+          units:   latest.billedUnits - sameMonthLastYear.billedUnits,
+          unitsPct: pct(latest.billedUnits - sameMonthLastYear.billedUnits, sameMonthLastYear.billedUnits),
+        }
       : null,
   };
 
@@ -384,7 +464,7 @@ async function buildSnapshot(serviceNumber) {
     lastThreeAmounts: history,
 
     // Full 12-month bill history for charts and detail panel
-    billHistory:      billHistory12,
+    billHistory:      billHistory18,
 
     // Last 12 payment transactions
     paymentHistory:   paymentHistory12,

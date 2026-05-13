@@ -33,14 +33,19 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 // ── Trend badge ───────────────────────────────────────────────────────────────
-function TrendBadge({ value, unit = '' }) {
+function TrendBadge({ value, unit = '', percent = null }) {
   if (value == null) return null;
   const up = value > 0;
   const zero = value === 0;
+  const label = zero
+    ? 'Same'
+    : `${up ? '+' : ''}${unit === '₹' ? formatInr(Math.abs(value)) : `${Math.abs(value).toLocaleString('en-IN')} ${unit}`}`;
+  const pctLabel = percent != null ? ` (${percent > 0 ? '+' : ''}${percent.toFixed(0)}%)` : '';
+
   return (
     <span className={`trend-badge trend-badge--${zero ? 'neutral' : up ? 'up' : 'down'}`}>
       {zero ? '=' : up ? <FiTrendingUp size={11} /> : <FiTrendingDown size={11} />}
-      {zero ? 'Same' : `${up ? '+' : ''}${unit === '₹' ? formatInr(Math.abs(value)) : `${Math.abs(value).toLocaleString('en-IN')} ${unit}`}`}
+      {label}{pctLabel}
     </span>
   );
 }
@@ -72,20 +77,6 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
   return (
     <article className={`scard scard--${status.toLowerCase()}${detailOpen ? ' scard--expanded' : ''}`}>
-      {/* ── Alert banners ────────────────────────────────────── */}
-      {insights?.amountSpike && (
-        <div className="scard__alert scard__alert--warning">
-          <FiAlertTriangle size={13} />
-          Bill is 25%+ above recent average — possible spike
-        </div>
-      )}
-      {insights?.unitSpike && (
-        <div className="scard__alert scard__alert--info">
-          <FiZap size={13} />
-          Units consumed are unusually high this month
-        </div>
-      )}
-
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="scard__header">
         <div className="scard__title-col">
@@ -138,20 +129,38 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
             {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
           </strong>
           {status === 'DUE' && insights?.vsLastMonth && (
-            <div style={{ marginTop: 4 }}>
-              <TrendBadge value={insights.vsLastMonth.amount} unit="₹" />
+            <div style={{ display:'flex', gap: 5, marginTop: 4 }}>
+              <TrendBadge
+                value={insights.vsLastMonth.amount}
+                unit="₹"
+                percent={insights.vsLastMonth.amountPct}
+              />
               <span className="scard__vs-label"> vs last month</span>
             </div>
           )}
         </div>
         <div className="scard__amount-right">
           {dueCopy && <span className={`due-chip due-chip--${dueTone}`}>{dueCopy}</span>}
-          {insights?.predictedNextBill && (
+          {/* {insights?.predictedNextBill && (
             <div className="predict-chip">
               <FiActivity size={11} />
               Next ~{formatInr(insights.predictedNextBill)}
+              {insights.predictedNextBillRange && insights.predictedNextBillRange !== `${insights.predictedNextBill}` && (
+                <small>
+                  {' '}
+                  ({insights.predictedNextBillRange.split(' - ').map((value) => formatInr(Number(value))).join(' - ')})
+                </small>
+              )}
+              {insights.predictedNextUnits != null && (
+                <span>
+                  {' '}· {Number(insights.predictedNextUnits).toLocaleString('en-IN')}u
+                  {insights.predictedNextUnitsRange && insights.predictedNextUnitsRange !== `${insights.predictedNextUnits}` && (
+                    <small> ({insights.predictedNextUnitsRange})</small>
+                  )}
+                </span>
+              )}
             </div>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -170,7 +179,11 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           <dd>
             {service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')}
             {insights?.vsLastMonth?.units != null && (
-              <TrendBadge value={insights.vsLastMonth.units} unit="u" />
+              <TrendBadge
+                value={insights.vsLastMonth.units}
+                unit="u"
+                percent={insights.vsLastMonth.unitsPct}
+              />
             )}
           </dd>
         </div>
@@ -188,17 +201,22 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
             <strong>{formatInr(insights.avgAmount)}</strong>
           </div>
           <div className="insight-chip">
-            <span className="insight-chip__label">₹/unit</span>
-            <strong>{insights.avgCostPerUnit}</strong>
-          </div>
-          <div className="insight-chip">
             <span className="insight-chip__label">Avg units</span>
-            <strong>{insights.avgUnits.toLocaleString('en-IN')}</strong>
+            <strong>
+              {insights.avgUnits6m != null ? `${insights.avgUnits6m.toLocaleString('en-IN')}u - 6m` : '—'}
+            </strong>
+            <strong>
+              {insights.avgUnits12m != null ? `${insights.avgUnits12m.toLocaleString('en-IN')}u - 12m` : ''}
+            </strong>
           </div>
           {insights.vsSameMonthLastYear && (
             <div className="insight-chip">
               <span className="insight-chip__label">vs last yr</span>
-              <TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" />
+              <TrendBadge
+                value={insights.vsSameMonthLastYear.amount}
+                unit="₹"
+                percent={insights.vsSameMonthLastYear.amountPct}
+              />
             </div>
           )}
         </div>
@@ -211,19 +229,24 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
       {/* ── History strip ────────────────────────────────────── */}
       {Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
-        <div className="scard__history">
-          {service.lastThreeAmounts.map((b) => (
-            <span key={`${b.billDate}-${b.billAmount}`}>
-              <span className="history-date">
-                {formatDate(b.paidDate || b.billDate)}
+        <>
+          <div className="scard__history-label">Last 3 months payments</div>
+          <div className="scard__history">
+            {service.lastThreeAmounts.map((b) => (
+              <span key={`${b.billDate}-${b.billAmount}`}>
+                <span className="history-date">
+                  {formatDate(b.paidDate || b.billDate)}
+                </span>
+                <div>
+                  <b>{formatInr(b.billAmount)}</b>
+                  {b.billedUnits != null && (
+                    <small> ({Number(b.billedUnits).toLocaleString('en-IN')}u)</small>
+                  )}
+                </div>
               </span>
-              <b>{formatInr(b.billAmount)}</b>
-              {b.billedUnits != null && (
-                <small> · {Number(b.billedUnits).toLocaleString('en-IN')}u</small>
-              )}
-            </span>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* ── Error ────────────────────────────────────────────── */}
@@ -243,7 +266,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           {hasDetail && (
             <button className="btn btn--ghost btn--sm" onClick={() => setDetailOpen(v => !v)}>
               {detailOpen ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-              {detailOpen ? 'Less' : 'Details'}
+              {detailOpen ? 'Insights' : 'Insights'}
             </button>
           )}
           {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
@@ -272,7 +295,6 @@ function DetailPanel({ service, tab, onTabChange }) {
   const tabs = [
     { id: 'charts',   label: 'Trends',   show: !!service.trendData?.length },
     { id: 'payments', label: 'Payments', show: !!service.paymentHistory?.length },
-    { id: 'breakup',  label: 'Breakup',  show: !!service.billBreakup },
   ].filter(t => t.show);
 
   return (
@@ -300,10 +322,6 @@ function DetailPanel({ service, tab, onTabChange }) {
         <PaymentHistoryPanel payments={service.paymentHistory} />
       )}
 
-      {/* Bill breakup tab */}
-      {tab === 'breakup' && service.billBreakup && (
-        <BreakupDetailPanel breakup={service.billBreakup} />
-      )}
     </div>
   );
 }
@@ -329,7 +347,7 @@ function ChartsPanel({ data, insights }) {
   return (
     <div className="charts-panel">
       <div className="charts-panel__header">
-        <span className="detail__section-title">12-Month Trend</span>
+        <span className="detail__section-title">18-Month Trend</span>
         <div className="seg seg--sm">
           {[
             { id: 'amount', label: 'Amount' },
@@ -348,9 +366,8 @@ function ChartsPanel({ data, insights }) {
       </div>
 
       <div className="chart-wrap">
-        {(view === 'amount' || view === 'combo') && (
+        {view === 'amount' && (
           <div className="chart-block">
-            {view === 'combo' && <p className="chart-block__title">Bill Amount (₹)</p>}
             <ResponsiveContainer width="100%" height={160}>
               <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} />
@@ -365,19 +382,56 @@ function ChartsPanel({ data, insights }) {
           </div>
         )}
 
-        {(view === 'units' || view === 'combo') && (
+        {view === 'units' && (
           <div className="chart-block">
-            {view === 'combo' && <p className="chart-block__title">Units Consumed</p>}
             <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+              <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} />
                 <YAxis tickFormatter={fmtU} tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={44} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="billedUnits" name="Units" fill="var(--info)" radius={[3,3,0,0]} maxBarSize={28} />
+                <Line type="monotone" dataKey="billedUnits" name="Units" stroke="var(--info)" strokeWidth={2} dot={{ r: 3, fill: 'var(--info)' }} />
                 {insights?.avgUnits && (
                   <ReferenceLine y={insights.avgUnits} stroke="var(--text-3)" strokeDasharray="4 3" label={{ value: 'avg', fontSize: 9, fill: 'var(--text-3)', position: 'insideTopRight' }} />
                 )}
-              </BarChart>
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {view === 'combo' && (
+          <div className="chart-block" style={{ width: '100%' }}>
+            <p className="chart-block__title">Amount + Units trend</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={chartData} margin={{ top: 4, right: 40, left: -16, bottom: 0 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} />
+                <YAxis
+                  yAxisId="left"
+                  tickFormatter={fmt}
+                  tick={{ fontSize: 10, fill: 'var(--text-3)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={44}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={fmtU}
+                  tick={{ fontSize: 10, fill: 'var(--text-3)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={44}
+                />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 4 }} />
+                <Area type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--accent)" fill="var(--accent-dim)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent)' }} />
+                <Line yAxisId="right" type="monotone" dataKey="billedUnits" name="Units" stroke="var(--info)" strokeWidth={2} dot={{ r: 3, fill: 'var(--info)' }} />
+                {insights?.avgAmount && (
+                  <ReferenceLine y={insights.avgAmount} yAxisId="left" stroke="var(--text-3)" strokeDasharray="4 3" label={{ value: 'avg', fontSize: 9, fill: 'var(--text-3)', position: 'insideTopRight' }} />
+                )}
+                {insights?.avgUnits && (
+                  <ReferenceLine y={insights.avgUnits} yAxisId="right" stroke="var(--text-3)" strokeDasharray="4 3" label={{ value: 'avg', fontSize: 9, fill: 'var(--text-3)', position: 'insideTopRight' }} />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}
@@ -386,13 +440,25 @@ function ChartsPanel({ data, insights }) {
       {/* Insight cards */}
       {insights && (
         <div className="insight-grid">
-          <InsightCard label="Avg monthly bill" value={formatInr(insights.avgAmount)} />
-          <InsightCard label="Highest this year" value={formatInr(insights.maxAmount)} tone="danger" />
-          <InsightCard label="Lowest this year"  value={formatInr(insights.minAmount)} tone="success" />
-          <InsightCard label="Avg cost/unit"     value={`₹${insights.avgCostPerUnit}`} />
-          <InsightCard label="Avg units/month"   value={`${insights.avgUnits.toLocaleString('en-IN')} u`} />
+          <InsightCard
+            label="Highest bill"
+            value={formatInr(insights.maxAmount)}
+            meta={formatMonthYear(insights.maxAmountMonth)}
+            tone="danger"
+          />
+          <InsightCard
+            label="Lowest bill"
+            value={formatInr(insights.minAmount)}
+            meta={formatMonthYear(insights.minAmountMonth)}
+            tone="success"
+          />
           {insights.predictedNextBill && (
-            <InsightCard label="Predicted next bill" value={formatInr(insights.predictedNextBill)} tone="info" />
+            <InsightCard
+              label="Predicted next bill"
+              value={formatInr(insights.predictedNextBill)}
+              meta={insights.predictedBasis}
+              tone="info"
+            />
           )}
         </div>
       )}
@@ -400,13 +466,21 @@ function ChartsPanel({ data, insights }) {
   );
 }
 
-function InsightCard({ label, value, tone = 'neutral' }) {
+function InsightCard({ label, value, meta, tone = 'neutral' }) {
   return (
     <div className={`insight-card insight-card--${tone}`}>
       <span className="insight-card__label">{label}</span>
       <strong className="insight-card__value">{value}</strong>
+      {meta && <span className="insight-card__meta">({meta})</span>}
     </div>
   );
+}
+
+function formatMonthYear(month) {
+  if (!month) return null;
+  const [year, mon] = month.split('-');
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${MONTHS[Number(mon) - 1]}-${year}`;
 }
 
 // ── Payment History Panel ─────────────────────────────────────────────────────
