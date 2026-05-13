@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { FiGrid, FiZap } from 'react-icons/fi';
+import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 
 const NAV = [
-  { id: 'electricity', label: 'Electricity', icon: <FiZap size={18} /> },
-  // Future dashboards go here
+  { id: 'electricity', label: 'Electricity', icon: FiZap },
+  { id: 'home',        label: 'Overview',    icon: FiGrid },
+  { id: 'settings',   label: 'Settings',    icon: FiSettings },
 ];
 
 export function App() {
@@ -13,46 +14,69 @@ export function App() {
 
   return (
     <div className="shell">
-      {/* ── Sidebar ───────────────────────────────────────── */}
+      {/* Desktop sidebar */}
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <FiGrid size={20} />
-          <span>My Dashboard</span>
+          <div className="sidebar__logo"><FiGrid size={16} /></div>
+          <span>MyDashboard</span>
         </div>
-
         <nav className="sidebar__nav">
-          {NAV.map((item) => (
+          {NAV.map(({ id, label, icon: Icon }) => (
             <button
-              key={item.id}
-              className={`sidebar__item ${activePage === item.id ? 'sidebar__item--active' : ''}`}
-              onClick={() => setActivePage(item.id)}
+              key={id}
+              className={`sidebar__item ${activePage === id ? 'sidebar__item--active' : ''}`}
+              onClick={() => setActivePage(id)}
             >
-              {item.icon}
-              {item.label}
+              <Icon size={17} />
+              {label}
             </button>
           ))}
         </nav>
-
-        <div className="sidebar__footer">
-          <span className="sidebar__version">v1.0.0</span>
-        </div>
+        <div className="sidebar__footer">v1.0.0</div>
       </aside>
 
-      {/* ── Main content ──────────────────────────────────── */}
+      {/* Main */}
       <main className="main">
         {activePage === 'electricity' && <ElectricityDashboard />}
+        {activePage === 'home' && (
+          <div className="page coming-soon">
+            <h2>Overview</h2><p>Coming soon</p>
+          </div>
+        )}
+        {activePage === 'settings' && (
+          <div className="page coming-soon">
+            <h2>Settings</h2><p>Coming soon</p>
+          </div>
+        )}
       </main>
 
+      {/* Mobile bottom nav */}
+      <nav className="bottom-nav">
+        {NAV.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={`bottom-nav__item ${activePage === id ? 'bottom-nav__item--active' : ''}`}
+            onClick={() => setActivePage(id)}
+          >
+            <Icon size={20} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+
       <Toaster
-        position="bottom-right"
+        position="top-center"
         toastOptions={{
+          duration: 3000,
           style: {
-            background: 'var(--surface)',
-            color: 'var(--text)',
+            background: 'var(--surface-2)',
+            color: 'var(--text-1)',
             border: '1px solid var(--border)',
-            borderRadius: '10px',
+            borderRadius: '12px',
             fontSize: '13px',
             fontWeight: '500',
+            fontFamily: 'var(--font)',
+            boxShadow: 'var(--shadow-lg)',
           },
         }}
       />
