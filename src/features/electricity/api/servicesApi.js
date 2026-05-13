@@ -1,112 +1,205 @@
-import { db } from '../../../shared/db/storage.js';
-import { fetchApspdclSnapshot, validateServiceNumber } from './apspdclClient.js';
-
 /**
- * Local API Service Layer
- * This acts as the application's backend API layer, providing customized
- * responses instead of raw APSPDCL payloads.
- * 
- * Equivalent REST Endpoints mapped to these functions:
- * - GET  /api/services            => listAllServices
- * - GET  /api/services/trash      => listTrashServices
- * - POST /api/services            => addService
- * - POST /api/services/:id/refresh => refreshService
- * - POST /api/services/refresh-all => refreshAllServices
- * - PUT  /api/services/:id        => updateService
- * - DELETE /api/services/:id      => moveToTrash
+ * Services API — frontend HTTP client
+ *
+ * All calls go to our own local API server (server/index.js).
+ * The server handles APSPDCL internally — raw APSPDCL URLs never appear here.
+ *
+ * REST contract (matches server/index.js routes exactly):
+ *
+ *   POST /api/services/validate            → validate + get initial snapshot
+ *   POST /api/services/:sn/refresh         → refresh one service
+ *   POST /api/services/refresh-all         → refresh many services (body: serviceNumbers[])
+ *
+ * Persistence (list / trash / CRUD) is local-only via storage.js.
+ * The server has no database — it is a pure processing proxy.
  */
 
-// GET /api/services
-export async function listAllServices() {
-  return await db.getAll();
+import { db } from '../../../shared/db/storage.js';
+
+// ── HTTP base ─────────────────────────────────────────────────────────────────
+
+/**
+ * In dev:  Vite proxies /api/* → http://localhost:4100/api/*
+ * On Android: set VITE_API_URL to your LAN server, e.g. http://192.168.1.10:4100/api
+ */
+function apiBase() {
+  const env = import.meta.env?.VITE_API_URL;
+  if (env && !env.includes('127.0.0.1:5173') && !env.includes('localhost:5173')) return env.replace(/\/$/, '');
+  return '/api';
 }
 
-// GET /api/services/trash
-export async function listTrashServices() {
-  return await db.getTrash();
+async function apiPost(path, body) {
+  const res = await fetch(`${apiBase()}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.ok) throw new Error(json.error || `API error ${res.status}`);
+  return json;
 }
 
-// POST /api/services
-export async function addService(payload) {
-  const { serviceNumber, label } = payload;
-  
-  // Validate with APSPDCL
-  const valid = await validateServiceNumber(serviceNumber);
-  if (!valid) throw new Error('Invalid APSPDCL service number');
+// ── Snapshot → DB patch mapper ────────────────────────────────────────────────
 
-  const existing = await db.getByNumber(serviceNumber);
-  if (existing && !existing.isDeleted) {
-    throw new Error('Service number already exists');
+function snapshotToPatch(snapshot) {
+  return {
+    customerName:     snapshot.customerName,
+    lastBillDate:     snapshot.billDate,
+    lastDueDate:      snapshot.dueDate,
+    lastAmountDue:    snapshot.amountDue,
+    lastBilledUnits:  snapshot.billedUnits,
+    lastThreeAmounts: snapshot.lastThreeAmounts,
+    lastStatus:       snapshot.status,
+    lastFetchedAt:    snapshot.fetchedAt || new Date().toISOString(),
+    isPaid:           snapshot.isPaid,
+    paidDate:         snapshot.paidDate,
+    receiptNumber:    snapshot.receiptNumber,
+    paidAmount:       snapshot.paidAmount,
+    billBreakup:      snapshot.billBreakup,
+    lastError:        null,
+  };
+}
+
+// ── Concurrency queue ─────────────────────────────────────────────────────────
+
+async function runWithConcurrency(tasks, limit) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++;
+      try { results[i] = { status: 'fulfilled', value: await tasks[i]() }; }
+      catch (reason) { results[i] = { status: 'rejected', reason }; }
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
+}
+
+// ── API functions ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /services  (local DB only)
+ */
+export async function listServices() {
+  return db.getAll();
+}
+
+/**
+ * GET /services/trash  (local DB only)
+ */
+export async function listTrash() {
+  return db.getTrash();
+}
+
+/**
+ * POST /services
+ *
+ * Calls POST /api/services/validate (→ server makes 2 APSPDCL calls).
+ * On success, persists to local DB and applies the snapshot immediately.
+ * No second refresh needed.
+ */
+export async function createService({ serviceNumber, label }) {
+  const existing = await db.getByNumber(serviceNumber);
+  if (existing && !existing.isDeleted) throw new Error('This service number is already added');
+
+  // One server call = validation + initial data fetch combined
+  const { snapshot } = await apiPost('/services/validate', { serviceNumber });
 
   const service = await db.create({ serviceNumber, label });
-  return service;
+  return db.update(service.id, { ...snapshotToPatch(snapshot), lastError: null });
 }
 
-// POST /api/services/:id/refresh
+/**
+ * POST /services/:id/refresh
+ *
+ * Calls POST /api/services/:serviceNumber/refresh (→ server makes 2 APSPDCL calls).
+ * Updates local DB on success, records error on failure.
+ */
 export async function refreshService(id) {
   const service = await db.getById(id);
-  if (!service) throw new Error('Service not found');
+  if (!service) throw new Error(`Service ${id} not found`);
 
-  const snapshot = await fetchApspdclSnapshot(service.serviceNumber);
-  
-  // Update local DB with the customized snapshot response
-  await db.update(id, {
-    customerName: snapshot.customerName,
-    lastBillDate: snapshot.billDate,
-    lastDueDate: snapshot.dueDate,
-    lastAmountDue: snapshot.amountDue,
-    lastBilledUnits: snapshot.billedUnits,
-    lastThreeAmounts: snapshot.lastThreeAmounts,
-    lastStatus: snapshot.status,
-    lastFetchedAt: new Date().toISOString(),
-    isPaid: snapshot.isPaid,
-    paidDate: snapshot.paidDate,
-    receiptNumber: snapshot.receiptNumber,
-    paidAmount: snapshot.paidAmount,
-    billBreakup: snapshot.billBreakup,
-    lastError: null,
+  try {
+    const { snapshot } = await apiPost(`/services/${service.serviceNumber}/refresh`, {});
+    return db.update(id, snapshotToPatch(snapshot));
+  } catch (err) {
+    await db.update(id, { lastError: err.message || 'Refresh failed', lastFetchedAt: new Date().toISOString() });
+    throw err;
+  }
+}
+
+/**
+ * POST /services/refresh-all
+ *
+ * Sends all service numbers to POST /api/services/refresh-all in one request.
+ * Server processes them sequentially. Client updates local DB from results.
+ *
+ * @param {(done:number, total:number)=>void} onProgress
+ * @returns {{ succeeded:number, failed:number, errors:string[] }}
+ */
+export async function refreshAllServices(onProgress) {
+  const services = await db.getAll();
+  if (!services.length) return { succeeded: 0, failed: 0, errors: [] };
+
+  const serviceNumbers = services.map(s => s.serviceNumber);
+
+  // One API call to the server — server fans out to APSPDCL sequentially
+  const json = await apiPost('/services/refresh-all', { serviceNumbers });
+  const { results } = json;
+
+  // Apply each result to local DB
+  let done = 0;
+  const tasks = results.map(result => async () => {
+    const service = services.find(s => s.serviceNumber === result.serviceNumber);
+    if (!service) return;
+
+    if (result.ok && result.snapshot) {
+      await db.update(service.id, snapshotToPatch(result.snapshot));
+    } else {
+      await db.update(service.id, {
+        lastError: result.error || 'Refresh failed',
+        lastFetchedAt: new Date().toISOString(),
+      });
+    }
+    done++;
+    onProgress?.(done, results.length);
   });
 
-  return await db.getById(id);
+  // Apply DB updates with some concurrency (DB writes, not APSPDCL calls)
+  await runWithConcurrency(tasks, 4);
+
+  const errors = results.filter(r => !r.ok).map(r => r.error || 'Unknown error');
+  return { succeeded: json.succeeded, failed: json.failed, errors };
 }
 
-// POST /api/services/refresh-all
-export async function refreshAllServices() {
-  const services = await db.getAll();
-  const results = await Promise.allSettled(
-    services.map((s) => refreshService(s.id))
-  );
-  
-  const failed = results.filter((r) => r.status === 'rejected').length;
-  if (failed > 0) {
-    throw new Error(`${failed} service(s) failed to refresh`);
-  }
-  return await db.getAll();
-}
-
-// PUT /api/services/:id
+/**
+ * PUT /services/:id  (local DB only)
+ */
 export async function updateService(id, patch) {
   if (patch.pinned !== undefined) {
-    patch = {
-      ...patch,
-      pinnedAt: patch.pinned ? new Date().toISOString() : null,
-    };
+    patch = { ...patch, pinnedAt: patch.pinned ? new Date().toISOString() : null };
   }
-  return await db.update(id, patch);
+  return db.update(id, patch);
 }
 
-// DELETE /api/services/:id
+/**
+ * PUT /services/:id/restore  (local DB only)
+ */
+export async function restoreService(id) {
+  return db.update(id, { isDeleted: false, deletedAt: null });
+}
+
+/**
+ * DELETE /services/:id  (local DB only, soft delete)
+ */
 export async function moveToTrash(id) {
   await db.delete(id, false);
 }
 
-// POST /api/services/:id/restore
-export async function restoreService(id) {
-  return await db.update(id, { isDeleted: false, deletedAt: null });
-}
-
-// DELETE /api/services/:id/permanent
+/**
+ * DELETE /services/:id/permanent  (local DB only, hard delete)
+ */
 export async function deletePermanently(id) {
   await db.delete(id, true);
 }

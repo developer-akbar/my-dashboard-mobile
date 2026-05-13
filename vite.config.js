@@ -7,11 +7,11 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api/apspdcl': {
-        target: 'https://apspdcl.in',
+      // All /api/* calls → our local API server
+      // APSPDCL endpoints never appear in browser DevTools
+      '/api': {
+        target: 'http://localhost:4200',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/apspdcl/, '/ConsumerDashboard/public'),
-        secure: false,
       }
     }
   },

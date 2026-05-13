@@ -13,50 +13,63 @@ export function ElectricityDashboard() {
   const { services, trash, loading, refreshingIds, actions } =
     useElectricityServices();
 
-  const [filters, setFilters] = useState({
-    query: '',
-    status: '',
-    sort: 'amount',
-  });
+  const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [activeView, setActiveView] = useState('active');
   const [dialog, setDialog] = useState({ open: false, service: null });
   const [refreshingAll, setRefreshingAll] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(null); // { done, total }
 
-  const visible = useMemo(
-    () => filterServices(services, filters),
-    [services, filters]
-  );
+  const visible = useMemo(() => filterServices(services, filters), [services, filters]);
 
+  // ── Submit dialog (add or edit) ─────────────────────────────────────────────
   async function submitService(payload) {
-    try {
-      if (dialog.service) {
-        await toast.promise(actions.update(dialog.service.id, payload), {
+    if (dialog.service) {
+      // Edit: only label / metadata — no APSPDCL call
+      await toast.promise(
+        actions.update(dialog.service.id, { label: payload.label }),
+        {
           loading: 'Saving…',
           success: 'Service updated',
           error: (e) => e?.message || 'Update failed',
-        });
-      } else {
-        await toast.promise(actions.create(payload), {
-          loading: 'Adding service and fetching bill…',
+        }
+      );
+    } else {
+      // Add: validate + fetch in one shot
+      await toast.promise(
+        actions.add(payload),
+        {
+          loading: 'Validating and fetching bill data…',
           success: 'Service added',
           error: (e) => e?.message || 'Add failed',
-        });
-      }
-      setDialog({ open: false, service: null });
-    } catch {
-      // error shown by toast
+        }
+      );
     }
+    setDialog({ open: false, service: null });
   }
 
-  async function refreshAll() {
+  // ── Refresh all ─────────────────────────────────────────────────────────────
+  async function handleRefreshAll() {
+    const total = services.length;
+    if (!total) return;
+
     setRefreshingAll(true);
+    setRefreshProgress({ done: 0, total });
+
     try {
-      await actions.refreshAll();
-      toast.success('All services refreshed');
-    } catch {
-      // errors shown per-service
+      const summary = await actions.refreshAll((done, t) => {
+        setRefreshProgress({ done, total: t });
+      });
+
+      if (summary.failed === 0) {
+        toast.success(`All ${summary.succeeded} service(s) refreshed`);
+      } else {
+        toast.error(`${summary.failed} service(s) failed to refresh`);
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Refresh all failed');
     } finally {
       setRefreshingAll(false);
+      setRefreshProgress(null);
     }
   }
 
@@ -65,11 +78,16 @@ export function ElectricityDashboard() {
       {/* ── Page header ─────────────────────────────────── */}
       <header className="page__header">
         <div>
-          <p className="eyebrow">
-            <FiZap size={13} /> APSPDCL
-          </p>
+          <p className="eyebrow"><FiZap size={13} /> APSPDCL</p>
           <h1>Electricity</h1>
         </div>
+        {/* Refresh-all progress badge */}
+        {refreshProgress && (
+          <div className="refresh-progress">
+            <FiRefreshCw size={13} className="spin" />
+            {refreshProgress.done} / {refreshProgress.total}
+          </div>
+        )}
       </header>
 
       {/* ── Summary ─────────────────────────────────────── */}
@@ -80,14 +98,14 @@ export function ElectricityDashboard() {
         filters={filters}
         onFiltersChange={setFilters}
         onAdd={() => setDialog({ open: true, service: null })}
-        onRefreshAll={refreshAll}
+        onRefreshAll={handleRefreshAll}
         refreshingAll={refreshingAll}
         activeView={activeView}
         onViewChange={setActiveView}
         trashCount={trash.length}
       />
 
-      {/* ── Content ─────────────────────────────────────── */}
+      {/* ── Active services ──────────────────────────────── */}
       {activeView === 'active' && (
         <>
           {loading ? (
@@ -116,7 +134,7 @@ export function ElectricityDashboard() {
                   service={s}
                   refreshing={refreshingIds.has(s.id)}
                   onRefresh={() =>
-                    toast.promise(actions.refreshOne(s.id), {
+                    toast.promise(actions.refresh(s.id), {
                       loading: 'Refreshing…',
                       success: 'Bill refreshed',
                       error: (e) => e?.message || 'Refresh failed',
@@ -127,12 +145,10 @@ export function ElectricityDashboard() {
                     toast.promise(actions.remove(s.id), {
                       loading: 'Moving to trash…',
                       success: 'Moved to trash',
-                      error: 'Delete failed',
+                      error: (e) => e?.message || 'Delete failed',
                     })
                   }
-                  onTogglePin={() =>
-                    actions.update(s.id, { pinned: !s.pinned })
-                  }
+                  onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
                 />
               ))}
             </div>
@@ -140,21 +156,22 @@ export function ElectricityDashboard() {
         </>
       )}
 
+      {/* ── Trash ───────────────────────────────────────── */}
       {activeView === 'trash' && (
         <TrashView
           services={trash}
           onRestore={(id) =>
             toast.promise(actions.restore(id), {
               loading: 'Restoring…',
-              success: 'Restored',
-              error: 'Restore failed',
+              success: 'Service restored',
+              error: (e) => e?.message || 'Restore failed',
             })
           }
           onDeletePermanent={(id) =>
-            toast.promise(actions.remove(id, true), {
-              loading: 'Deleting…',
+            toast.promise(actions.purge(id), {
+              loading: 'Deleting permanently…',
               success: 'Deleted permanently',
-              error: 'Delete failed',
+              error: (e) => e?.message || 'Delete failed',
             })
           }
         />

@@ -170,7 +170,26 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 28px;
+}
+
+.refresh-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  margin-top: 10px;
 }
 
 .eyebrow {

@@ -137,12 +137,18 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       {Array.isArray(service.lastThreeAmounts) &&
         service.lastThreeAmounts.length > 0 && (
           <div className="scard__history">
-            {service.lastThreeAmounts.map((b) => (
-              <span key={`${b.closingDate}-${b.billAmount}`}>
-                {formatDate(b.closingDate)}&nbsp;
-                <b>{formatInr(b.billAmount)}</b>
-              </span>
-            ))}
+            {service.lastThreeAmounts.map((b) => {
+              const billedUnits = b.billedUnits ?? b.units ?? null;
+              return (
+                <span key={`${b.closingDate}-${b.billAmount}`}>
+                  {formatDate(b.closingDate)}&nbsp;
+                  <b>{formatInr(b.billAmount)}</b>
+                  {billedUnits != null && (
+                    <small> ({Number(billedUnits).toLocaleString('en-IN')} units)</small>
+                  )}
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -192,7 +198,7 @@ function BillBreakup({ breakup }) {
       >
         <span>Bill breakup</span>
         <span className="breakup__toggle-right">
-          <strong>{formatInr(breakup.totalBill || breakup.grossTotal || 0)}</strong>
+          <strong>{formatInr(breakup.totalBill || 0)}</strong>
           <FiChevronDown size={15} className="chevron" />
         </span>
       </button>
@@ -228,7 +234,7 @@ function BillBreakup({ breakup }) {
 
           <div className="breakup__row breakup__row--net">
             <span>Total Amount Due</span>
-            <b>{formatInr(breakup.totalBill || 0)}</b>
+            <b>{formatInr(breakup.totalBill || breakup.netDue || 0)}</b>
           </div>
         </div>
       )}
