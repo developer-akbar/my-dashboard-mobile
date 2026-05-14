@@ -91,9 +91,9 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
         <div className="scard__topbar-info">
           <h3 className="scard__name">{service.label || 'Untitled'}</h3>
-          {service.customerName && service.customerName !== service.label && (
-            <p className="scard__customer">{service.customerName}</p>
-          )}
+          <p className="scard__customer">
+            {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || 'Untitled')}
+          </p>
           <button className="scard__num" onClick={copyNum}>
             <FiCopy size={10} />{service.serviceNumber}
           </button>

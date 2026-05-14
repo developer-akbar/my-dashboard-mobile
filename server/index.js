@@ -233,17 +233,21 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
     currentTotal += p.amount;
     currentPaidDate = p.date;
     currentReceiptNo = p.receiptNo;
-    if (currentTotal >= billAmount) {
-      return {
-        isPaid: true,
-        paidDate: p.date,
-        receiptNumber: p.receiptNo,
-        paidAmount: currentTotal,
-        currentPaymentTotal: currentTotal,
-        arrears: [],
-        arrearsTotal: 0,
-      };
-    }
+  }
+
+  // If there are any payments after the bill closes, we consider it paid.
+  // This handles cases where the paid amount is slightly less than the bill amount due to ISD adjustments
+  // (e.g. paid 2139 for a 2174 bill) and the BillDesk API is unavailable to provide the exact demand.
+  if (currentTotal > 0) {
+    return {
+      isPaid: true,
+      paidDate: currentPaidDate,
+      receiptNumber: currentReceiptNo,
+      paidAmount: currentTotal,
+      currentPaymentTotal: currentTotal,
+      arrears: [],
+      arrearsTotal: 0,
+    };
   }
 
   // ── Current bill not paid. Find arrears (advance payments for current bill). ──
@@ -291,8 +295,8 @@ function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 
   const grossTotal = toNum(bill.ec) + toNum(bill.fixchg) + toNum(bill.cc) + toNum(bill.ed) + toNum(bill.fsa);
   const roundedGrossTotal = Math.round(grossTotal);
 
-  // Net Due = Gross Total - Arrears - isdAmount
-  const netDue = Math.max(0, roundedGrossTotal - arrearsTotal - isdAmount);
+  // Net Due = Gross Total - Arrears + isdAmount
+  const netDue = Math.max(0, roundedGrossTotal - arrearsTotal + isdAmount);
 
   return {
     ec:      bill.ec,
@@ -384,8 +388,9 @@ async function buildSnapshot(serviceNumber) {
   const grossTotal = toNum(latest.ec) + toNum(latest.fixchg) + toNum(latest.cc) + toNum(latest.ed) + toNum(latest.fsa);
   const roundedGrossTotal = Math.round(grossTotal);
 
-  // isdAmount = Gross Total - Arrears - BillDeskAmount
-  const isdAmount = billDeskAmount != null ? Math.max(0, roundedGrossTotal - pay.arrearsTotal - billDeskAmount) : 0;
+  // isdAmount = Original Bill Amount - (Gross Total - Arrears)
+  const originalBillAmountForIsd = billDeskAmount ?? latest.billAmount;
+  const isdAmount = originalBillAmountForIsd != null ? originalBillAmountForIsd - (roundedGrossTotal - pay.arrearsTotal) : 0;
 
   const breakup = buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount);
   const amountDue = status === 'DUE' ? (breakup?.netDue ?? finalDueAmount) : 0;
