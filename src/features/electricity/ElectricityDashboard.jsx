@@ -8,12 +8,14 @@ import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
+import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 
 export function ElectricityDashboard() {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [activeView, setActiveView] = useState('active');
   const [dialog, setDialog] = useState({ open: false, service: null });
+  const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', isDanger: false, onConfirm: () => {} });
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
 
@@ -25,6 +27,27 @@ export function ElectricityDashboard() {
         loading: 'Saving…', success: 'Updated', error: e => e?.message || 'Failed',
       });
     } else {
+      const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
+      if (inTrash) {
+        setConfirmState({
+          open: true,
+          title: 'Restore from Trash?',
+          description: 'This service is currently in the Trash.\n\nWould you like to restore it instead of adding a new one?',
+          isDanger: false,
+          onConfirm: async () => {
+            await toast.promise(actions.restore(inTrash.id), { loading: 'Restoring…', success: 'Restored', error: 'Failed' });
+            setDialog({ open: false, service: null });
+          }
+        });
+        return;
+      }
+      
+      const inActive = services.find(s => s.serviceNumber === payload.serviceNumber);
+      if (inActive) {
+        toast.error('Service number already exists in your active list.');
+        return;
+      }
+
       await toast.promise(actions.add(payload), {
         loading: 'Validating and fetching bill…', success: 'Service added', error: e => e?.message || 'Failed',
       });
@@ -104,7 +127,15 @@ export function ElectricityDashboard() {
                   refreshing={refreshingIds.has(s.id)}
                   onRefresh={() => toast.promise(actions.refresh(s.id), { loading: 'Refreshing…', success: 'Refreshed', error: e => e?.message || 'Failed' })}
                   onEdit={() => setDialog({ open: true, service: s })}
-                  onDelete={() => toast.promise(actions.remove(s.id), { loading: 'Moving to trash…', success: 'Moved to trash', error: e => e?.message || 'Failed' })}
+                  onDelete={() => {
+                    setConfirmState({
+                      open: true,
+                      title: 'Move to Trash?',
+                      description: 'This service will be moved to the Trash.\nYou can restore it later from the Trash section.',
+                      isDanger: true,
+                      onConfirm: () => toast.promise(actions.remove(s.id), { loading: 'Moving to trash…', success: 'Moved to trash', error: e => e?.message || 'Failed' })
+                    });
+                  }}
                   onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
                 />
               ))}
@@ -117,7 +148,15 @@ export function ElectricityDashboard() {
         <TrashView
           services={trash}
           onRestore={id => toast.promise(actions.restore(id), { loading: 'Restoring…', success: 'Restored', error: 'Failed' })}
-          onDeletePermanent={id => toast.promise(actions.purge(id), { loading: 'Deleting…', success: 'Deleted permanently', error: 'Failed' })}
+          onDeletePermanent={id => {
+            setConfirmState({
+              open: true,
+              title: 'Delete permanently?',
+              description: 'This action cannot be undone and all history will be lost.',
+              isDanger: true,
+              onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: 'Deleted permanently', error: 'Failed' })
+            });
+          }}
         />
       )}
 
@@ -126,6 +165,15 @@ export function ElectricityDashboard() {
         service={dialog.service}
         onClose={() => setDialog({ open: false, service: null })}
         onSubmit={submitService}
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        description={confirmState.description}
+        isDanger={confirmState.isDanger}
+        onClose={() => setConfirmState(prev => ({ ...prev, open: false }))}
+        onConfirm={confirmState.onConfirm}
       />
     </div>
   );

@@ -408,6 +408,7 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 14px;
+  align-items: start;
 }
 
 /* ── Service Card ───────────────────────────────────────────────────────────── */
@@ -804,6 +805,31 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   backdrop-filter: blur(4px);
   padding: 0;
 }
+
+.overlay--center {
+  padding: 20px;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+  animation: scaleUp 0.2s cubic-bezier(0.16,1,0.3,1);
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.dialog__title { font-size: 17px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
+.dialog__desc { font-size: 13.5px; color: var(--text-2); margin-bottom: 24px; white-space: pre-wrap; }
+.dialog__footer { display: flex; gap: 8px; justify-content: flex-end; }
 
 .sheet {
   width: 100%;
