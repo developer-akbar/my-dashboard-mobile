@@ -22,13 +22,13 @@ import { db } from '../../../shared/db/storage.js';
  * In dev:  Vite proxies /api/* → http://localhost:4100/api/*
  * On Android: set VITE_API_URL to your LAN server, e.g. http://192.168.1.10:4100/api
  */
-function apiBase() {
+export function apiBase() {
   const env = import.meta.env?.VITE_API_URL;
   if (env && !env.includes('127.0.0.1:5173') && !env.includes('localhost:5173')) return env.replace(/\/$/, '');
   return '/api';
 }
 
-async function apiPost(path, body) {
+export async function apiPost(path, body) {
   const res = await fetch(`${apiBase()}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -126,12 +126,12 @@ export async function listTrash() {
  * On success, persists to local DB and applies the snapshot immediately.
  * No second refresh needed.
  */
-export async function createService({ serviceNumber, label }) {
+export async function createService({ serviceNumber, label }, billdeskSession) {
   const existing = await db.getByNumber(serviceNumber);
   if (existing && !existing.isDeleted) throw new Error('This service number is already added');
 
   // One server call = validation + initial data fetch combined
-  const { snapshot } = await apiPost('/services/validate', { serviceNumber });
+  const { snapshot } = await apiPost('/services/validate', { serviceNumber, billdeskSession });
 
   const service = await db.create({ serviceNumber, label });
   return db.update(service.id, { ...snapshotToPatch(snapshot), lastError: null });
@@ -143,12 +143,12 @@ export async function createService({ serviceNumber, label }) {
  * Calls POST /api/services/:serviceNumber/refresh (→ server makes 2 APSPDCL calls).
  * Updates local DB on success, records error on failure.
  */
-export async function refreshService(id) {
+export async function refreshService(id, billdeskSession) {
   const service = await db.getById(id);
   if (!service) throw new Error(`Service ${id} not found`);
 
   try {
-    const { snapshot } = await apiPost(`/services/${service.serviceNumber}/refresh`, {});
+    const { snapshot } = await apiPost(`/services/${service.serviceNumber}/refresh`, { billdeskSession });
     return db.update(id, snapshotToPatch(snapshot));
   } catch (err) {
     await db.update(id, { lastError: err.message || 'Refresh failed', lastFetchedAt: new Date().toISOString() });
@@ -163,16 +163,17 @@ export async function refreshService(id) {
  * Server processes them sequentially. Client updates local DB from results.
  *
  * @param {(done:number, total:number)=>void} onProgress
+ * @param {object} billdeskSession
  * @returns {{ succeeded:number, failed:number, errors:string[] }}
  */
-export async function refreshAllServices(onProgress) {
+export async function refreshAllServices(onProgress, billdeskSession) {
   const services = await db.getAll();
   if (!services.length) return { succeeded: 0, failed: 0, errors: [] };
 
   const serviceNumbers = services.map(s => s.serviceNumber);
 
   // One API call to the server — server fans out to APSPDCL sequentially
-  const json = await apiPost('/services/refresh-all', { serviceNumbers });
+  const json = await apiPost('/services/refresh-all', { serviceNumbers, billdeskSession });
   const { results } = json;
 
   // Apply each result to local DB

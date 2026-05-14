@@ -40,20 +40,12 @@ const PORT = process.env.API_PORT || 4100;
 app.use(cors());
 app.use(express.json());
 
+import { scrapeBillDeskSession } from './utils/billdesk/session.js';
+
 // ── APSPDCL raw client (server-side only) ─────────────────────────────────────
 
 const APSPDCL_BASE = 'https://apspdcl.in/ConsumerDashboard/public';
 const BILLDESK_URL = 'https://payments.billdesk.com/MercOnline/SPDCLController';
-const BILLDESK_REQTOKEN = process.env.BILLDESK_REQTOKEN || 'jqwnKJzbISLlGFEAytVm';
-const BILLDESK_JCAPTCHAVAL = process.env.BILLDESK_JCAPTCHAVAL || '108296';
-const BILLDESK_COOKIE = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
-
-console.log('[api] BillDesk env', {
-  port: PORT,
-  reqToken: !!BILLDESK_REQTOKEN,
-  jcaptchaVal: !!BILLDESK_JCAPTCHAVAL,
-  cookie: !!BILLDESK_COOKIE,
-});
 
 async function apspdclPost(endpoint, serviceNumber) {
   const res = await fetch(`${APSPDCL_BASE}/${endpoint}`, {
@@ -68,30 +60,34 @@ async function apspdclPost(endpoint, serviceNumber) {
   catch { return { data: [] }; }
 }
 
-async function fetchBillDeskBill(serviceNumber) {
+async function fetchBillDeskBill(serviceNumber, billdeskSession) {
+  const reqtoken = billdeskSession?.reqtoken || process.env.BILLDESK_REQTOKEN || 'jqwnKJzbISLlGFEAytVm';
+  const jcaptchaVal = billdeskSession?.captcha || process.env.BILLDESK_JCAPTCHAVAL || '108296';
+  const cookie = billdeskSession?.cookie || process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
+
   const headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Origin': 'https://payments.billdesk.com',
     'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController',
     'User-Agent': 'Mozilla/5.0',
   };
-  if (BILLDESK_COOKIE) {
-    headers.Cookie = BILLDESK_COOKIE;
+  if (cookie) {
+    headers.Cookie = cookie;
   }
 
   const body = new URLSearchParams({
     reqid: 'confirm',
-    reqtoken: BILLDESK_REQTOKEN,
+    reqtoken: reqtoken,
     txtCustomerID: String(serviceNumber),
-    jcaptchaVal: BILLDESK_JCAPTCHAVAL,
+    jcaptchaVal: jcaptchaVal,
   }).toString();
 
   console.log('[api] BillDesk request', {
     serviceNumber,
     url: BILLDESK_URL,
-    hasReqToken: !!BILLDESK_REQTOKEN,
-    hasJcaptcha: !!BILLDESK_JCAPTCHAVAL,
-    hasCookie: !!BILLDESK_COOKIE,
+    hasReqToken: !!reqtoken,
+    hasJcaptcha: !!jcaptchaVal,
+    hasCookie: !!cookie,
   });
 
   const res = await fetch(BILLDESK_URL, {
@@ -322,7 +318,7 @@ function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 
  * Returns null if the service number is unknown / has no data.
  * Throws only on network failures.
  */
-async function buildSnapshot(serviceNumber) {
+async function buildSnapshot(serviceNumber, billdeskSession) {
   const [billResult, paymentResult] = await Promise.allSettled([
     apspdclPost('publicbillhistory', serviceNumber),
     apspdclPost('publicpaymenthistory', serviceNumber),
@@ -357,7 +353,7 @@ async function buildSnapshot(serviceNumber) {
   let billDeskIsPaid = false;
   let billDeskError = null;
   try {
-    billDeskData = await fetchBillDeskBill(serviceNumber);
+    billDeskData = await fetchBillDeskBill(serviceNumber, billdeskSession);
     if (billDeskData) {
       billDeskAmount = billDeskData.billDeskAmount;
       billDeskBillAmount = billDeskData.billDeskBillAmount;
@@ -681,7 +677,7 @@ app.get('/api/services/trash', (_req, res) => {
 
 /**
  * POST /api/services/validate
- * Body: { serviceNumber: "1234567890123" }
+ * Body: { serviceNumber: "1234567890123", billdeskSession?: { reqtoken, captcha, cookie } }
  *
  * Validates a service number against APSPDCL.
  * Returns the full snapshot DTO on success so the client can use it immediately
@@ -690,12 +686,12 @@ app.get('/api/services/trash', (_req, res) => {
  * APSPDCL calls: 2 (bill + payment)
  */
 app.post('/api/services/validate', async (req, res) => {
-  const { serviceNumber } = req.body || {};
+  const { serviceNumber, billdeskSession } = req.body || {};
   if (!serviceNumber || !/^\d{13}$/.test(serviceNumber)) {
     return res.status(400).json({ ok: false, error: 'Service number must be 13 digits' });
   }
   try {
-    const snapshot = await buildSnapshot(serviceNumber);
+    const snapshot = await buildSnapshot(serviceNumber, billdeskSession);
     if (!snapshot) {
       return res.status(404).json({ ok: false, error: 'Invalid APSPDCL service number — no bill history found' });
     }
@@ -707,6 +703,7 @@ app.post('/api/services/validate', async (req, res) => {
 
 /**
  * POST /api/services/:serviceNumber/refresh
+ * Body: { billdeskSession?: { reqtoken, captcha, cookie } }
  *
  * Fetches fresh data for one service number from APSPDCL.
  * The :serviceNumber param is the 13-digit APSPDCL number (not a DB id —
@@ -718,12 +715,13 @@ app.post('/api/services/validate', async (req, res) => {
  */
 app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
   const { serviceNumber } = req.params;
+  const { billdeskSession } = req.body || {};
   console.log('[api] route POST /api/services/:serviceNumber/refresh', { serviceNumber });
   if (!/^\d{13}$/.test(serviceNumber)) {
     return res.status(400).json({ ok: false, error: 'Invalid service number' });
   }
   try {
-    const snapshot = await buildSnapshot(serviceNumber);
+    const snapshot = await buildSnapshot(serviceNumber, billdeskSession);
     if (!snapshot) {
       return res.status(404).json({ ok: false, error: 'No data found for this service number' });
     }
@@ -735,7 +733,7 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
 
 /**
  * POST /api/services/refresh-all
- * Body: { serviceNumbers: ["1234567890123", ...] }
+ * Body: { serviceNumbers: ["1234567890123", ...], billdeskSession?: { reqtoken, captcha, cookie } }
  *
  * Refreshes a list of service numbers.
  * Processed sequentially to avoid hammering APSPDCL.
@@ -745,7 +743,7 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
  * Response: { ok: true, results: [{ serviceNumber, snapshot?, error? }] }
  */
 app.post('/api/services/refresh-all', async (req, res) => {
-  const { serviceNumbers } = req.body || {};
+  const { serviceNumbers, billdeskSession } = req.body || {};
   console.log('[api] route POST /api/services/refresh-all', { count: Array.isArray(serviceNumbers) ? serviceNumbers.length : 0 });
   if (!Array.isArray(serviceNumbers) || !serviceNumbers.length) {
     return res.status(400).json({ ok: false, error: 'serviceNumbers array is required' });
@@ -754,7 +752,7 @@ app.post('/api/services/refresh-all', async (req, res) => {
   const results = [];
   for (const sn of serviceNumbers) {
     try {
-      const snapshot = await buildSnapshot(sn);
+      const snapshot = await buildSnapshot(sn, billdeskSession);
       results.push(snapshot
         ? { serviceNumber: sn, ok: true, snapshot }
         : { serviceNumber: sn, ok: false, error: 'No data returned' });
@@ -769,6 +767,56 @@ app.post('/api/services/refresh-all', async (req, res) => {
     failed:    results.filter(r => !r.ok).length,
     results,
   });
+});
+
+/**
+ * GET /api/billdesk/init-session
+ * 
+ * Scrapes BillDesk for a fresh reqtoken and generates the dynamic cookie
+ * needed for the Captcha image request.
+ */
+app.get('/api/billdesk/init-session', async (req, res) => {
+  try {
+    const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
+    const session = await scrapeBillDeskSession(baseCookie);
+    res.json({ ok: true, ...session });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/billdesk/captcha-image
+ * Query: ?cookie=<dynamic_cookie_string>
+ * 
+ * Proxies the Captcha image to bypass CORS and third-party cookie restrictions.
+ */
+app.get('/api/billdesk/captcha-image', async (req, res) => {
+  try {
+    const cookie = req.query.cookie;
+    if (!cookie) return res.status(400).send('Missing cookie parameter');
+    
+    const imgRes = await fetch('https://payments.billdesk.com/MercOnline/NumericCaptchaServlet', {
+      headers: {
+        'Cookie': cookie,
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController'
+      }
+    });
+    
+    if (!imgRes.ok) throw new Error(`Image fetch failed with status ${imgRes.status}`);
+    
+    res.setHeader('Content-Type', imgRes.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    
+    // fetch body is a ReadableStream which can be converted to an array buffer or piped.
+    // In Node 18+, we can convert to array buffer and send as buffer.
+    const arrayBuffer = await imgRes.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err) {
+    console.error('[api] Captcha image fetch failed:', err);
+    res.status(502).send('Failed to fetch captcha image');
+  }
 });
 
 // ── Health check ──────────────────────────────────────────────────────────────

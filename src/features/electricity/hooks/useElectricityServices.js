@@ -18,6 +18,7 @@ import {
   shouldAutoRefresh,
   updateService,
 } from '../api/servicesApi.js';
+import { getValidSession } from '../utils/billdeskSession.jsx';
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
@@ -78,10 +79,13 @@ export function useElectricityServices() {
       const stale = services.filter(shouldAutoRefresh);
       if (stale.length === 0) return;
 
+      const session = await getValidSession();
+      if (!session) return; // User cancelled captcha or failed
+
       // Mark all stale as refreshing
       stale.forEach(s => dispatch({ type: 'REFRESHING_ADD', id: s.id }));
       try {
-        await refreshAllServices();
+        await refreshAllServices(undefined, session);
       } finally {
         stale.forEach(s => dispatch({ type: 'REFRESHING_REMOVE', id: s.id }));
         await reload();
@@ -93,7 +97,10 @@ export function useElectricityServices() {
   // POST /services
   // Validates + fetches in one shot (2 APSPDCL calls total), then reloads.
   const add = useCallback(async ({ serviceNumber, label }) => {
-    await createService({ serviceNumber, label });
+    const session = await getValidSession();
+    if (!session) return;
+    
+    await createService({ serviceNumber, label }, session);
     await reload();
   }, [reload]);
 
@@ -108,9 +115,12 @@ export function useElectricityServices() {
       throw new Error(`Please wait ${wait}s before refreshing again`);
     }
 
+    const session = await getValidSession();
+    if (!session) return;
+
     dispatch({ type: 'REFRESHING_ADD', id });
     try {
-      await refreshService(id);
+      await refreshService(id, session);
       cooldowns.current.set(id, Date.now() + 120_000);
     } finally {
       dispatch({ type: 'REFRESHING_REMOVE', id });
@@ -125,6 +135,9 @@ export function useElectricityServices() {
   // Uses concurrency-limited queue inside servicesApi — at most 2 in-flight.
   // Returns summary { succeeded, failed, errors }.
   const refreshAll = useCallback(async (onProgress) => {
+    const session = await getValidSession();
+    if (!session) return null;
+    
     // Mark all as refreshing
     const services = state.services;
     services.forEach((s) => dispatch({ type: 'REFRESHING_ADD', id: s.id }));
@@ -134,7 +147,7 @@ export function useElectricityServices() {
         onProgress?.(completed, total);
         // Reload incrementally so cards update as each service finishes
         await reload();
-      });
+      }, session);
       return summary;
     } finally {
       services.forEach((s) => dispatch({ type: 'REFRESHING_REMOVE', id: s.id }));
