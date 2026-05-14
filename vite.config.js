@@ -10,7 +10,7 @@ export default defineConfig({
       // All /api/* calls → our local API server
       // APSPDCL endpoints never appear in browser DevTools
       '/api': {
-        target: 'http://localhost:4200',
+        target: 'http://localhost:4201',
         changeOrigin: true,
       }
     }

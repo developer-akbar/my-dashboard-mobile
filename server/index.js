@@ -28,8 +28,11 @@
  *   - The DTO is small and purpose-built (no raw APSPDCL noise)
  */
 
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.API_PORT || 4100;
@@ -40,6 +43,17 @@ app.use(express.json());
 // ── APSPDCL raw client (server-side only) ─────────────────────────────────────
 
 const APSPDCL_BASE = 'https://apspdcl.in/ConsumerDashboard/public';
+const BILLDESK_URL = 'https://payments.billdesk.com/MercOnline/SPDCLController';
+const BILLDESK_REQTOKEN = process.env.BILLDESK_REQTOKEN || 'jqwnKJzbISLlGFEAytVm';
+const BILLDESK_JCAPTCHAVAL = process.env.BILLDESK_JCAPTCHAVAL || '108296';
+const BILLDESK_COOKIE = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
+
+console.log('[api] BillDesk env', {
+  port: PORT,
+  reqToken: !!BILLDESK_REQTOKEN,
+  jcaptchaVal: !!BILLDESK_JCAPTCHAVAL,
+  cookie: !!BILLDESK_COOKIE,
+});
 
 async function apspdclPost(endpoint, serviceNumber) {
   const res = await fetch(`${APSPDCL_BASE}/${endpoint}`, {
@@ -52,6 +66,104 @@ async function apspdclPost(endpoint, serviceNumber) {
   if (!text || !text.trim()) return { data: [] };
   try { return JSON.parse(text); }
   catch { return { data: [] }; }
+}
+
+async function fetchBillDeskBill(serviceNumber) {
+  const headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Origin': 'https://payments.billdesk.com',
+    'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController',
+    'User-Agent': 'Mozilla/5.0',
+  };
+  if (BILLDESK_COOKIE) {
+    headers.Cookie = BILLDESK_COOKIE;
+  }
+
+  const body = new URLSearchParams({
+    reqid: 'confirm',
+    reqtoken: BILLDESK_REQTOKEN,
+    txtCustomerID: String(serviceNumber),
+    jcaptchaVal: BILLDESK_JCAPTCHAVAL,
+  }).toString();
+
+  console.log('[api] BillDesk request', {
+    serviceNumber,
+    url: BILLDESK_URL,
+    hasReqToken: !!BILLDESK_REQTOKEN,
+    hasJcaptcha: !!BILLDESK_JCAPTCHAVAL,
+    hasCookie: !!BILLDESK_COOKIE,
+  });
+
+  const res = await fetch(BILLDESK_URL, {
+    method: 'POST',
+    headers,
+    body,
+  });
+  if (!res.ok) throw new Error(`BillDesk responded with ${res.status}`);
+
+  const html = await res.text();
+  console.log('[api] BillDesk response', {
+    serviceNumber,
+    status: res.status,
+    length: html.length,
+  });
+  // console.log('[api] BillDesk raw HTML preview', html.slice(0, 4000));
+  return parseBillDeskHtml(html);
+}
+
+function parseBillDeskHtml(html) {
+  const parseField = (label) => {
+    const patterns = [
+      new RegExp(`${label}\\s*:\\s*</td>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
+      new RegExp(`<td[^>]*>\\s*${label}\\s*</td>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
+      new RegExp(`<th[^>]*>\\s*${label}\\s*</th>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
+      new RegExp(`${label}\\s*:\\s*([^<\\n]+)`, 'i'),
+      new RegExp(`${label}[^>]*>\\s*([^<]+)</td>`, 'i'),
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match) return match[1].trim();
+    }
+    return null;
+  };
+
+  const parseNumber = (value) => {
+    if (!value) return null;
+    const normalized = String(value).replace(/,/g, '').trim();
+    return normalized === '' ? null : Number(normalized);
+  };
+
+  const customerName = parseField('Customer Name') || parseField('Consumer Name') || parseField('Name');
+  const billAmount = parseNumber(parseField('Bill Amount'));
+  const currentDemand = parseNumber(parseField('Current Demand'));
+
+  console.log('[api] BillDesk parse candidates', {
+    customerName,
+    billAmount,
+    currentDemand,
+  });
+
+  if (billAmount == null && currentDemand == null) {
+    const htmlSnippet = html.slice(0, 1200).replace(/\s+/g, ' ');
+    console.warn('[api] BillDesk parse failed: no bill amount found', {
+      customerName,
+      billAmount,
+      currentDemand,
+      htmlSnippet,
+    });
+    return null;
+  }
+
+  const billDeskAmount = currentDemand === 0 ? 0 : currentDemand ?? billAmount;
+
+  return {
+    customerName,
+    billDeskAmount,
+    billDeskBillAmount: billAmount,
+    billDeskCurrentDemand: currentDemand,
+    billDeskIsPaid: currentDemand === 0,
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -94,16 +206,17 @@ function normaliseBill(row) {
     irda:  toNum(row.irda),
     othchg:toNum(row.othchg),
     sur:   toNum(row.sur),
+    isd:   toNum(row.isd),  // Initial Security Deposit
   };
 }
 
-function analysePayments(rawPayments, bills) {
-  const empty = { isPaid:false, paidDate:null, receiptNumber:null, paidAmount:null, arrears:[], arrearsTotal:0 };
+function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
+  const empty = { isPaid:false, paidDate:null, receiptNumber:null, paidAmount:null, currentPaymentTotal:0, arrears:[], arrearsTotal:0 };
   if (!Array.isArray(rawPayments) || !rawPayments.length || !bills?.length) return empty;
 
   const latest     = bills[0];
   const billDate   = latest.closingDate;
-  const billAmount = latest.billAmount;
+  const billAmount = currentBillAmountOverride ?? latest.billAmount;
 
   const payments = rawPayments
     .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), receiptNo: p.prno || null }))
@@ -113,11 +226,23 @@ function analysePayments(rawPayments, bills) {
   // ── Is current bill fully paid? ──────────────────────────────────────────
   const paymentsAsc = [...payments].sort((a, b) => a.date - b.date);
   let currentTotal = 0;
+  let currentPaidDate = null;
+  let currentReceiptNo = null;
   for (const p of paymentsAsc) {
     if (p.date < billDate) continue;  // Ignore payments before bill closes
     currentTotal += p.amount;
+    currentPaidDate = p.date;
+    currentReceiptNo = p.receiptNo;
     if (currentTotal >= billAmount) {
-      return { isPaid: true, paidDate: p.date, receiptNumber: p.receiptNo, paidAmount: p.amount, arrears: [], arrearsTotal: 0 };
+      return {
+        isPaid: true,
+        paidDate: p.date,
+        receiptNumber: p.receiptNo,
+        paidAmount: currentTotal,
+        currentPaymentTotal: currentTotal,
+        arrears: [],
+        arrearsTotal: 0,
+      };
     }
   }
 
@@ -131,20 +256,19 @@ function analysePayments(rawPayments, bills) {
     // Find which payments settle the previous bill
     // These are payments after prev bill closed but before current bill closes,
     // accumulated until reaching prev bill's amount
-    const prevSettlePayments = [];  // List of payment objects that settle prev bill
+    const prevSettlePayments = [];
     let prevAccum = 0;
     for (const p of paymentsAsc) {
-      if (p.date <= prevDate || p.date >= billDate) continue;  // Outside the window? skip
+      if (p.date <= prevDate || p.date >= billDate) continue;
       prevSettlePayments.push(p);
       prevAccum += p.amount;
-      if (prevAccum >= prevAmount) break;  // Settled!
+      if (prevAccum >= prevAmount) break;
     }
 
-    // Arrears = other payments in the same window that don't settle the prev bill
-    const prevSettleSet = new Set(prevSettlePayments);  // Use object reference
+    const prevSettleSet = new Set(prevSettlePayments);
     arrears = payments.filter(p => {
-      if (p.date <= prevDate || p.date >= billDate) return false;  // Outside window
-      return !prevSettleSet.has(p);  // Not in the settle list
+      if (p.date <= prevDate || p.date >= billDate) return false;
+      return !prevSettleSet.has(p);
     });
   }
 
@@ -153,28 +277,39 @@ function analysePayments(rawPayments, bills) {
 
   return {
     isPaid: false,
-    paidDate: latestPayment?.date || null,
-    receiptNumber: latestPayment?.receiptNo || null,
-    paidAmount: latestPayment?.amount || null,
+    paidDate: currentPaidDate || latestPayment?.date || null,
+    receiptNumber: currentReceiptNo || latestPayment?.receiptNo || null,
+    paidAmount: currentTotal > 0 ? currentTotal : latestPayment?.amount || null,
+    currentPaymentTotal: currentTotal,
     arrears,
     arrearsTotal,
   };
 }
 
-function buildBreakup(bill, arrearPayments, arrearsTotal) {
+function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 0, finalBillAmount = null, isdAmount = 0) {
+  // Calculate Gross Total as sum of components
+  const grossTotal = toNum(bill.ec) + toNum(bill.fixchg) + toNum(bill.cc) + toNum(bill.ed) + toNum(bill.fsa);
+  const roundedGrossTotal = Math.round(grossTotal);
+
+  // Net Due = Gross Total - Arrears - isdAmount
+  const netDue = Math.max(0, roundedGrossTotal - arrearsTotal - isdAmount);
+
   return {
     ec:      bill.ec,
     fixchg:  bill.fixchg,
     cc:      bill.cc,
     ed:      bill.ed,
     fsa:     bill.fsa,
-    grossTotal:        bill.billAmount,
-    currentMonthBill:  bill.billAmount,  // Same as grossTotal (full bill before arrears)
-    arrears:           arrearsTotal,     // Numeric total for display
-    arrearPayments,                       // Array of {date, amount, receiptNo}
+    isd:     isdAmount,                        // Reconciled Initial Security Deposit
+    isdOriginal: toNum(bill.isd),             // APSPDCL-reported deposit value
+    grossTotal:        roundedGrossTotal,
+    currentMonthBill:  roundedGrossTotal,
+    arrears:           arrearsTotal,
+    arrearPayments,
     arrearsTotal,
-    totalBill:         Math.max(0, bill.billAmount - arrearsTotal),  // Amount due after deductions
-    netDue:            Math.max(0, bill.billAmount - arrearsTotal),
+    isdAmount,
+    totalBill:         netDue,
+    netDue:            netDue,
   };
 }
 
@@ -212,16 +347,50 @@ async function buildSnapshot(serviceNumber) {
     b => b.closingDate.getUTCFullYear() === currentYear && b.closingDate.getUTCMonth() === currentMonth
   );
 
-  const pay = analysePayments(paymentData.data || [], bills);
+  let billDeskData = null;
+  let billDeskAmount = null;
+  let billDeskBillAmount = null;
+  let billDeskIsPaid = false;
+  let billDeskError = null;
+  try {
+    billDeskData = await fetchBillDeskBill(serviceNumber);
+    if (billDeskData) {
+      billDeskAmount = billDeskData.billDeskAmount;
+      billDeskBillAmount = billDeskData.billDeskBillAmount;
+      billDeskIsPaid = billDeskData.billDeskIsPaid === true;
+      // If BillDesk says paid (currentDemand = 0), don't set error
+    } else {
+      billDeskError = 'BillDesk response could not be parsed';
+    }
+  } catch (error) {
+    billDeskError = error?.message || 'BillDesk fetch failed';
+    console.warn('[api] BillDesk fetch failed:', billDeskError);
+  }
+
+  const pay = analysePayments(paymentData.data || [], bills, billDeskAmount ?? undefined);
 
   let status;
   if (!hasCurrentMonthBill)   status = 'NO_DUES';
   else if (pay.isPaid)        status = 'PAID';
-  else if (latest.billAmount > 0) status = 'DUE';
+  else if (billDeskIsPaid)    status = 'PAID';  // BillDesk says currentDemand is 0 = paid
+  else if ((billDeskAmount ?? latest.billAmount) > 0) status = 'DUE';
   else                        status = 'UNKNOWN';
 
-  const breakup  = status === 'DUE' ? buildBreakup(latest, pay.arrears, pay.arrearsTotal) : null;
-  const amountDue = status === 'DUE' ? (breakup?.netDue ?? latest.billAmount) : 0;
+  const finalDueAmount = billDeskAmount ?? latest.billAmount;
+  const publicDueAmount = latest.billAmount;
+  const billDeskSource = billDeskAmount != null ? 'BILLDESK' : 'APSPDCL';
+
+  // Calculate Gross Total as sum of components
+  const grossTotal = toNum(latest.ec) + toNum(latest.fixchg) + toNum(latest.cc) + toNum(latest.ed) + toNum(latest.fsa);
+  const roundedGrossTotal = Math.round(grossTotal);
+
+  // isdAmount = Gross Total - Arrears - BillDeskAmount
+  const isdAmount = billDeskAmount != null ? Math.max(0, roundedGrossTotal - pay.arrearsTotal - billDeskAmount) : 0;
+
+  const breakup  = status === 'DUE'
+    ? buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount)
+    : null;
+  const amountDue = status === 'DUE' ? (breakup?.netDue ?? finalDueAmount) : 0;
 
   // ── Parse all payments ────────────────────────────────────────────────────
   const allPayments = (paymentData.data || [])
@@ -291,7 +460,7 @@ async function buildSnapshot(serviceNumber) {
   const trendMonths = [
     ...(hasCurrentMonthBill ? [{
       month:       `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`,
-      billAmount:  latest.billAmount,
+      billAmount:  finalDueAmount,
       amountDue:   amountDue,
       billedUnits: latest.billedUnits,
       status,
@@ -441,14 +610,19 @@ async function buildSnapshot(serviceNumber) {
   // ── Clean DTO — only what the UI needs ──────────────────────────────────────
   return {
     serviceNumber,
-    customerName:     null,
+    customerName:     billDeskData?.customerName ?? null,
 
     // Current bill
     billDate:         latest.closingDate.toISOString(),
     dueDate:          latest.dueDate?.toISOString() || null,
     billedUnits:      latest.billedUnits,
-    billAmount:       latest.billAmount,   // gross (before arrears)
-    amountDue,                             // net (after arrears)
+    billAmount:       finalDueAmount,   // final bill amount from BillDesk when available
+    publicBillAmount: publicDueAmount,
+    billDeskAmount:   billDeskAmount ?? null,
+    billDeskBillAmount: billDeskBillAmount ?? null,
+    billDeskCurrentDemand: billDeskData?.billDeskCurrentDemand ?? null,
+    billDeskError,
+    amountDue,                             // net (after arrears/current payment)
     status,                                // DUE | PAID | NO_DUES | UNKNOWN
 
     // Payment status
@@ -471,6 +645,10 @@ async function buildSnapshot(serviceNumber) {
 
     // Monthly trend series for charts (oldest→newest)
     trendData:        trendMonths,
+
+    // BillDesk reconciliation
+    isdAmount,
+    billDeskSource,
 
     // Derived insights
     insights,
@@ -537,6 +715,7 @@ app.post('/api/services/validate', async (req, res) => {
  */
 app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
   const { serviceNumber } = req.params;
+  console.log('[api] route POST /api/services/:serviceNumber/refresh', { serviceNumber });
   if (!/^\d{13}$/.test(serviceNumber)) {
     return res.status(400).json({ ok: false, error: 'Invalid service number' });
   }
@@ -564,6 +743,7 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
  */
 app.post('/api/services/refresh-all', async (req, res) => {
   const { serviceNumbers } = req.body || {};
+  console.log('[api] route POST /api/services/refresh-all', { count: Array.isArray(serviceNumbers) ? serviceNumbers.length : 0 });
   if (!Array.isArray(serviceNumbers) || !serviceNumbers.length) {
     return res.status(400).json({ ok: false, error: 'serviceNumbers array is required' });
   }

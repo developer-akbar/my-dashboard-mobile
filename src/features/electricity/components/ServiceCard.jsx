@@ -91,6 +91,9 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
         <div className="scard__topbar-info">
           <h3 className="scard__name">{service.label || 'Untitled'}</h3>
+          {service.customerName && service.customerName !== service.label && (
+            <p className="scard__customer">{service.customerName}</p>
+          )}
           <button className="scard__num" onClick={copyNum}>
             <FiCopy size={10} />{service.serviceNumber}
           </button>
@@ -236,6 +239,12 @@ function BreakupPanel({ breakup }) {
         </div>
       ))}
       <div className="bp__row bp__row--sub"><span className="bp__label">Gross Total</span><b>{formatInr(breakup.grossTotal || 0)}</b></div>
+      {breakup.isd !== 0 && breakup.isd != null && (
+        <div className={`bp__row bp__row--deduction ${breakup.isd < 0 ? 'credit' : ''}`}>
+          <span className="bp__label">Initial Security Deposit</span>
+          <b>{formatInr(breakup.isd)}</b>
+        </div>
+      )}
       {breakup.arrearsTotal > 0 && (
         <>
           <div className="bp__divider">Advance Payments (Arrears)</div>
