@@ -440,6 +440,7 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   align-items: center;
   gap: 10px;
   padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--primary);
 }
 
 .scard__status-dot {
@@ -584,9 +585,11 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
+  justify-content: space-between;
 }
 .chip {
   display: flex;
+  flex-grow: 1;
   flex-direction: column;
   gap: 2px;
   padding: 7px 10px;
@@ -632,6 +635,9 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
 }
 
 /* ── Accordion ──────────────────────────────────────────────────────────────── */
+.acc.acc--open {
+    border: 1px solid var(--primary-hi);
+}
 .acc {
   border-top: 1px solid var(--border);
 }
@@ -793,7 +799,7 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   inset: 0;
   z-index: 200;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   background: rgba(0,0,0,0.6);
   backdrop-filter: blur(4px);
   padding: 0;

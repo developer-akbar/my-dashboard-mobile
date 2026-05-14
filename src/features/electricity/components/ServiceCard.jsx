@@ -41,9 +41,9 @@ function ChartTip({ active, payload, label }) {
   );
 }
 
-const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmtMonth(m) { if (!m) return '—'; const [y,mo]=m.split('-'); return `${MO[+mo-1]} ${y}`; }
-function fmtK(v) { return v >= 1000 ? `₹${(v/1000).toFixed(1)}k` : `₹${v}`; }
+const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fmtMonth(m) { if (!m) return '—'; const [y, mo] = m.split('-'); return `${MO[+mo - 1]} ${y}`; }
+function fmtK(v) { return v >= 1000 ? `₹${(v / 1000).toFixed(1)}k` : `₹${v}`; }
 
 // ── Accordion section ─────────────────────────────────────────────────────────
 
@@ -68,11 +68,11 @@ function Section({ title, badge, defaultOpen = false, children }) {
 export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const status   = service.lastStatus || 'UNKNOWN';
-  const dueTone  = getDueTone(service.lastDueDate, service.isPaid);
-  const dueCopy  = getDueCopy(service.lastDueDate, service.isPaid);
+  const status = service.lastStatus || 'UNKNOWN';
+  const dueTone = getDueTone(service.lastDueDate, service.isPaid);
+  const dueCopy = getDueCopy(service.lastDueDate, service.isPaid);
   const insights = service.insights;
-  const breakup  = service.billBreakup;
+  const breakup = service.billBreakup;
 
   async function copyNum() {
     try { await navigator.clipboard.writeText(service.serviceNumber); toast.success('Copied'); }
@@ -98,7 +98,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
             <FiCopy size={10} />{service.serviceNumber}
           </button>
         </div>
-        <span className={`pill pill--${status.toLowerCase()}`}>{status.replace('_',' ')}</span>
+        <span className={`pill pill--${status.toLowerCase()}`}>{status.replace('_', ' ')}</span>
         <div className="scard__actions">
           <button className={`icon-btn ${refreshing ? 'icon-btn--spin' : ''}`} onClick={onRefresh} disabled={refreshing} title="Refresh">
             <FiRefreshCw size={15} />
@@ -110,10 +110,10 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
             {menuOpen && (
               <div className="popover">
                 <button onMouseDown={() => { setMenuOpen(false); onTogglePin(); }}>
-                  {service.pinned ? <BsPinFill size={13}/> : <BsPin size={13}/>} {service.pinned ? 'Unpin' : 'Pin'}
+                  {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
                 </button>
-                <button onMouseDown={() => { setMenuOpen(false); onEdit(); }}><FiEdit2 size={13}/> Edit</button>
-                <button className="danger" onMouseDown={() => { setMenuOpen(false); onDelete(); }}><FiTrash2 size={13}/> Trash</button>
+                <button onMouseDown={() => { setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
+                <button className="danger" onMouseDown={() => { setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
               </div>
             )}
           </div>
@@ -132,8 +132,16 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className="scard__hero-right">
           {dueCopy && !service.isPaid && <span className={`due-tag due-tag--${dueTone}`}>{dueCopy}</span>}
           {service.isPaid && (
-            <span className="paid-tag"><FiCheckCircle size={12}/> Paid</span>
+            <span className="paid-tag"><FiCheckCircle size={12} /> Paid</span>
           )}
+          {/* <div className="scard__foot"> */}
+            {service.isPaid
+              ? <span className="receipt-line">{formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
+              : <span />}
+            {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
+              <button className="btn btn--pay" onClick={payNow}><FiExternalLink size={13} /> Pay now</button>
+            )}
+          {/* </div> */}
         </div>
       </div>
 
@@ -143,7 +151,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className="kv"><span>Due date</span><b>{formatDate(service.lastDueDate)}</b></div>
         <div className="kv">
           <span>Units</span>
-          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')}</b>
+          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights.vsLastMonth.units} unit="u" percent={insights.vsLastMonth.unitsPct} /></b>
         </div>
         <div className="kv"><span>Updated</span><b title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</b></div>
       </div>
@@ -152,7 +160,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       {insights && (
         <div className="scard__chips">
           <div className="chip"><span>Avg/mo</span><b>{formatInr(insights.avgAmount)}</b></div>
-          {insights.avgUnits6m != null && <div className="chip"><span>Avg units</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u</b></div>}
+          {insights.avgUnits6m != null && <div className="chip"><span>Avg units</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u - 6m</b><b>{insights.avgUnits12m.toLocaleString('en-IN')} u - 12m</b></div>}
           {insights.vsSameMonthLastYear && (
             <div className="chip"><span>vs last yr</span><TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} /></div>
           )}
@@ -161,7 +169,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
       {/* ── Error ────────────────────────────────────────── */}
       {service.lastError && (
-        <div className="scard__error"><FiAlertTriangle size={12}/>{service.lastError}</div>
+        <div className="scard__error"><FiAlertTriangle size={12} />{service.lastError}</div>
       )}
 
       {/* ── Accordions ───────────────────────────────────── */}
@@ -198,27 +206,27 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       )}
 
       {/* ── Footer ───────────────────────────────────────── */}
-      <div className="scard__foot">
+      {/* <div className="scard__foot">
         {service.isPaid
-          ? <span className="receipt-line"><FiCheckCircle size={12}/>{service.receiptNumber || '—'} · {formatInr(service.paidAmount)}</span>
+          ? <span className="receipt-line"><FiCheckCircle size={12}/>{service.receiptNumber || '—'} · {formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
           : <span/>}
         {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
           <button className="btn btn--pay" onClick={payNow}><FiExternalLink size={13}/> Pay now</button>
         )}
-      </div>
+      </div> */}
     </article>
   );
 }
 
 // ── Breakup panel ─────────────────────────────────────────────────────────────
 
-function BreakupPanel({ breakup, isPaid }) {
+function BreakupPanel({ breakup, isPaid, paidAmount }) {
   const rows = [
-    { label: 'Energy Charges',     key: 'ec',     color: '#6366f1' },
-    { label: 'Fixed Charges',      key: 'fixchg', color: '#06b6d4' },
-    { label: 'Customer Charges',   key: 'cc',     color: '#f59e0b' },
-    { label: 'Electricity Duty',   key: 'ed',     color: '#10b981' },
-    { label: 'Fuel Surcharge',     key: 'fsa',    color: '#8b5cf6' },
+    { label: 'Energy Charges', key: 'ec', color: '#6366f1' },
+    { label: 'Fixed Charges', key: 'fixchg', color: '#06b6d4' },
+    { label: 'Customer Charges', key: 'cc', color: '#f59e0b' },
+    { label: 'Electricity Duty', key: 'ed', color: '#10b981' },
+    { label: 'Fuel Surcharge', key: 'fsa', color: '#8b5cf6' },
   ];
   const total = breakup.grossTotal || 1;
   return (
@@ -242,7 +250,7 @@ function BreakupPanel({ breakup, isPaid }) {
       {breakup.isd !== 0 && breakup.isd != null && (
         <div className={`bp__row bp__row--deduction ${breakup.isd < 0 ? 'credit' : ''}`}>
           <span className="bp__label">Initial Security Deposit</span>
-          <b>- {formatInr(breakup.isd)}</b>
+          <b>{formatInr(breakup.isd)}</b>
         </div>
       )}
       {breakup.arrearsTotal > 0 && (
@@ -250,17 +258,24 @@ function BreakupPanel({ breakup, isPaid }) {
           <div className="bp__divider">Advance Payments (Arrears)</div>
           {Array.isArray(breakup.arrears) && breakup.arrears.map((a, i) => (
             <div key={i} className="bp__row bp__row--arrear">
-              <FiCheckCircle size={11} color="#10b981"/>
-              <span className="bp__label mono-sm">{a.receiptNo || `Payment ${i+1}`} <small>({formatDate(a.date)})</small></span>
+              <FiCheckCircle size={11} color="#10b981" />
+              <span className="bp__label mono-sm">{a.receiptNo || `Payment ${i + 1}`} <small>({formatDate(a.date)})</small></span>
               <b className="credit">−{formatInr(a.amount)}</b>
             </div>
           ))}
           <div className="bp__row bp__row--arrear"><span className="bp__label">Total Arrears</span><b className="credit">−{formatInr(breakup.arrearsTotal)}</b></div>
         </>
       )}
+      {isPaid && paidAmount != null && (
+        <div className="bp__row bp__row--arrear">
+          <FiCheckCircle size={11} color="#10b981" />
+          <span className="bp__label">Paid Amount</span>
+          <b className="credit">−{formatInr(paidAmount)}</b>
+        </div>
+      )}
       <div className="bp__row bp__row--net">
-        <span className="bp__label">{isPaid ? 'Paid Amount' : 'Net Due'}</span>
-        <b style={isPaid ? { color: 'var(--green)' } : {}}>{formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}</b>
+        <span className="bp__label">Net Due</span>
+        <b style={isPaid ? { color: 'var(--green)' } : {}}>{formatInr(isPaid ? 0 : (breakup.netDue ?? breakup.grossTotal ?? 0))}</b>
       </div>
     </div>
   );
@@ -272,7 +287,7 @@ function TrendPanel({ data, insights }) {
   const [view, setView] = useState('amount');
   const chartData = data.map(d => {
     const [yr, mo] = d.month.split('-');
-    return { ...d, label: `${MO[+mo-1]}'${yr.slice(2)}` };
+    return { ...d, label: `${MO[+mo - 1]}'${yr.slice(2)}` };
   });
 
   return (
@@ -280,36 +295,36 @@ function TrendPanel({ data, insights }) {
       <div className="trend__head">
         <span className="trend__title">18-Month Trend</span>
         <div className="seg seg--xs">
-          {['amount','units','combo'].map(v => (
-            <button key={v} className={`seg__btn ${view===v?'seg__btn--active':''}`} onClick={() => setView(v)}>
-              {v==='amount'?'₹':v==='units'?'U':'Both'}
+          {['amount', 'units', 'combo'].map(v => (
+            <button key={v} className={`seg__btn ${view === v ? 'seg__btn--active' : ''}`} onClick={() => setView(v)}>
+              {v === 'amount' ? '₹' : v === 'units' ? 'U' : 'Both'}
             </button>
           ))}
         </div>
       </div>
 
-      {(view==='amount'||view==='combo') && (
+      {(view === 'amount' || view === 'combo') && (
         <ResponsiveContainer width="100%" height={150}>
-          <ComposedChart data={chartData} margin={{top:4,right:4,left:-18,bottom:0}}>
-            <XAxis dataKey="label" tick={{fontSize:9,fill:'var(--text-3)'}} tickLine={false} axisLine={false} interval={2}/>
-            <YAxis tickFormatter={fmtK} tick={{fontSize:9,fill:'var(--text-3)'}} tickLine={false} axisLine={false} width={42}/>
-            <Tooltip content={<ChartTip/>}/>
-            <Area type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--primary)" fill="var(--primary-dim)" strokeWidth={2} dot={{r:2,fill:'var(--primary)'}}/>
-            {insights?.avgAmount && <ReferenceLine y={insights.avgAmount} stroke="var(--text-3)" strokeDasharray="3 3" label={{value:'avg',fontSize:8,fill:'var(--text-3)',position:'insideTopRight'}}/>}
+          <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
+            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
+            <Tooltip content={<ChartTip />} />
+            <Area type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--primary)" fill="var(--primary-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--primary)' }} />
+            {insights?.avgAmount && <ReferenceLine y={insights.avgAmount} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />}
           </ComposedChart>
         </ResponsiveContainer>
       )}
 
-      {view==='combo' && <div style={{height:8}}/>}
+      {view === 'combo' && <div style={{ height: 8 }} />}
 
-      {(view==='units'||view==='combo') && (
+      {(view === 'units' || view === 'combo') && (
         <ResponsiveContainer width="100%" height={150}>
-          <BarChart data={chartData} margin={{top:4,right:4,left:-18,bottom:0}}>
-            <XAxis dataKey="label" tick={{fontSize:9,fill:'var(--text-3)'}} tickLine={false} axisLine={false} interval={2}/>
-            <YAxis tick={{fontSize:9,fill:'var(--text-3)'}} tickLine={false} axisLine={false} width={42}/>
-            <Tooltip content={<ChartTip/>}/>
-            <Bar dataKey="billedUnits" name="Units" fill="var(--cyan)" radius={[2,2,0,0]} maxBarSize={20}/>
-            {insights?.avgUnits && <ReferenceLine y={insights.avgUnits} stroke="var(--text-3)" strokeDasharray="3 3" label={{value:'avg',fontSize:8,fill:'var(--text-3)',position:'insideTopRight'}}/>}
+          <BarChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
+            <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
+            <Tooltip content={<ChartTip />} />
+            <Bar dataKey="billedUnits" name="Units" fill="var(--cyan)" radius={[2, 2, 0, 0]} maxBarSize={20} />
+            {insights?.avgUnits && <ReferenceLine y={insights.avgUnits} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />}
           </BarChart>
         </ResponsiveContainer>
       )}
@@ -347,7 +362,7 @@ function PaymentsPanel({ payments }) {
       {payments.map((p, i) => (
         <div key={i} className="pymt__row">
           <div className="pymt__left">
-            <FiCalendar size={11}/>
+            <FiCalendar size={11} />
             <span>{formatDate(p.date)}</span>
           </div>
           <span className="mono-sm pymt__ref">{p.receiptNo || '—'}</span>

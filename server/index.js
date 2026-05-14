@@ -458,8 +458,8 @@ async function buildSnapshot(serviceNumber) {
   const trendMonths = [
     ...(hasCurrentMonthBill ? [{
       month:       `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`,
-      billAmount:  finalDueAmount,
-      amountDue:   amountDue,
+      billAmount:  latest.billAmount,
+      amountDue:   latest.billAmount,
       billedUnits: latest.billedUnits,
       status,
     }] : []),
