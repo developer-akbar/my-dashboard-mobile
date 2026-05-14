@@ -387,9 +387,7 @@ async function buildSnapshot(serviceNumber) {
   // isdAmount = Gross Total - Arrears - BillDeskAmount
   const isdAmount = billDeskAmount != null ? Math.max(0, roundedGrossTotal - pay.arrearsTotal - billDeskAmount) : 0;
 
-  const breakup  = status === 'DUE'
-    ? buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount)
-    : null;
+  const breakup = buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount);
   const amountDue = status === 'DUE' ? (breakup?.netDue ?? finalDueAmount) : 0;
 
   // ── Parse all payments ────────────────────────────────────────────────────

@@ -130,7 +130,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           )}
         </div>
         <div className="scard__hero-right">
-          {dueCopy && <span className={`due-tag due-tag--${dueTone}`}>{dueCopy}</span>}
+          {dueCopy && !service.isPaid && <span className={`due-tag due-tag--${dueTone}`}>{dueCopy}</span>}
           {service.isPaid && (
             <span className="paid-tag"><FiCheckCircle size={12}/> Paid</span>
           )}
@@ -212,7 +212,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
 // ── Breakup panel ─────────────────────────────────────────────────────────────
 
-function BreakupPanel({ breakup }) {
+function BreakupPanel({ breakup, isPaid }) {
   const rows = [
     { label: 'Energy Charges',     key: 'ec',     color: '#6366f1' },
     { label: 'Fixed Charges',      key: 'fixchg', color: '#06b6d4' },
@@ -242,7 +242,7 @@ function BreakupPanel({ breakup }) {
       {breakup.isd !== 0 && breakup.isd != null && (
         <div className={`bp__row bp__row--deduction ${breakup.isd < 0 ? 'credit' : ''}`}>
           <span className="bp__label">Initial Security Deposit</span>
-          <b>{formatInr(breakup.isd)}</b>
+          <b>- {formatInr(breakup.isd)}</b>
         </div>
       )}
       {breakup.arrearsTotal > 0 && (
@@ -258,7 +258,10 @@ function BreakupPanel({ breakup }) {
           <div className="bp__row bp__row--arrear"><span className="bp__label">Total Arrears</span><b className="credit">−{formatInr(breakup.arrearsTotal)}</b></div>
         </>
       )}
-      <div className="bp__row bp__row--net"><span className="bp__label">Net Due</span><b>{formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}</b></div>
+      <div className="bp__row bp__row--net">
+        <span className="bp__label">{isPaid ? 'Paid Amount' : 'Net Due'}</span>
+        <b style={isPaid ? { color: 'var(--green)' } : {}}>{formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}</b>
+      </div>
     </div>
   );
 }
