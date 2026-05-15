@@ -47,6 +47,39 @@
   color-scheme: dark;
 }
 
+/* Light theme */
+[data-theme="light"] {
+  --bg:         #f4f6f8;
+  --bg-2:       #ffffff;
+  --bg-3:       #f9fafb;
+  --surface:    #ffffff;
+  --surface-2:  #f8fafc;
+  --surface-3:  #f1f5f9;
+  --border:     rgba(0,0,0,0.06);
+  --border-md:  rgba(0,0,0,0.10);
+  --border-hi:  rgba(0,0,0,0.16);
+
+  --text-1:  #0f172a;
+  --text-2:  #475569;
+  --text-3:  #64748b;
+
+  --primary:       #4f46e5;
+  --primary-hi:    #6366f1;
+  --primary-dim:   rgba(79,70,229,0.12);
+  --primary-glow:  rgba(79,70,229,0.30);
+
+  --red:      #e11d48;  --red-dim:   rgba(225,29,72,0.12);
+  --amber:    #d97706;  --amber-dim: rgba(217,119,6,0.12);
+  --green:    #059669;  --green-dim: rgba(5,150,105,0.12);
+  --blue:     #2563eb;  --blue-dim:  rgba(37,99,235,0.12);
+  --cyan:     #0891b2;  --cyan-dim:  rgba(8,145,178,0.12);
+  --violet:   #7c3aed;  --violet-dim:rgba(124,58,237,0.12);
+
+  --shadow:    0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.10);
+  color-scheme: light;
+}
+
 /* ── Reset ─────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
@@ -273,7 +306,6 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   top: 12px;
   z-index: 40;
   backdrop-filter: blur(16px);
-  background: rgba(17,19,24,0.85);
 }
 
 .toolbar__row { display: flex; align-items: center; gap: 8px; }
@@ -790,8 +822,8 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   font-weight: 700;
   vertical-align: middle;
 }
-.tbadge--up   { background: var(--red-dim);   color: var(--red);   }
-.tbadge--dn   { background: var(--green-dim); color: var(--green); }
+.tbadge--up   { background: var(--red-dim);   color: var(--red) !important;   }
+.tbadge--dn   { background: var(--green-dim); color: var(--green) !important; }
 .tbadge--flat { background: rgba(255,255,255,0.05); color: var(--text-3); }
 
 /* ── Dialog / Bottom sheet ──────────────────────────────────────────────────── */

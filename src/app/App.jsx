@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
@@ -11,6 +11,12 @@ const NAV = [
 
 export function App() {
   const [activePage, setActivePage] = useState('electricity');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   return (
     <div className="shell">
@@ -44,8 +50,36 @@ export function App() {
           </div>
         )}
         {activePage === 'settings' && (
-          <div className="page coming-soon">
-            <h2>Settings</h2><p>Coming soon</p>
+          <div className="page">
+            <div className="page__header">
+              <div>
+                <h2 className="page__title">Settings</h2>
+                <p>Application preferences</p>
+              </div>
+            </div>
+            
+            <div className="scard" style={{ padding: '20px' }}>
+              <h3 style={{ marginBottom: '16px', fontSize: '15px' }}>Appearance</h3>
+              <div className="field">
+                <label className="field__label">Theme</label>
+                <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                  <button 
+                    className={`seg__btn ${theme === 'dark' ? 'seg__btn--active' : ''}`}
+                    onClick={() => setTheme('dark')}
+                    style={{ padding: '0 16px' }}
+                  >
+                    Dark
+                  </button>
+                  <button 
+                    className={`seg__btn ${theme === 'light' ? 'seg__btn--active' : ''}`}
+                    onClick={() => setTheme('light')}
+                    style={{ padding: '0 16px' }}
+                  >
+                    Light
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>

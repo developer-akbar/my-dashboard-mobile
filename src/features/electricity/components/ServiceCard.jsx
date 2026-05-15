@@ -132,7 +132,12 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           )}
           {/* <div className="scard__foot"> */}
             {service.isPaid
-              ? <span className="receipt-line">{formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
+              ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                  <span className="receipt-line">{formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
+                  <button className="btn btn--ghost" onClick={onPay} style={{ height: '26px', padding: '0 8px', fontSize: '11.5px', marginTop: '2px', color: 'var(--primary)' }}><FiExternalLink size={11} /> Pay More</button>
+                </div>
+              )
               : <span />}
             {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
               <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13} /> Pay now</button>
