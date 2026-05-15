@@ -75,9 +75,9 @@ function CaptchaModal({ serviceNumber, initialSessionData, resolve, cleanup }) {
   return (
     <div className="overlay overlay--center" onClick={e => e.target === e.currentTarget && !validating && handleCancel()}>
       <div className="dialog" role="dialog" aria-modal="true" style={{ width: '320px' }}>
-        <h2 className="dialog__title">BillDesk Authentication</h2>
+        <h2 className="dialog__title">Manual Authentication</h2>
         <p className="dialog__desc" style={{ marginBottom: '16px' }}>
-          To fetch fresh billing data securely, please solve this Captcha. It will be valid for 1 hour.
+          Our automated solver needs help. Please solve this Captcha to fetch fresh billing data.
         </p>
         
         <form onSubmit={handleSubmit}>
@@ -136,22 +136,45 @@ export async function getValidSession(serviceNumber) {
     }
   }
 
-  // 2. Fetch new reqtoken and cookie
+  // 2. Try automatic OCR solver
+  const loadToast = toast.loading('Connecting and solving Captcha automatically...');
+  try {
+    const res = await fetch(`${apiBase()}/billdesk/auto-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serviceNumber })
+    });
+    const json = await res.json();
+    
+    if (json.ok) {
+      toast.success('Captcha solved automatically', { id: loadToast });
+      localStorage.setItem('billdesk_session', JSON.stringify(json.session));
+      return json.session;
+    }
+    
+    // If auto failed, dismiss toast and move to fallback
+    toast.error('Auto-solver failed. Please enter manually.', { id: loadToast });
+  } catch (err) {
+    toast.error('Network error during auto-session', { id: loadToast });
+  }
+
+  // 3. Fallback to Manual Modal
+  // Fetch fresh session for the manual modal
+  const initToast = toast.loading('Loading manual captcha...');
   let sessionData;
-  const loadToast = toast.loading('Connecting to BillDesk...');
   try {
     const res = await fetch(`${apiBase()}/billdesk/init-session`);
     const json = await res.json();
-    toast.dismiss(loadToast);
+    toast.dismiss(initToast);
     if (!json.ok) throw new Error(json.error);
     sessionData = json;
   } catch (err) {
-    toast.dismiss(loadToast);
-    toast.error('Failed to initialize BillDesk session');
+    toast.dismiss(initToast);
+    toast.error('Failed to initialize manual BillDesk session');
     return null;
   }
 
-  // 3. Present Modal and wait for user
+  // Present Modal and wait for user
   return new Promise((resolve) => {
     const container = document.createElement('div');
     document.body.appendChild(container);

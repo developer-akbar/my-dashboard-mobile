@@ -885,6 +885,68 @@ app.get('/api/billdesk/captcha-image', async (req, res) => {
   }
 });
 
+import { solveCaptchaImage } from './utils/billdesk/ocr.js';
+
+app.post('/api/billdesk/auto-session', async (req, res) => {
+  const { serviceNumber } = req.body || {};
+  if (!serviceNumber) {
+    return res.status(400).json({ ok: false, error: 'Missing serviceNumber' });
+  }
+
+  let lastError = 'Failed to solve captcha';
+  // Try up to 3 times to account for OCR inaccuracies
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`[api] auto-session attempt ${attempt} for ${serviceNumber}`);
+      const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
+      const session = await scrapeBillDeskSession(baseCookie);
+      
+      const captchaText = await solveCaptchaImage(session.cookie);
+      if (!captchaText || captchaText.length < 5) {
+        console.warn(`[api] auto-session attempt ${attempt} OCR yielded invalid length: ${captchaText}`);
+        continue;
+      }
+      
+      // Validate
+      session.captcha = captchaText;
+      const headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Origin': 'https://payments.billdesk.com',
+        'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController',
+        'User-Agent': 'Mozilla/5.0',
+        'Cookie': session.cookie
+      };
+
+      const body = new URLSearchParams({
+        reqid: 'confirm',
+        reqtoken: session.reqtoken || '',
+        txtCustomerID: String(serviceNumber),
+        jcaptchaVal: session.captcha || '',
+      }).toString();
+
+      const bdRes = await fetch(BILLDESK_URL, { method: 'POST', headers, body });
+      if (!bdRes.ok) throw new Error(`BillDesk returned ${bdRes.status}`);
+      const html = await bdRes.text();
+      const htmlLower = html.toLowerCase();
+
+      if (htmlLower.includes('wrong captcha') || htmlLower.includes('invalid captcha') || htmlLower.includes('incorrect captcha') || htmlLower.includes('enter valid captcha')) {
+         console.warn(`[api] auto-session attempt ${attempt} failed: Invalid Captcha (${captchaText})`);
+         continue;
+      }
+
+      // Success!
+      session.timestamp = Date.now();
+      return res.json({ ok: true, session });
+      
+    } catch (err) {
+      console.error(`[api] auto-session attempt ${attempt} error:`, err);
+      lastError = err.message;
+    }
+  }
+
+  return res.json({ ok: false, error: lastError });
+});
+
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
