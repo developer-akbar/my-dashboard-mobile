@@ -364,7 +364,6 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     }
   } catch (error) {
     billDeskError = error?.message || 'BillDesk fetch failed';
-    console.warn('[api] BillDesk fetch failed:', billDeskError);
   }
 
   const pay = analysePayments(paymentData.data || [], bills, billDeskAmount ?? undefined);
@@ -726,7 +725,6 @@ app.post('/api/services/validate', async (req, res) => {
 app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
   const { serviceNumber } = req.params;
   const { billdeskSession } = req.body || {};
-  console.log('[api] route POST /api/services/:serviceNumber/refresh', { serviceNumber });
   if (!/^\d{13}$/.test(serviceNumber)) {
     return res.status(400).json({ ok: false, error: 'Invalid service number' });
   }
@@ -754,7 +752,6 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
  */
 app.post('/api/services/refresh-all', async (req, res) => {
   const { serviceNumbers, billdeskSession } = req.body || {};
-  console.log('[api] route POST /api/services/refresh-all', { count: Array.isArray(serviceNumbers) ? serviceNumbers.length : 0 });
   if (!Array.isArray(serviceNumbers) || !serviceNumbers.length) {
     return res.status(400).json({ ok: false, error: 'serviceNumbers array is required' });
   }
@@ -897,13 +894,11 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
   // Try up to 3 times to account for OCR inaccuracies
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      console.log(`[api] auto-session attempt ${attempt} for ${serviceNumber}`);
       const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
       const session = await scrapeBillDeskSession(baseCookie);
       
       const captchaText = await solveCaptchaImage(session.cookie);
       if (!captchaText || captchaText.length < 5) {
-        console.warn(`[api] auto-session attempt ${attempt} OCR yielded invalid length: ${captchaText}`);
         continue;
       }
       
@@ -930,7 +925,6 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
       const htmlLower = html.toLowerCase();
 
       if (htmlLower.includes('wrong captcha') || htmlLower.includes('invalid captcha') || htmlLower.includes('incorrect captcha') || htmlLower.includes('enter valid captcha')) {
-         console.warn(`[api] auto-session attempt ${attempt} failed: Invalid Captcha (${captchaText})`);
          continue;
       }
 
@@ -966,7 +960,6 @@ app.use((err, _req, res, _next) => {
 // Only listen when running directly (locally), not when imported as a module by Vercel
 if (process.env.NODE_ENV !== 'production' || process.env.API_PORT) {
   app.listen(PORT, () => {
-    console.log(`[api] My Dashboard API running at http://localhost:${PORT}`);
   });
 }
 

@@ -308,7 +308,7 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   backdrop-filter: blur(16px);
 }
 
-.toolbar__row { display: flex; align-items: center; gap: 8px; }
+.toolbar__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .toolbar__row--top { }
 .toolbar__row--bottom { justify-content: space-between; }
 .toolbar__filters { display: flex; gap: 6px; }

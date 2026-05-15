@@ -29,14 +29,28 @@ export function apiBase() {
 }
 
 export async function apiPost(path, body) {
-  const res = await fetch(`${apiBase()}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  if (!res.ok || !json.ok) throw new Error(json.error || `API error ${res.status}`);
-  return json;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s global timeout
+
+  try {
+    const res = await fetch(`${apiBase()}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || `API error ${res.status}`);
+    return json;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError' || err.message.includes('Timeout')) {
+      throw new Error('Server request timed out. Please try again.');
+    }
+    throw err;
+  }
 }
 
 // ── Snapshot → DB patch mapper ────────────────────────────────────────────────

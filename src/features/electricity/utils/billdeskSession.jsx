@@ -140,7 +140,8 @@ export async function getValidSession(serviceNumber) {
   const loadToast = toast.loading('Connecting and solving Captcha automatically...');
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const warningId = setTimeout(() => toast.loading('Taking longer than usual...', { id: loadToast }), 8000); // 8s warning
     
     const res = await fetch(`${apiBase()}/billdesk/auto-session`, {
       method: 'POST',
@@ -150,6 +151,7 @@ export async function getValidSession(serviceNumber) {
     });
     
     clearTimeout(timeoutId);
+    clearTimeout(warningId);
     
     const contentType = res.headers.get('content-type');
     if (!res.ok || !contentType || !contentType.includes('application/json')) {
