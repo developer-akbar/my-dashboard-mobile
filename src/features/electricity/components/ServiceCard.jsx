@@ -304,7 +304,7 @@ function TrendPanel({ data, insights }) {
         </div>
       </div>
 
-      {(view === 'amount' || view === 'combo') && (
+      {view === 'amount' && (
         <ResponsiveContainer width="100%" height={150}>
           <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
@@ -316,17 +316,28 @@ function TrendPanel({ data, insights }) {
         </ResponsiveContainer>
       )}
 
-      {view === 'combo' && <div style={{ height: 8 }} />}
-
-      {(view === 'units' || view === 'combo') && (
+      {view === 'units' && (
         <ResponsiveContainer width="100%" height={150}>
-          <BarChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
             <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
             <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
             <Tooltip content={<ChartTip />} />
-            <Bar dataKey="billedUnits" name="Units" fill="var(--cyan)" radius={[2, 2, 0, 0]} maxBarSize={20} />
+            <Area type="monotone" dataKey="billedUnits" name="Units" stroke="var(--cyan)" fill="var(--cyan-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--cyan)' }} />
             {insights?.avgUnits && <ReferenceLine y={insights.avgUnits} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />}
-          </BarChart>
+          </ComposedChart>
+        </ResponsiveContainer>
+      )}
+
+      {view === 'combo' && (
+        <ResponsiveContainer width="100%" height={150}>
+          <ComposedChart data={chartData} margin={{ top: 4, right: 0, left: -18, bottom: 0 }}>
+            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
+            <YAxis yAxisId="left" tickFormatter={fmtK} tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={36} />
+            <Tooltip content={<ChartTip />} />
+            <Area yAxisId="left" type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--primary)" fill="var(--primary-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--primary)' }} />
+            <Line yAxisId="right" type="monotone" dataKey="billedUnits" name="Units" stroke="var(--cyan)" strokeWidth={2} dot={{ r: 2, fill: 'var(--cyan)' }} />
+          </ComposedChart>
         </ResponsiveContainer>
       )}
 

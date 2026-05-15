@@ -1,5 +1,7 @@
-import { FiAlertTriangle, FiCheckCircle, FiZap, FiDollarSign } from 'react-icons/fi';
+import { FiAlertTriangle, FiCheckCircle, FiZap } from 'react-icons/fi';
 import { formatInr } from '../../../shared/utils/index.js';
+
+const RupeeIcon = ({ size }) => <span style={{ fontSize: size, fontWeight: 700, lineHeight: 1 }}>₹</span>;
 
 export function SummaryBar({ services }) {
   const due   = services.filter(s => s.lastStatus === 'DUE');
@@ -8,7 +10,7 @@ export function SummaryBar({ services }) {
 
   const stats = [
     { icon: FiZap,          label: 'Services',     value: services.length, tone: 'blue'   },
-    { icon: FiDollarSign,   label: 'Total Due',    value: totalDue > 0 ? formatInr(totalDue) : '₹0', tone: totalDue > 0 ? 'red' : 'slate' },
+    { icon: RupeeIcon,      label: 'Total Due',    value: totalDue > 0 ? formatInr(totalDue) : '₹0', tone: totalDue > 0 ? 'red' : 'slate' },
     { icon: FiAlertTriangle,label: 'Pending',      value: due.length,  tone: due.length > 0 ? 'amber' : 'slate' },
     { icon: FiCheckCircle,  label: 'Cleared',      value: paid.length, tone: 'green'  },
   ];
