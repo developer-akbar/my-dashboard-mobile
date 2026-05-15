@@ -1,200 +1,90 @@
 # My Dashboard
 
-A personal tracking dashboard built with **React 18 + Vite 5 + Capacitor 5**.
-
-- **Android app** → data stored in **SQLite** via `@capacitor-community/sqlite`
-- **Browser / Desktop** → data stored in **IndexedDB** via `idb`
-- No backend server required — all data is local, APSPDCL API is called directly
+A modern, privacy-first personal tracking dashboard built with **React 18 + Vite + Capacitor**. Currently focused on comprehensive electricity bill tracking (specifically APSPDCL and BillDesk integrations), it is designed to run seamlessly in modern web browsers and as a native Android app.
 
 ---
 
-## Features
+## ⚡ Key Features
 
-- ⚡ **Electricity tracker** — APSPDCL bill monitoring with live refresh
-- 💡 Correct bill calculation including advance payment (arrears) deduction
-- 📱 Capacitor-ready for Android deployment
-- 🌐 Works in browser via IndexedDB (no install needed)
-- 🔌 Extensible — add more dashboards (water, broadband, etc.)
+- **Multi-Service Tracking:** Monitor multiple APSPDCL electricity connections from a single, unified view.
+- **Rich Visualizations:**
+  - 18-month historical trend charts.
+  - Granular bill breakups (Energy Charges, Fixed Charges, Fuel Surcharge, Initial Security Deposits, Arrears).
+  - Monthly usage predictions and spike detection.
+- **Automated Captcha Solving:** Includes a custom Node.js proxy server utilizing `sharp` and `tesseract.js` (OCR) to automatically read and solve the BillDesk Captcha, fetching the latest live demand without user interaction.
+- **Hybrid Fallback:** If the automated OCR fails, the UI gracefully degrades to a secure manual Captcha entry modal so you are never locked out of your data.
+- **Light / Dark Mode:** A toggleable, clean SaaS aesthetic designed for high readability across devices.
+- **Quick Payments:** "Pay Now" and "Pay More" shortcuts directly open the relevant gateways.
+- **Privacy-First Storage:** No cloud database. All historical and service data is stored locally on your device (IndexedDB for Web, SQLite for Android).
 
 ---
 
-## Tech Stack
+## 🛠️ Architecture & Tech Stack
 
-| Concern | Tech |
+| Domain | Technology |
 |---|---|
-| UI framework | React 18 |
-| Build tool | Vite 5 |
-| Android bridge | Capacitor 5 |
-| Android storage | SQLite (`@capacitor-community/sqlite`) |
-| Browser storage | IndexedDB (`idb`) |
-| Fonts | Arial, Helvetica, sans-serif (standard system fonts) |
+| **Frontend UI** | React 18, Recharts (visuals), Vanilla CSS (variables-driven theming) |
+| **Mobile Bridge** | Capacitor 5 |
+| **Local Storage** | IndexedDB (`idb`) for Web, SQLite for Android |
+| **Backend Proxy** | Node.js + Express (handles scraping, CORS bypass, and OCR) |
+| **Image Processing** | `sharp` (noise reduction), `tesseract.js` (OCR) |
 
 ---
 
-## Prerequisites
+## 🚀 Setup & Installation
 
-| Tool | Version | Notes |
-|---|---|---|
-| Node.js | ≥ 18 | LTS recommended |
-| npm | ≥ 9 | comes with Node |
-| Java | 17 | for Android builds only |
-| Android Studio | latest | for Android builds only |
+### Prerequisites
+- Node.js (≥ 18 LTS)
+- npm (≥ 9)
+- Android Studio & Java 17 (Required *only* if building the Android App)
 
----
+### 1. Web / Local Development
 
-## Running on Localhost (Browser)
+Since the architecture uses a backend proxy to safely scrape BillDesk and bypass browser CORS limitations, you must run both the backend server and the frontend dev server.
 
-### 1. Install dependencies
+1. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
 
-```bash
-npm install
-```
+2. **Start the Proxy Server:**
+   This runs the Node server (default `http://localhost:4100`) which handles the heavy lifting (APSPDCL APIs, BillDesk Captcha OCR).
+   ```bash
+   node server/index.js
+   ```
 
-### 2. Start dev server
+3. **Start the Frontend Dev Server:**
+   In a new terminal tab, start Vite:
+   ```bash
+   npm run dev
+   ```
+   *Open **http://localhost:5173** in your browser. Vite automatically proxies `/api/*` requests to the local Node server.*
 
-```bash
-npm run dev
-```
+### 2. Building for Android (Capacitor)
 
-Open **http://localhost:5173** in your browser.
+The Capacitor app requires your backend proxy server to be hosted and accessible from the mobile device. During local testing on a physical device, ensure your phone and computer are on the same Wi-Fi network.
 
-> The Vite dev server proxies APSPDCL API calls through `/api/apspdcl/*` to avoid
-> CORS issues. This proxy is only active in dev mode — the production Android build
-> calls APSPDCL directly via Capacitor's native HTTP.
+1. **Configure API URL (if needed):**
+   Update your API base path in the frontend source code (`src/features/electricity/api/servicesApi.js`) to point to your computer's local IP address (e.g., `http://192.168.x.x:4100`) instead of localhost.
 
-### 3. Add a service
+2. **Build the Web Assets:**
+   ```bash
+   npm run build
+   ```
 
-1. Click **Add service**
-2. Enter a label (e.g. "Home") and your 13-digit APSPDCL service number
-3. The app will fetch the current bill automatically
+3. **Sync to Android:**
+   ```bash
+   npx cap sync android
+   ```
 
----
-
-## Building for Android
-
-### 1. Install Capacitor CLI (once)
-
-```bash
-npm install -g @capacitor/cli
-```
-
-### 2. Build the web assets
-
-```bash
-npm run build
-```
-
-### 3. Add Android platform (first time only)
-
-```bash
-npx cap add android
-```
-
-### 4. Sync web assets to Android
-
-```bash
-npx cap sync android
-```
-
-### 5. Open in Android Studio
-
-```bash
-npx cap open android
-```
-
-In Android Studio: **Run → Run 'app'** (connected device or emulator).
-
-### All-in-one shortcut
-
-```bash
-npm run android
-```
-
-This runs `build → cap sync android → cap open android`.
+4. **Run via Android Studio:**
+   ```bash
+   npx cap open android
+   ```
+   *In Android Studio: Run → Run 'app' on your connected device or emulator.*
 
 ---
 
-## Project Structure
+## 🔧 Extensibility
 
-```
-my-dashboard/
-├── src/
-│   ├── app/
-│   │   └── App.jsx                  # Shell with sidebar navigation
-│   ├── features/
-│   │   └── electricity/
-│   │       ├── api/
-│   │       │   └── apspdclClient.js # APSPDCL API + billing logic
-│   │       ├── components/
-│   │       │   ├── ServiceCard.jsx
-│   │       │   ├── ServiceDialog.jsx
-│   │       │   ├── SummaryBar.jsx
-│   │       │   ├── Toolbar.jsx
-│   │       │   └── TrashView.jsx
-│   │       ├── hooks/
-│   │       │   └── useElectricityServices.js  # State + DB operations
-│   │       ├── utils/
-│   │       │   └── filters.js
-│   │       └── ElectricityDashboard.jsx
-│   ├── shared/
-│   │   ├── db/
-│   │   │   └── storage.js           # SQLite / IndexedDB abstraction
-│   │   └── utils/
-│   │       └── index.js             # formatInr, dates, validation
-│   ├── styles/
-│   │   └── global.css
-│   └── main.jsx
-├── capacitor.config.ts
-├── vite.config.js
-├── index.html
-└── package.json
-```
-
----
-
-## Billing Calculation Logic
-
-The APSPDCL bill total is computed as:
-
-```
-Gross Total = EC + Fixed Charges + Customer Charges + ED + FSA
-            (APSPDCL provides this pre-rounded in billAmount field)
-```
-
-Advance payments ("arrears") are detected from the payment history API:
-- Any payment whose date falls **between the bill's closing date and today**
-- AND whose amount is **less than the full bill amount** (not a full payment)
-
-```
-Net Due = Gross Total − Sum of arrears
-```
-
-**Example (your bill):**
-- Gross Total: ₹2,258 (EC 2040.75 + Fixed 30 + CC 55 + ED 20.52 + FSA 111.45)
-- Advance payment on 23-Apr-26: ₹30
-- Net Due shown: ₹2,228
-
-The official site shows ₹2,193. The remaining ₹35 difference is likely an
-additional adjustment/credit not yet identified. Once found, it can be added
-to the arrears list.
-
----
-
-## Adding More Dashboards
-
-1. Create `src/features/<name>/` following the electricity pattern
-2. Add a nav entry in `src/app/App.jsx`
-3. Add the corresponding DB table in `src/shared/db/storage.js`
-
----
-
-## Environment
-
-No `.env` file needed. The APSPDCL API endpoints are public and require no API keys.
-
-For Capacitor HTTP on Android to work (calling external URLs from native), ensure
-your `AndroidManifest.xml` has internet permission (added automatically by Capacitor):
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-```
+The codebase is structured modularly. While it currently tracks Electricity, the `src/features` folder is designed so you can easily plug in new tracking domains (Water, Broadband, Subscriptions) and link them to the shared local storage wrapper in `src/shared/db`.
