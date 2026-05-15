@@ -963,6 +963,11 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ ok: false, error: err.message || 'Internal error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`[api] My Dashboard API running at http://localhost:${PORT}`);
-});
+// Only listen when running directly (locally), not when imported as a module by Vercel
+if (process.env.NODE_ENV !== 'production' || process.env.API_PORT) {
+  app.listen(PORT, () => {
+    console.log(`[api] My Dashboard API running at http://localhost:${PORT}`);
+  });
+}
+
+export default app;
