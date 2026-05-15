@@ -1,8 +1,7 @@
 export function generateDynamicCookie(requestCookie, setCookieHeaders) {
-  if (!requestCookie) return '';
-  if (!setCookieHeaders || setCookieHeaders.length === 0) return requestCookie;
+  if (!setCookieHeaders || setCookieHeaders.length === 0) return requestCookie || '';
 
-  let newCookie = requestCookie;
+  let newCookie = requestCookie || '';
 
   // 1. Extract Values
   let newJSessionId = null;
@@ -17,10 +16,18 @@ export function generateDynamicCookie(requestCookie, setCookieHeaders) {
       const value = match[2];
       if (key === 'JSESSIONID') {
         newJSessionId = value;
-      } else if (key.startsWith('TS')) {
+      } else if (key.startsWith('TS') || key === 'srv_id' || key.startsWith('BIGipServer')) {
         newTsValues[key] = value;
       }
     }
+  }
+
+  // If no original cookie, construct from scratch
+  if (!newCookie) {
+    let parts = [];
+    for (const [k, v] of Object.entries(newTsValues)) parts.push(`${k}=${v}`);
+    if (newJSessionId) parts.push(`JSESSIONID=${newJSessionId}`);
+    return parts.join('; ');
   }
 
   // 2. Replace JSESSIONID

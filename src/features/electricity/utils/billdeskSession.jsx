@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client';
 import toast from 'react-hot-toast';
 import { apiBase } from '../api/servicesApi.js';
 
-function CaptchaModal({ sessionData, resolve, cleanup }) {
+function CaptchaModal({ serviceNumber, initialSessionData, resolve, cleanup }) {
+  const [sessionData, setSessionData] = useState(initialSessionData);
   const [captcha, setCaptcha] = useState('');
+  const [validating, setValidating] = useState(false);
 
   // Prevent scrolling when open
   useEffect(() => {
@@ -12,7 +14,7 @@ function CaptchaModal({ sessionData, resolve, cleanup }) {
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!captcha || captcha.length !== 6) {
       toast.error('Enter valid 6-digit captcha');
@@ -24,6 +26,39 @@ function CaptchaModal({ sessionData, resolve, cleanup }) {
       captcha,
       timestamp: Date.now()
     };
+    
+    setValidating(true);
+    const validateToast = toast.loading('Validating captcha...');
+    try {
+      const res = await fetch(`${apiBase()}/billdesk/validate-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceNumber, billdeskSession: finalSession })
+      });
+      const json = await res.json();
+      
+      if (!json.ok) {
+        toast.error(json.error || 'Validation failed', { id: validateToast });
+        setCaptcha('');
+        
+        // Fetch new session because captcha is single-use
+        try {
+          const initRes = await fetch(`${apiBase()}/billdesk/init-session`);
+          const initJson = await initRes.json();
+          if (initJson.ok) setSessionData(initJson);
+        } catch (e) {
+          toast.error('Failed to get new captcha image');
+        }
+        
+        setValidating(false);
+        return;
+      }
+      toast.success('Validation successful', { id: validateToast });
+    } catch (err) {
+      toast.error('Network error during validation', { id: validateToast });
+      setValidating(false);
+      return;
+    }
     
     // Store in localStorage for 1 hour
     localStorage.setItem('billdesk_session', JSON.stringify(finalSession));
@@ -38,7 +73,7 @@ function CaptchaModal({ sessionData, resolve, cleanup }) {
   };
 
   return (
-    <div className="overlay overlay--center" onClick={e => e.target === e.currentTarget && handleCancel()}>
+    <div className="overlay overlay--center" onClick={e => e.target === e.currentTarget && !validating && handleCancel()}>
       <div className="dialog" role="dialog" aria-modal="true" style={{ width: '320px' }}>
         <h2 className="dialog__title">BillDesk Authentication</h2>
         <p className="dialog__desc" style={{ marginBottom: '16px' }}>
@@ -67,13 +102,16 @@ function CaptchaModal({ sessionData, resolve, cleanup }) {
                 placeholder="Enter numbers"
                 autoComplete="off"
                 autoFocus
+                disabled={validating}
               />
             </div>
           </div>
           
           <div className="dialog__footer" style={{ marginTop: '24px' }}>
-            <button type="button" className="btn btn--ghost" onClick={handleCancel}>Cancel</button>
-            <button type="submit" className="btn btn--primary">Submit</button>
+            <button type="button" className="btn btn--ghost" onClick={handleCancel} disabled={validating}>Cancel</button>
+            <button type="submit" className={`btn btn--primary ${validating ? 'btn--loading' : ''}`} disabled={validating}>
+              {validating ? 'Verifying...' : 'Submit'}
+            </button>
           </div>
         </form>
       </div>
@@ -81,7 +119,9 @@ function CaptchaModal({ sessionData, resolve, cleanup }) {
   );
 }
 
-export async function getValidSession() {
+export async function getValidSession(serviceNumber) {
+  if (!serviceNumber) throw new Error('serviceNumber is required for session validation');
+
   // 1. Check local storage
   const stored = localStorage.getItem('billdesk_session');
   if (stored) {
@@ -126,7 +166,8 @@ export async function getValidSession() {
 
     root.render(
       <CaptchaModal 
-        sessionData={sessionData} 
+        serviceNumber={serviceNumber}
+        initialSessionData={sessionData} 
         resolve={resolve} 
         cleanup={cleanup} 
       />

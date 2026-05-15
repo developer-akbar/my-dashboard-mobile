@@ -1,0 +1,102 @@
+
+
+
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>::APSPDCL::</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="shortcut icon"
+	href="/MercOnline/spdcl/images/favicon.ico">
+<link type="text/css" rel="stylesheet"
+	href="/MercOnline/spdcl/css/bootstrap.min.css" />
+<link type="text/css" rel="stylesheet"
+	href="/MercOnline/spdcl/css/style.css" />
+<link rel="stylesheet"
+	href="/MercOnline/spdcl/css/jquery-ui.css" />
+<script type="text/javascript"
+	src="/MercOnline/spdcl/js/jquery-1.12.4.js"></script>
+<script type="text/javascript"
+	src="/MercOnline/spdcl/js/jquery-ui.js"></script>
+<link rel="stylesheet" type="text/css" href="/MercOnline/spdcl/css/inline/SPDCLDetails.css"/>
+<script type="text/javascript" src="/MercOnline/spdcl/js/inline/SPDCLDetails.js"></script>	
+</head>
+
+<body>
+	<form name="form1" action="SPDCLConfirm.jsp" method="post">
+		<input type="hidden" name="reqid" value="confirm"> 
+		<input type="hidden" name="reqtoken" value="WbPSMBCNYflceW87seLI">
+	    <input type="hidden" id="usnStartArr" value='["1","|","4","|","6","|","9"]' />
+		<div id="wrapper">
+			<div id="header">
+				<img
+					src="/MercOnline/spdcl/images/billdesk-logo.png">
+			</div>
+			<div id="content">
+				<h3>Online Electricity Bill Payment</h3>
+				<p></p>
+				<br>
+				<div class="row">
+					<div class="col-md-2"></div>
+					<div class="col-md-8 col-sm-12 col-xs-12">
+						<div class="tb_wrapper">
+							<table class="tb_detail" border="0" cellpadding="0"
+								cellspacing="0" width="100%">
+								<tbody>
+									<tr>
+										
+										<td>Service Number:</td>
+										<td class="rtd"><input name="txtCustomerID"
+											id="txtCustomerID" size="13" maxlength="13" tabindex="1"
+											class="form-control form-group" type="text"></td>
+									</tr>
+
+									<tr>
+										<td colspan="2" align="center"><img
+											src="./NumericCaptchaServlet" id="jCaptchaImg" height="50" width="200"/>
+											<input type='button' id="reloadCaptcha" class="reload_captcha" />
+
+											<div class="my-label">
+												<br>Please enter CAPTCHA here.<br>
+											</div>
+											<div class="holo-field">
+												<div class="holo-field-bracket"></div>
+												<input type='text' name="jcaptchaVal" id='jcaptchaVal'
+													value='' class="form-control form-group captcha_style" />
+											</div> <br> 
+											<div id="errTr" align="center" class="color_red">
+												Wrong Captcha Text Entered
+											</div>  <br></td>
+									</tr>
+								</tbody>
+							</table>
+							<br> <br> <input name="btn2" value="Submit" id="submitButton" class="btn-submit" type="button">
+						</div>
+					</div>
+					<div class="col-md-2"></div>
+				</div>
+				<div id="dialog" class="display_none">
+					<p>Transaction has to be done through the given link:
+						<a id="redirectURL" href="https://payments.billdesk.com/MercOnline/CPDCLAPPGController">https://payments.billdesk.com/MercOnline/CPDCLAPPGController</a>
+					</p>
+				</div>
+
+			</div>
+			<div class="custom_style"></div>
+			<br>
+			<br> <br>
+			<br> <br>
+			<br>
+			<div id="footer">
+				<span>&copy; 2012 APSPDCL. All Rights Reserved</span>
+			</div>
+		</div>
+	</form>
+</body>
+</html>

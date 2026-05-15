@@ -79,7 +79,7 @@ export function useElectricityServices() {
       const stale = services.filter(shouldAutoRefresh);
       if (stale.length === 0) return;
 
-      const session = await getValidSession();
+      const session = await getValidSession(stale[0].serviceNumber);
       if (!session) return; // User cancelled captcha or failed
 
       // Mark all stale as refreshing
@@ -97,8 +97,8 @@ export function useElectricityServices() {
   // POST /services
   // Validates + fetches in one shot (2 APSPDCL calls total), then reloads.
   const add = useCallback(async ({ serviceNumber, label }) => {
-    const session = await getValidSession();
-    if (!session) return;
+    const session = await getValidSession(serviceNumber);
+    if (!session) throw new Error('CANCELLED');
     
     await createService({ serviceNumber, label }, session);
     await reload();
@@ -115,8 +115,11 @@ export function useElectricityServices() {
       throw new Error(`Please wait ${wait}s before refreshing again`);
     }
 
-    const session = await getValidSession();
-    if (!session) return;
+    const service = state.services.find(s => s.id === id);
+    if (!service) throw new Error('Service not found');
+
+    const session = await getValidSession(service.serviceNumber);
+    if (!session) throw new Error('CANCELLED');
 
     dispatch({ type: 'REFRESHING_ADD', id });
     try {
@@ -128,15 +131,16 @@ export function useElectricityServices() {
     }
     // Note: refreshService already writes lastError to db on failure,
     // so we let the error bubble up for the toast without a second db write.
-  }, [reload]);
+  }, [state.services, reload]);
 
   // ── actions.refreshAll ──────────────────────────────────────────────────────
   // POST /services/refresh-all
   // Uses concurrency-limited queue inside servicesApi — at most 2 in-flight.
   // Returns summary { succeeded, failed, errors }.
   const refreshAll = useCallback(async (onProgress) => {
-    const session = await getValidSession();
-    if (!session) return null;
+    if (!state.services.length) return { succeeded: 0, failed: 0, errors: [] };
+    const session = await getValidSession(state.services[0].serviceNumber);
+    if (!session) throw new Error('CANCELLED');
     
     // Mark all as refreshing
     const services = state.services;

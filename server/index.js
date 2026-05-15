@@ -456,15 +456,22 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
 
   // ── Trend data — 18-month monthly series for charts ──────────────────────
   // Combine current month + past bills, sorted oldest→newest for chart display
+  const hasCurrentMonthBillData = hasCurrentMonthBill || billDeskBillAmount != null;
   const trendMonths = [
     ...(hasCurrentMonthBill ? [{
       month:       `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`,
-      billAmount:  latest.billAmount,
-      amountDue:   latest.billAmount,
+      billAmount:  billDeskBillAmount ?? latest.billAmount,
+      amountDue:   amountDue,
       billedUnits: latest.billedUnits,
       status,
-    }] : []),
-    ...pastBills.slice(0, hasCurrentMonthBill ? 17 : 18).map(b => ({
+    }] : (billDeskBillAmount != null ? [{
+      month:       `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`,
+      billAmount:  billDeskBillAmount,
+      amountDue:   amountDue,
+      billedUnits: 0,
+      status,
+    }] : [])),
+    ...pastBills.slice(0, hasCurrentMonthBillData ? 17 : 18).map(b => ({
       month:       `${b.closingDate.getUTCFullYear()}-${String(b.closingDate.getUTCMonth() + 1).padStart(2, '0')}`,
       billAmount:  b.billAmount,
       amountDue:   b.billAmount,
@@ -476,8 +483,8 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   // ── Insights ──────────────────────────────────────────────────────────────
   const pastAmounts  = trendMonths.map((m) => m.billAmount);
   const pastUnits    = trendMonths.map((m) => m.billedUnits);
-  const historicalAmounts = hasCurrentMonthBill ? pastAmounts.slice(0, -1) : pastAmounts;
-  const historicalUnits   = hasCurrentMonthBill ? pastUnits.slice(0, -1) : pastUnits;
+  const historicalAmounts = hasCurrentMonthBillData ? pastAmounts.slice(0, -1) : pastAmounts;
+  const historicalUnits   = hasCurrentMonthBillData ? pastUnits.slice(0, -1) : pastUnits;
 
   function avg(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
   function max(arr) { return arr.length ? Math.max(...arr) : 0; }
@@ -495,10 +502,13 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   const minUnits    = min(pastUnits);
   const avgCostPerUnit = avgUnits > 0 ? avgAmount / avgUnits : 0;
 
+  const currentInsightAmount = billDeskBillAmount ?? latest.billAmount;
+  const currentInsightUnits  = hasCurrentMonthBill ? latest.billedUnits : 0;
+
   // Spike detection: current vs 3-month avg
   const recent3Avg  = avg(pastAmounts.slice(-3));
-  const unitSpike   = avgUnits > 0 && latest.billedUnits > avgUnits * 1.25;
-  const amountSpike = recent3Avg > 0 && latest.billAmount > recent3Avg * 1.25;
+  const unitSpike   = avgUnits > 0 && currentInsightUnits > avgUnits * 1.25;
+  const amountSpike = recent3Avg > 0 && currentInsightAmount > recent3Avg * 1.25;
 
   // Prediction uses same month last year when available, otherwise recent trend
   const targetMonthNumber = ((currentMonth + 1) % 12) + 1;
@@ -770,7 +780,63 @@ app.post('/api/services/refresh-all', async (req, res) => {
 });
 
 /**
+ * POST /api/billdesk/validate-session
+ * Body: { serviceNumber, billdeskSession: { reqtoken, captcha, cookie } }
+ */
+app.post('/api/billdesk/validate-session', async (req, res) => {
+  const { serviceNumber, billdeskSession } = req.body || {};
+  if (!serviceNumber || !billdeskSession) {
+    return res.status(400).json({ ok: false, error: 'Missing parameters' });
+  }
+
+  const { reqtoken, captcha, cookie } = billdeskSession;
+  const headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Origin': 'https://payments.billdesk.com',
+    'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController',
+    'User-Agent': 'Mozilla/5.0',
+  };
+  if (cookie) headers.Cookie = cookie;
+
+  const body = new URLSearchParams({
+    reqid: 'confirm',
+    reqtoken: reqtoken || '',
+    txtCustomerID: String(serviceNumber),
+    jcaptchaVal: captcha || '',
+  }).toString();
+
+  try {
+    const bdRes = await fetch(BILLDESK_URL, { method: 'POST', headers, body });
+    if (!bdRes.ok) throw new Error(`BillDesk returned ${bdRes.status}`);
+    const html = await bdRes.text();
+
+    const errorMatch = html.match(/<div id="error_msg"[^>]*>[\s\S]*?<p>([^<]+)<\/p>/i);
+    if (errorMatch) {
+      return res.json({ ok: false, error: errorMatch[1].trim() });
+    }
+
+    const htmlLower = html.toLowerCase();
+    if (htmlLower.includes('wrong captcha') || htmlLower.includes('invalid captcha') || htmlLower.includes('incorrect captcha') || htmlLower.includes('enter valid captcha')) {
+      return res.json({ ok: false, error: 'Invalid Captcha' });
+    }
+
+    // If we're still seeing the captcha form and no customer/bill amount, it failed.
+    if (!htmlLower.includes('customer name') && !htmlLower.includes('consumer name') && !htmlLower.includes('bill amount') && htmlLower.includes('please enter captcha here')) {
+      const errTrMatch = html.match(/<div id="errTr"[^>]*>([^<]+)<\/div>/i);
+      const colorRedMatch = html.match(/<div[^>]*class="[^"]*color_red[^"]*"[^>]*>([^<]+)<\/div>/i);
+      const errText = (errTrMatch && errTrMatch[1].trim()) || (colorRedMatch && colorRedMatch[1].trim()) || 'Validation failed';
+      return res.json({ ok: false, error: errText });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(502).json({ ok: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/billdesk/init-session
+
  * 
  * Scrapes BillDesk for a fresh reqtoken and generates the dynamic cookie
  * needed for the Captcha image request.

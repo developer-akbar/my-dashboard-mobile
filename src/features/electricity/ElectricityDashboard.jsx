@@ -48,11 +48,19 @@ export function ElectricityDashboard() {
         return;
       }
 
-      await toast.promise(actions.add(payload), {
-        loading: 'Validating and fetching bill…', success: 'Service added', error: e => e?.message || 'Failed',
-      });
+      const t = toast.loading('Validating and fetching bill…');
+      try {
+        await actions.add(payload);
+        toast.success('Service added', { id: t });
+        setDialog({ open: false, service: null });
+      } catch (e) {
+        if (e?.message === 'CANCELLED') {
+          toast.dismiss(t);
+        } else {
+          toast.error(e?.message || 'Failed', { id: t });
+        }
+      }
     }
-    setDialog({ open: false, service: null });
   }
 
   async function handleRefreshAll() {
@@ -61,11 +69,15 @@ export function ElectricityDashboard() {
     setRefreshProgress({ done: 0, total: services.length });
     try {
       const summary = await actions.refreshAll((done, t) => setRefreshProgress({ done, total: t }));
-      summary.failed === 0
-        ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
-        : toast.error(`${summary.failed} failed to refresh`);
+      if (summary) {
+        summary.failed === 0
+          ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
+          : toast.error(`${summary.failed} failed to refresh`);
+      }
     } catch (err) {
-      toast.error(err?.message || 'Refresh failed');
+      if (err?.message !== 'CANCELLED') {
+        toast.error(err?.message || 'Refresh failed');
+      }
     } finally {
       setRefreshingAll(false);
       setRefreshProgress(null);
@@ -125,7 +137,16 @@ export function ElectricityDashboard() {
                   key={s.id}
                   service={s}
                   refreshing={refreshingIds.has(s.id)}
-                  onRefresh={() => toast.promise(actions.refresh(s.id), { loading: 'Refreshing…', success: 'Refreshed', error: e => e?.message || 'Failed' })}
+                  onRefresh={async () => {
+                    const t = toast.loading('Refreshing…');
+                    try {
+                      await actions.refresh(s.id);
+                      toast.success('Refreshed', { id: t });
+                    } catch (e) {
+                      if (e?.message === 'CANCELLED') toast.dismiss(t);
+                      else toast.error(e?.message || 'Failed', { id: t });
+                    }
+                  }}
                   onEdit={() => setDialog({ open: true, service: s })}
                   onDelete={() => {
                     setConfirmState({
