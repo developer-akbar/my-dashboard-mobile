@@ -84,6 +84,24 @@ export function ElectricityDashboard() {
     }
   }
 
+  function handlePay(service) {
+    setConfirmState({
+      open: true,
+      title: 'Redirecting to BillDesk',
+      description: 'You will be redirected to the APSPDCL official website to pay your bill.\n\nYour service number will be automatically copied to your clipboard so you can paste it easily.',
+      isDanger: false,
+      onConfirm: async () => {
+        try { 
+          await navigator.clipboard.writeText(service.serviceNumber); 
+          toast.success('Service number copied to clipboard'); 
+        } catch { 
+          toast.error('Failed to copy service number'); 
+        }
+        window.open('https://payments.billdesk.com/MercOnline/SPDCLController', '_blank', 'noopener,noreferrer');
+      }
+    });
+  }
+
   return (
     <div className="page">
       <header className="page__header">
@@ -158,6 +176,7 @@ export function ElectricityDashboard() {
                     });
                   }}
                   onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
+                  onPay={() => handlePay(s)}
                 />
               ))}
             </div>

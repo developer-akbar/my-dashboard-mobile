@@ -65,7 +65,7 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin }) {
+export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const status = service.lastStatus || 'UNKNOWN';
@@ -77,10 +77,6 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
   async function copyNum() {
     try { await navigator.clipboard.writeText(service.serviceNumber); toast.success('Copied'); }
     catch { toast.error('Copy failed'); }
-  }
-  async function payNow() {
-    await copyNum();
-    window.open('https://payments.billdesk.com/MercOnline/SPDCLController', '_blank', 'noopener,noreferrer');
   }
 
   return (
@@ -139,7 +135,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
               ? <span className="receipt-line">{formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
               : <span />}
             {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-              <button className="btn btn--pay" onClick={payNow}><FiExternalLink size={13} /> Pay now</button>
+              <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13} /> Pay now</button>
             )}
           {/* </div> */}
         </div>
@@ -211,7 +207,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           ? <span className="receipt-line"><FiCheckCircle size={12}/>{service.receiptNumber || '—'} · {formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
           : <span/>}
         {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-          <button className="btn btn--pay" onClick={payNow}><FiExternalLink size={13}/> Pay now</button>
+          <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13}/> Pay now</button>
         )}
       </div> */}
     </article>
