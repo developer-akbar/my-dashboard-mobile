@@ -1,6 +1,13 @@
-import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 
 export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount }) {
+  const { t, i18n } = useTranslation();
+
+  const toggleLanguage = () => {
+    i18n.changeLanguage(i18n.language === 'en' ? 'te' : 'en');
+  };
+
   return (
     <div className="toolbar">
       <div className="toolbar__row toolbar__row--top">
@@ -9,11 +16,15 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
           <input
             value={filters.query}
             onChange={e => onFiltersChange({ ...filters, query: e.target.value })}
-            placeholder="Search services…"
+            placeholder={t('search_services')}
           />
         </div>
+        <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
+          <FiGlobe size={15} style={{ marginRight: '4px' }} />
+          {i18n.language === 'en' ? 'తెలుగు' : 'English'}
+        </button>
         <button className="btn btn--primary btn--sm" onClick={onAdd}>
-          <FiPlus size={15} /> Add
+          <FiPlus size={15} /> {t('add')}
         </button>
       </div>
 
@@ -21,20 +32,20 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         <div className="toolbar__filters">
           <div className="select-wrap">
             <select className="select" value={filters.status} onChange={e => onFiltersChange({ ...filters, status: e.target.value })}>
-              <option value="">All</option>
-              <option value="DUE">Due</option>
-              <option value="PAID">Paid</option>
-              <option value="NO_DUES">No dues</option>
-              <option value="UNKNOWN">Unknown</option>
+              <option value="">{t('filter_all')}</option>
+              <option value="DUE">{t('filter_due')}</option>
+              <option value="PAID">{t('filter_paid')}</option>
+              <option value="NO_DUES">{t('filter_no_dues')}</option>
+              <option value="UNKNOWN">{t('filter_unknown')}</option>
             </select>
             <FiChevronDown size={12} className="select-icon" />
           </div>
 
           <div className="select-wrap">
             <select className="select" value={filters.sort} onChange={e => onFiltersChange({ ...filters, sort: e.target.value })}>
-              <option value="amount">Amount ↓</option>
-              <option value="dueDate">Due date</option>
-              <option value="name">Name</option>
+              <option value="amount">{t('sort_amount')}</option>
+              <option value="dueDate">{t('sort_due_date')}</option>
+              <option value="name">{t('sort_name')}</option>
             </select>
             <FiChevronDown size={12} className="select-icon" />
           </div>
@@ -42,7 +53,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
 
         <div className="toolbar__actions">
           <div className="seg">
-            <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>Active</button>
+            <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>{t('active')}</button>
             <button className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('trash')}>
               <FiTrash2 size={12} />
               {trashCount > 0 && <span className="badge">{trashCount}</span>}
@@ -51,7 +62,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
 
           <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll}>
             <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
-            <span className="hide-xs">Refresh</span>
+            <span className="hide-xs">{t('refresh')}</span>
           </button>
         </div>
       </div>

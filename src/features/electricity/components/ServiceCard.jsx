@@ -11,6 +11,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts';
 import { formatInr, formatDate, formatDateTime, fromNow, getDueTone, getDueCopy } from '../../../shared/utils/index.js';
+import { useTranslation } from 'react-i18next';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { t } = useTranslation();
 
   const status = service.lastStatus || 'UNKNOWN';
   const dueTone = getDueTone(service.lastDueDate, service.isPaid);
@@ -86,17 +88,17 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       <div className="scard__topbar">
         <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
         <div className="scard__topbar-info">
-          <h3 className="scard__name">{service.label || 'Untitled'}</h3>
+          <h3 className="scard__name">{service.label || t('untitled')}</h3>
           <p className="scard__customer">
-            {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || 'Untitled')}
+            {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || t('untitled'))}
           </p>
           <button className="scard__num" onClick={copyNum}>
             <FiCopy size={10} />{service.serviceNumber}
           </button>
         </div>
-        <span className={`pill pill--${status.toLowerCase()}`}>{status.replace('_', ' ')}</span>
+        <span className={`pill pill--${status.toLowerCase()}`}>{t(`filter_${status.toLowerCase()}`, status.replace('_', ' '))}</span>
         <div className="scard__actions">
-          <button className={`icon-btn ${refreshing ? 'icon-btn--spin' : ''}`} onClick={onRefresh} disabled={refreshing} title="Refresh">
+          <button className={`icon-btn ${refreshing ? 'icon-btn--spin' : ''}`} onClick={onRefresh} disabled={refreshing} title={t('refresh')}>
             <FiRefreshCw size={15} />
           </button>
           <div className="scard__menu-wrap">
@@ -119,7 +121,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       {/* ── Hero amount ──────────────────────────────────── */}
       <div className="scard__hero">
         <div className="scard__hero-left">
-          <p className="scard__hero-label">Amount due</p>
+          <p className="scard__hero-label">{t('amount_due')}</p>
           <p className="scard__hero-amount">{status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}</p>
           {status === 'DUE' && insights?.vsLastMonth && (
             <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />
@@ -128,19 +130,19 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className="scard__hero-right">
           {dueCopy && !service.isPaid && <span className={`due-tag due-tag--${dueTone}`}>{dueCopy}</span>}
           {service.isPaid && (
-            <span className="paid-tag"><FiCheckCircle size={12} /> Paid</span>
+            <span className="paid-tag"><FiCheckCircle size={12} /> {t('paid')}</span>
           )}
           {/* <div className="scard__foot"> */}
             {service.isPaid
               ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                   <span className="receipt-line">{formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
-                  <button className="btn btn--ghost" onClick={onPay} style={{ height: '26px', padding: '0 8px', fontSize: '11.5px', marginTop: '2px', color: 'var(--primary)' }}><FiExternalLink size={11} /> Pay More</button>
+                  <button className="btn btn--ghost" onClick={onPay} style={{ height: '26px', padding: '0 8px', fontSize: '11.5px', marginTop: '2px', color: 'var(--primary)' }}><FiExternalLink size={11} /> {t('pay_more')}</button>
                 </div>
               )
               : <span />}
             {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-              <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13} /> Pay now</button>
+              <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13} /> {t('pay_now')}</button>
             )}
           {/* </div> */}
         </div>
@@ -148,22 +150,22 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
       {/* ── Key metrics row ──────────────────────────────── */}
       <div className="scard__kv">
-        <div className="kv"><span>Bill date</span><b>{formatDate(service.lastBillDate)}</b></div>
-        <div className="kv"><span>Due date</span><b>{formatDate(service.lastDueDate)}</b></div>
+        <div className="kv"><span>{t('bill_date')}</span><b>{formatDate(service.lastBillDate)}</b></div>
+        <div className="kv"><span>{t('due_date')}</span><b>{formatDate(service.lastDueDate)}</b></div>
         <div className="kv">
-          <span>Units</span>
+          <span>{t('units')}</span>
           <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights.vsLastMonth.units} unit="u" percent={insights.vsLastMonth.unitsPct} /></b>
         </div>
-        <div className="kv"><span>Updated</span><b title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</b></div>
+        <div className="kv"><span>{t('updated')}</span><b title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</b></div>
       </div>
 
       {/* ── Quick stats ──────────────────────────────────── */}
       {insights && (
         <div className="scard__chips">
-          <div className="chip"><span>Avg/mo</span><b>{formatInr(insights.avgAmount)}</b></div>
-          {insights.avgUnits6m != null && <div className="chip"><span>Avg units</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u - 6m</b><b>{insights.avgUnits12m.toLocaleString('en-IN')} u - 12m</b></div>}
+          <div className="chip"><span>{t('avg_mo')}</span><b>{formatInr(insights.avgAmount)}</b></div>
+          {insights.avgUnits6m != null && <div className="chip"><span>{t('avg_units')}</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u - 6m</b><b>{insights.avgUnits12m.toLocaleString('en-IN')} u - 12m</b></div>}
           {insights.vsSameMonthLastYear && (
-            <div className="chip"><span>vs last year</span><TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} /></div>
+            <div className="chip"><span>{t('vs_last_year')}</span><TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} /></div>
           )}
         </div>
       )}
@@ -175,13 +177,13 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
       {/* ── Accordions ───────────────────────────────────── */}
       {breakup && (
-        <Section title="Bill Breakup" badge={formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}>
-          <BreakupPanel breakup={breakup} />
+        <Section title={t('bill_breakup')} badge={formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}>
+          <BreakupPanel breakup={breakup} isPaid={service.isPaid} paidAmount={service.paidAmount} t={t} />
         </Section>
       )}
 
       {Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
-        <Section title="Recent Bills">
+        <Section title={t('recent_bills')}>
           <div className="hist-list">
             {service.lastThreeAmounts.map((b, i) => (
               <div key={i} className="hist-row">
@@ -195,14 +197,14 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       )}
 
       {service.trendData?.length > 0 && (
-        <Section title="Trends">
-          <TrendPanel data={service.trendData} insights={insights} />
+        <Section title={t('trends')}>
+          <TrendPanel data={service.trendData} insights={insights} t={t} />
         </Section>
       )}
 
       {service.paymentHistory?.length > 0 && (
-        <Section title="Payment History" badge={`${service.paymentHistory.length}`}>
-          <PaymentsPanel payments={service.paymentHistory} />
+        <Section title={t('payment_history')} badge={`${service.paymentHistory.length}`}>
+          <PaymentsPanel payments={service.paymentHistory} t={t} />
         </Section>
       )}
 
@@ -221,13 +223,13 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
 // ── Breakup panel ─────────────────────────────────────────────────────────────
 
-function BreakupPanel({ breakup, isPaid, paidAmount }) {
+function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
   const rows = [
-    { label: 'Energy Charges', key: 'ec', color: '#6366f1' },
-    { label: 'Fixed Charges', key: 'fixchg', color: '#06b6d4' },
-    { label: 'Customer Charges', key: 'cc', color: '#f59e0b' },
-    { label: 'Electricity Duty', key: 'ed', color: '#10b981' },
-    { label: 'Fuel Surcharge', key: 'fsa', color: '#8b5cf6' },
+    { label: t('energy_charges', 'Energy Charges'), key: 'ec', color: '#6366f1' },
+    { label: t('fixed_charges', 'Fixed Charges'), key: 'fixchg', color: '#06b6d4' },
+    { label: t('customer_charges', 'Customer Charges'), key: 'cc', color: '#f59e0b' },
+    { label: t('electricity_duty', 'Electricity Duty'), key: 'ed', color: '#10b981' },
+    { label: t('fuel_surcharge', 'Fuel Surcharge'), key: 'fsa', color: '#8b5cf6' },
   ];
   const total = breakup.grossTotal || 1;
   return (
@@ -247,16 +249,16 @@ function BreakupPanel({ breakup, isPaid, paidAmount }) {
           <b className="bp__val">{formatInr(breakup[r.key] || 0)}</b>
         </div>
       ))}
-      <div className="bp__row bp__row--sub"><span className="bp__label">Gross Total</span><b>{formatInr(breakup.grossTotal || 0)}</b></div>
+      <div className="bp__row bp__row--sub"><span className="bp__label">{t('gross_total')}</span><b>{formatInr(breakup.grossTotal || 0)}</b></div>
       {breakup.isd !== 0 && breakup.isd != null && (
         <div className={`bp__row bp__row--deduction ${breakup.isd < 0 ? 'credit' : ''}`}>
-          <span className="bp__label">Initial Security Deposit</span>
+          <span className="bp__label">{t('isd')}</span>
           <b>{formatInr(breakup.isd)}</b>
         </div>
       )}
       {breakup.arrearsTotal > 0 && (
         <>
-          <div className="bp__divider">Advance Payments (Arrears)</div>
+          <div className="bp__divider">{t('arrears')}</div>
           {Array.isArray(breakup.arrears) && breakup.arrears.map((a, i) => (
             <div key={i} className="bp__row bp__row--arrear">
               <FiCheckCircle size={11} color="#10b981" />
@@ -264,18 +266,18 @@ function BreakupPanel({ breakup, isPaid, paidAmount }) {
               <b className="credit">−{formatInr(a.amount)}</b>
             </div>
           ))}
-          <div className="bp__row bp__row--arrear"><span className="bp__label">Total Arrears</span><b className="credit">−{formatInr(breakup.arrearsTotal)}</b></div>
+          <div className="bp__row bp__row--arrear"><span className="bp__label">{t('total_arrears')}</span><b className="credit">−{formatInr(breakup.arrearsTotal)}</b></div>
         </>
       )}
       {isPaid && paidAmount != null && (
         <div className="bp__row bp__row--arrear">
           <FiCheckCircle size={11} color="#10b981" />
-          <span className="bp__label">Paid Amount</span>
+          <span className="bp__label">{t('paid_amount')}</span>
           <b className="credit">−{formatInr(paidAmount)}</b>
         </div>
       )}
       <div className="bp__row bp__row--net">
-        <span className="bp__label">Net Due</span>
+        <span className="bp__label">{t('net_due')}</span>
         <b style={isPaid ? { color: 'var(--green)' } : {}}>{formatInr(isPaid ? 0 : (breakup.netDue ?? breakup.grossTotal ?? 0))}</b>
       </div>
     </div>
@@ -284,7 +286,7 @@ function BreakupPanel({ breakup, isPaid, paidAmount }) {
 
 // ── Trend panel ───────────────────────────────────────────────────────────────
 
-function TrendPanel({ data, insights }) {
+function TrendPanel({ data, insights, t }) {
   const [view, setView] = useState('amount');
   const chartData = data.map(d => {
     const [yr, mo] = d.month.split('-');
@@ -294,11 +296,11 @@ function TrendPanel({ data, insights }) {
   return (
     <div className="trend">
       <div className="trend__head">
-        <span className="trend__title">18-Month Trend</span>
+        <span className="trend__title">{t('18_month_trend')}</span>
         <div className="seg seg--xs">
           {['amount', 'units', 'combo'].map(v => (
             <button key={v} className={`seg__btn ${view === v ? 'seg__btn--active' : ''}`} onClick={() => setView(v)}>
-              {v === 'amount' ? '₹' : v === 'units' ? 'U' : 'Both'}
+              {v === 'amount' ? '₹' : v === 'units' ? 'U' : t('both')}
             </button>
           ))}
         </div>
@@ -344,18 +346,18 @@ function TrendPanel({ data, insights }) {
       {insights && (
         <div className="trend__stats">
           <div className="tstat tstat--red">
-            <span>Highest</span>
+            <span>{t('highest')}</span>
             <b>{formatInr(insights.maxAmount)}</b>
             <small>{fmtMonth(insights.maxAmountMonth)}</small>
           </div>
           <div className="tstat tstat--green">
-            <span>Lowest</span>
+            <span>{t('lowest')}</span>
             <b>{formatInr(insights.minAmount)}</b>
             <small>{fmtMonth(insights.minAmountMonth)}</small>
           </div>
           {insights.predictedNextBill && (
             <div className="tstat tstat--blue">
-              <span>Next est.</span>
+              <span>{t('next_est')}</span>
               <b>~{formatInr(insights.predictedNextBill)}</b>
               <small>{insights.predictedBasis || 'Seasonal'}</small>
             </div>
@@ -368,7 +370,7 @@ function TrendPanel({ data, insights }) {
 
 // ── Payments panel ────────────────────────────────────────────────────────────
 
-function PaymentsPanel({ payments }) {
+function PaymentsPanel({ payments, t }) {
   return (
     <div className="pymt">
       {payments.map((p, i) => (

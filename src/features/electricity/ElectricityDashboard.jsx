@@ -9,6 +9,7 @@ import { TrashView } from './components/TrashView.jsx';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
+import { useTranslation } from 'react-i18next';
 
 export function ElectricityDashboard() {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
@@ -18,13 +19,14 @@ export function ElectricityDashboard() {
   const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', isDanger: false, onConfirm: () => {} });
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
+  const { t } = useTranslation();
 
   const visible = useMemo(() => filterServices(services, filters), [services, filters]);
 
   async function submitService(payload) {
     if (dialog.service) {
       await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
-        loading: 'Saving…', success: 'Updated', error: e => e?.message || 'Failed',
+        loading: t('saving'), success: 'Updated', error: e => e?.message || 'Failed',
       });
     } else {
       const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
@@ -35,7 +37,7 @@ export function ElectricityDashboard() {
           description: 'This service is currently in the Trash.\n\nWould you like to restore it instead of adding a new one?',
           isDanger: false,
           onConfirm: async () => {
-            await toast.promise(actions.restore(inTrash.id), { loading: 'Restoring…', success: 'Restored', error: 'Failed' });
+            await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: 'Failed' });
             setDialog({ open: false, service: null });
           }
         });
@@ -48,16 +50,16 @@ export function ElectricityDashboard() {
         return;
       }
 
-      const t = toast.loading('Validating and fetching bill…');
+      const tst = toast.loading('Validating and fetching bill…');
       try {
         await actions.add(payload);
-        toast.success('Service added', { id: t });
+        toast.success('Service added', { id: tst });
         setDialog({ open: false, service: null });
       } catch (e) {
         if (e?.message === 'CANCELLED') {
-          toast.dismiss(t);
+          toast.dismiss(tst);
         } else {
-          toast.error(e?.message || 'Failed', { id: t });
+          toast.error(e?.message || 'Failed', { id: tst });
         }
       }
     }
@@ -68,7 +70,7 @@ export function ElectricityDashboard() {
     setRefreshingAll(true);
     setRefreshProgress({ done: 0, total: services.length });
     try {
-      const summary = await actions.refreshAll((done, t) => setRefreshProgress({ done, total: t }));
+      const summary = await actions.refreshAll((done, tot) => setRefreshProgress({ done, total: tot }));
       if (summary) {
         summary.failed === 0
           ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
@@ -107,7 +109,7 @@ export function ElectricityDashboard() {
       <header className="page__header">
         <div>
           <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
-          <h1 className="page__title">Electricity</h1>
+          <h1 className="page__title">{t('electricity')}</h1>
         </div>
         {refreshProgress && (
           <div className="refresh-progress">
@@ -135,16 +137,16 @@ export function ElectricityDashboard() {
           {loading ? (
             <div className="state-box">
               <FiRefreshCw size={22} className="spin" />
-              <p>Loading services…</p>
+              <p>{t('loading_services')}</p>
             </div>
           ) : visible.length === 0 ? (
             <div className="state-box">
               <FiZap size={28} />
-              <h3>No services found</h3>
-              <p>{services.length === 0 ? 'Add your first APSPDCL service to get started.' : 'No results for this filter.'}</p>
+              <h3>{t('no_services_found')}</h3>
+              <p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>
               {services.length === 0 && (
                 <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>
-                  Add service
+                  {t('add_service')}
                 </button>
               )}
             </div>
@@ -156,13 +158,13 @@ export function ElectricityDashboard() {
                   service={s}
                   refreshing={refreshingIds.has(s.id)}
                   onRefresh={async () => {
-                    const t = toast.loading('Refreshing…');
+                    const tst = toast.loading('Refreshing…');
                     try {
                       await actions.refresh(s.id);
-                      toast.success('Refreshed', { id: t });
+                      toast.success('Refreshed', { id: tst });
                     } catch (e) {
-                      if (e?.message === 'CANCELLED') toast.dismiss(t);
-                      else toast.error(e?.message || 'Failed', { id: t });
+                      if (e?.message === 'CANCELLED') toast.dismiss(tst);
+                      else toast.error(e?.message || 'Failed', { id: tst });
                     }
                   }}
                   onEdit={() => setDialog({ open: true, service: s })}

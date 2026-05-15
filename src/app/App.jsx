@@ -1,22 +1,28 @@
 import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 
 const NAV = [
-  { id: 'electricity', label: 'Electricity', icon: FiZap },
-  { id: 'home',        label: 'Overview',    icon: FiGrid },
-  { id: 'settings',   label: 'Settings',    icon: FiSettings },
+  { id: 'electricity', icon: FiZap },
+  { id: 'home',        icon: FiGrid },
+  { id: 'settings',    icon: FiSettings },
 ];
 
 export function App() {
   const [activePage, setActivePage] = useState('electricity');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+  };
 
   return (
     <div className="shell">
@@ -27,14 +33,14 @@ export function App() {
           <span>MyDashboard</span>
         </div>
         <nav className="sidebar__nav">
-          {NAV.map(({ id, label, icon: Icon }) => (
+          {NAV.map(({ id, icon: Icon }) => (
             <button
               key={id}
               className={`sidebar__item ${activePage === id ? 'sidebar__item--active' : ''}`}
               onClick={() => setActivePage(id)}
             >
               <Icon size={17} />
-              {label}
+              {t(id)}
             </button>
           ))}
         </nav>
@@ -46,36 +52,57 @@ export function App() {
         {activePage === 'electricity' && <ElectricityDashboard />}
         {activePage === 'home' && (
           <div className="page coming-soon">
-            <h2>Overview</h2><p>Coming soon</p>
+            <h2>{t('home')}</h2><p>Coming soon</p>
           </div>
         )}
         {activePage === 'settings' && (
           <div className="page">
             <div className="page__header">
               <div>
-                <h2 className="page__title">Settings</h2>
+                <h2 className="page__title">{t('settings')}</h2>
                 <p>Application preferences</p>
               </div>
             </div>
             
             <div className="scard" style={{ padding: '20px' }}>
-              <h3 style={{ marginBottom: '16px', fontSize: '15px' }}>Appearance</h3>
+              <h3 style={{ marginBottom: '16px', fontSize: '15px' }}>{t('appearance')}</h3>
               <div className="field">
-                <label className="field__label">Theme</label>
+                <label className="field__label">{t('theme')}</label>
                 <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
                   <button 
                     className={`seg__btn ${theme === 'dark' ? 'seg__btn--active' : ''}`}
                     onClick={() => setTheme('dark')}
                     style={{ padding: '0 16px' }}
                   >
-                    Dark
+                    {t('dark')}
                   </button>
                   <button 
                     className={`seg__btn ${theme === 'light' ? 'seg__btn--active' : ''}`}
                     onClick={() => setTheme('light')}
                     style={{ padding: '0 16px' }}
                   >
-                    Light
+                    {t('light')}
+                  </button>
+                </div>
+              </div>
+              
+              <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '15px' }}>{t('language')}</h3>
+              <div className="field">
+                <label className="field__label">{t('app_language')}</label>
+                <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                  <button 
+                    className={`seg__btn ${i18n.language === 'en' ? 'seg__btn--active' : ''}`}
+                    onClick={() => changeLanguage('en')}
+                    style={{ padding: '0 16px' }}
+                  >
+                    English
+                  </button>
+                  <button 
+                    className={`seg__btn ${i18n.language === 'te' ? 'seg__btn--active' : ''}`}
+                    onClick={() => changeLanguage('te')}
+                    style={{ padding: '0 16px' }}
+                  >
+                    తెలుగు
                   </button>
                 </div>
               </div>
@@ -86,14 +113,14 @@ export function App() {
 
       {/* Mobile bottom nav */}
       <nav className="bottom-nav">
-        {NAV.map(({ id, label, icon: Icon }) => (
+        {NAV.map(({ id, icon: Icon }) => (
           <button
             key={id}
             className={`bottom-nav__item ${activePage === id ? 'bottom-nav__item--active' : ''}`}
             onClick={() => setActivePage(id)}
           >
             <Icon size={20} />
-            <span>{label}</span>
+            <span>{t(id)}</span>
           </button>
         ))}
       </nav>

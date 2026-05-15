@@ -7,6 +7,7 @@ A modern, privacy-first personal tracking dashboard built with **React 18 + Vite
 ## ⚡ Key Features
 
 - **Multi-Service Tracking:** Monitor multiple APSPDCL electricity connections from a single, unified view.
+- **Multi-Language Support:** Full internationalization (i18n) support with dynamically toggleable English and Telugu options available directly from the Settings menu.
 - **Rich Visualizations:**
   - 18-month historical trend charts.
   - Granular bill breakups (Energy Charges, Fixed Charges, Fuel Surcharge, Initial Security Deposits, Arrears).
