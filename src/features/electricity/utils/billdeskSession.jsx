@@ -139,11 +139,23 @@ export async function getValidSession(serviceNumber) {
   // 2. Try automatic OCR solver
   const loadToast = toast.loading('Connecting and solving Captcha automatically...');
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+    
     const res = await fetch(`${apiBase()}/billdesk/auto-session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serviceNumber })
+      body: JSON.stringify({ serviceNumber }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
+    const contentType = res.headers.get('content-type');
+    if (!res.ok || !contentType || !contentType.includes('application/json')) {
+      throw new Error(res.status === 504 ? 'Timeout from server' : 'Server error');
+    }
+    
     const json = await res.json();
     
     if (json.ok) {
@@ -155,7 +167,8 @@ export async function getValidSession(serviceNumber) {
     // If auto failed, dismiss toast and move to fallback
     toast.error('Auto-solver failed. Please enter manually.', { id: loadToast });
   } catch (err) {
-    toast.error('Network error during auto-session', { id: loadToast });
+    const isTimeout = err.name === 'AbortError' || err.message.includes('Timeout');
+    toast.error(isTimeout ? 'Auto-solver timed out. Please enter manually.' : 'Network error during auto-session. Please enter manually.', { id: loadToast });
   }
 
   // 3. Fallback to Manual Modal
