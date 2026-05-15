@@ -163,7 +163,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           <div className="chip"><span>Avg/mo</span><b>{formatInr(insights.avgAmount)}</b></div>
           {insights.avgUnits6m != null && <div className="chip"><span>Avg units</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u - 6m</b><b>{insights.avgUnits12m.toLocaleString('en-IN')} u - 12m</b></div>}
           {insights.vsSameMonthLastYear && (
-            <div className="chip"><span>vs last yr</span><TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} /></div>
+            <div className="chip"><span>vs last year</span><TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} /></div>
           )}
         </div>
       )}
