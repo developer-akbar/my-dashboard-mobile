@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'My Dashboard',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    cleartext: true
   },
   plugins: {
     CapacitorSQLite: {
@@ -16,7 +17,8 @@ const config: CapacitorConfig = {
       electronWindowsLocation: 'C:\\ProgramData\\CapacitorDatabases',
       electronMacLocation: '/Users/Shared/CapacitorDatabases',
       electronLinuxLocation: 'Databases'
-    }
+    },
+    "CapacitorHttp": {"enabled": true}
   }
 };
 
