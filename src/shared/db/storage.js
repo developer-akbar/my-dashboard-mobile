@@ -51,48 +51,62 @@ async function getSqlite() {
     '@capacitor-community/sqlite'
   );
   const conn = new SQLiteConnection(CapacitorSQLite);
-  const db = await conn.createConnection(
-    'mydashboard',
-    false,
-    'no-encryption',
-    1,
-    false
-  );
-  await db.open();
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS electricity_services (
-      id TEXT PRIMARY KEY,
-      serviceNumber TEXT NOT NULL,
-      label TEXT,
-      customerName TEXT,
-      lastBillDate TEXT,
-      lastDueDate TEXT,
-      lastAmountDue REAL,
-      lastBilledUnits REAL,
-      lastThreeAmounts TEXT,
-      lastStatus TEXT DEFAULT 'UNKNOWN',
-      lastFetchedAt TEXT,
-      lastRefreshedDate TEXT,
-      lastError TEXT,
-      isPaid INTEGER DEFAULT 0,
-      paidDate TEXT,
-      receiptNumber TEXT,
-      paidAmount REAL,
-      billBreakup TEXT,
-      billHistory TEXT,
-      paymentHistory TEXT,
-      trendData TEXT,
-      insights TEXT,
-      pinned INTEGER DEFAULT 0,
-      pinnedAt TEXT,
-      isDeleted INTEGER DEFAULT 0,
-      deletedAt TEXT,
-      createdAt TEXT,
-      updatedAt TEXT
-    )
-  `);
-  _sqlite = db;
-  return db;
+
+  let db;
+  try {
+    const retCC = await conn.checkConnectionsConsistency();
+    const isConn = await conn.isConnection('mydashboard', false);
+    
+    if (retCC.result && isConn.result) {
+      db = await conn.retrieveConnection('mydashboard', false);
+    } else {
+      db = await conn.createConnection(
+        'mydashboard',
+        false,
+        'no-encryption',
+        1,
+        false
+      );
+    }
+    await db.open();
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS electricity_services (
+        id TEXT PRIMARY KEY,
+        serviceNumber TEXT NOT NULL,
+        label TEXT,
+        customerName TEXT,
+        lastBillDate TEXT,
+        lastDueDate TEXT,
+        lastAmountDue REAL,
+        lastBilledUnits REAL,
+        lastThreeAmounts TEXT,
+        lastStatus TEXT DEFAULT 'UNKNOWN',
+        lastFetchedAt TEXT,
+        lastRefreshedDate TEXT,
+        lastError TEXT,
+        isPaid INTEGER DEFAULT 0,
+        paidDate TEXT,
+        receiptNumber TEXT,
+        paidAmount REAL,
+        billBreakup TEXT,
+        billHistory TEXT,
+        paymentHistory TEXT,
+        trendData TEXT,
+        insights TEXT,
+        pinned INTEGER DEFAULT 0,
+        pinnedAt TEXT,
+        isDeleted INTEGER DEFAULT 0,
+        deletedAt TEXT,
+        createdAt TEXT,
+        updatedAt TEXT
+      )
+    `);
+    _sqlite = db;
+    return db;
+  } catch (err) {
+    console.error("SQLite init error:", err);
+    throw err;
+  }
 }
 
 // ── UUID generator ───────────────────────────────────────────────────────────

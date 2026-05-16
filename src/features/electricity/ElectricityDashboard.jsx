@@ -10,6 +10,7 @@ import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { useTranslation } from 'react-i18next';
+import { SessionIndicator } from './components/SessionIndicator.jsx';
 
 export function ElectricityDashboard() {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
@@ -106,11 +107,12 @@ export function ElectricityDashboard() {
 
   return (
     <div className="page">
-      <header className="page__header">
+      <header className="page__header" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
           <h1 className="page__title">{t('electricity')}</h1>
         </div>
+        <SessionIndicator />
         {refreshProgress && (
           <div className="refresh-progress">
             <FiRefreshCw size={12} className="spin" />

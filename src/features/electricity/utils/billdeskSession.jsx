@@ -163,6 +163,7 @@ export async function getValidSession(serviceNumber) {
     if (json.ok) {
       toast.success('Captcha solved automatically', { id: loadToast });
       localStorage.setItem('billdesk_session', JSON.stringify(json.session));
+      window.dispatchEvent(new Event('storage'));
       return json.session;
     }
     

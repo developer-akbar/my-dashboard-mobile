@@ -4,8 +4,12 @@ import { useTranslation } from 'react-i18next';
 export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount }) {
   const { t, i18n } = useTranslation();
 
+  // Use resolvedLanguage as fallback if available, since language might be en-US
+  const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
+  const isTelugu = currentLang.startsWith('te');
+
   const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'en' ? 'te' : 'en');
+    i18n.changeLanguage(isTelugu ? 'en' : 'te');
   };
 
   return (
@@ -21,7 +25,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         </div>
         <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
           <FiGlobe size={15} style={{ marginRight: '4px' }} />
-          {i18n.language === 'en' ? 'తెలుగు' : 'English'}
+          {isTelugu ? 'English' : 'తెలుగు'}
         </button>
         <button className="btn btn--primary btn--sm" onClick={onAdd}>
           <FiPlus size={15} /> {t('add')}

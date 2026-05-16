@@ -60,9 +60,15 @@ export function useElectricityServices() {
 
   // ── Reload from local DB ────────────────────────────────────────────────────
   const reload = useCallback(async () => {
-    const [services, trash] = await Promise.all([listServices(), listTrash()]);
-    dispatch({ type: 'LOAD', services, trash });
-    return services; // return so auto-refresh can inspect them
+    try {
+      const [services, trash] = await Promise.all([listServices(), listTrash()]);
+      dispatch({ type: 'LOAD', services, trash });
+      return services; // return so auto-refresh can inspect them
+    } catch (e) {
+      console.error("Failed to load services:", e);
+      dispatch({ type: 'LOAD', services: [], trash: [] });
+      return [];
+    }
   }, []);
 
   // ── Auto-refresh stale services on first daily load ─────────────────────
