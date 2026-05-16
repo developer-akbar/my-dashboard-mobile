@@ -56,7 +56,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
           </div>
         </div>
 
-        <div className="toolbar__actions">
+        <div className="toolbar__actions" style={{ flex: 1 }}>
           <div className="seg">
             <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>{t('active')}</button>
             <button className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('trash')}>
@@ -65,7 +65,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginRight: '-4px' }}>
             <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll} style={{ border: 'none', background: 'transparent' }}>
               <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
               <span className="hide-xs">{t('refresh')}</span>
