@@ -69,6 +69,14 @@ async function getSqlite() {
       );
     }
     await db.open();
+
+    // Migrate: add historyFetchedAt if missing
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN historyFetchedAt TEXT;");
+    } catch (e) {
+      // Column probably exists, ignore
+    }
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS electricity_services (
         id TEXT PRIMARY KEY,
@@ -82,6 +90,7 @@ async function getSqlite() {
         lastThreeAmounts TEXT,
         lastStatus TEXT DEFAULT 'UNKNOWN',
         lastFetchedAt TEXT,
+        historyFetchedAt TEXT,
         lastRefreshedDate TEXT,
         lastError TEXT,
         isPaid INTEGER DEFAULT 0,
@@ -245,6 +254,7 @@ async function createService(data) {
     lastThreeAmounts: [],
     lastStatus: 'UNKNOWN',
     lastFetchedAt: null,
+    historyFetchedAt: null,
     lastRefreshedDate: null,
     lastError: null,
     isPaid: false,
@@ -271,14 +281,14 @@ async function createService(data) {
       `INSERT INTO electricity_services
         (id, serviceNumber, label, customerName, lastBillDate, lastDueDate,
          lastAmountDue, lastBilledUnits, lastThreeAmounts, lastStatus, lastFetchedAt,
-         lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
+         historyFetchedAt, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
          billBreakup, billHistory, paymentHistory, trendData, insights,
          pinned, pinnedAt, isDeleted, deletedAt, createdAt, updatedAt)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         ser.id, ser.serviceNumber, ser.label, ser.customerName,
         ser.lastBillDate, ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits,
-        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.lastRefreshedDate,
+        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastRefreshedDate,
         ser.lastError, ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.createdAt, ser.updatedAt
@@ -304,7 +314,7 @@ async function updateService(id, patch) {
       `UPDATE electricity_services SET
         serviceNumber=?, label=?, customerName=?, lastBillDate=?, lastDueDate=?,
         lastAmountDue=?, lastBilledUnits=?, lastThreeAmounts=?, lastStatus=?,
-        lastFetchedAt=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
+        lastFetchedAt=?, historyFetchedAt=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
         receiptNumber=?, paidAmount=?, billBreakup=?, billHistory=?,
         paymentHistory=?, trendData=?, insights=?,
         pinned=?, pinnedAt=?, isDeleted=?, deletedAt=?, updatedAt=?
@@ -312,7 +322,7 @@ async function updateService(id, patch) {
       [
         ser.serviceNumber, ser.label, ser.customerName, ser.lastBillDate,
         ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits, ser.lastThreeAmounts,
-        ser.lastStatus, ser.lastFetchedAt, ser.lastRefreshedDate, ser.lastError,
+        ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastRefreshedDate, ser.lastError,
         ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.updatedAt, ser.id

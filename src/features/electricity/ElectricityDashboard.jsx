@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { FiRefreshCw, FiZap } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
@@ -10,7 +10,6 @@ import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { useTranslation } from 'react-i18next';
-import { SessionIndicator } from './components/SessionIndicator.jsx';
 
 export function ElectricityDashboard() {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
@@ -22,12 +21,20 @@ export function ElectricityDashboard() {
   const [refreshProgress, setRefreshProgress] = useState(null);
   const { t } = useTranslation();
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 700);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 700);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const visible = useMemo(() => filterServices(services, filters), [services, filters]);
+  const useAccordion = isMobile ? visible.length > 1 : visible.length > 3;
 
   async function submitService(payload) {
     if (dialog.service) {
       await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
-        loading: t('saving'), success: 'Updated', error: e => e?.message || 'Failed',
+        loading: t('saving'), success: 'Updated', error: e => `Update failed: ${e?.message || 'Unknown error'}`,
       });
     } else {
       const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
@@ -38,7 +45,7 @@ export function ElectricityDashboard() {
           description: 'This service is currently in the Trash.\n\nWould you like to restore it instead of adding a new one?',
           isDanger: false,
           onConfirm: async () => {
-            await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: 'Failed' });
+            await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` });
             setDialog({ open: false, service: null });
           }
         });
@@ -60,7 +67,7 @@ export function ElectricityDashboard() {
         if (e?.message === 'CANCELLED') {
           toast.dismiss(tst);
         } else {
-          toast.error(e?.message || 'Failed', { id: tst });
+          toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
         }
       }
     }
@@ -75,11 +82,11 @@ export function ElectricityDashboard() {
       if (summary) {
         summary.failed === 0
           ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
-          : toast.error(`${summary.failed} failed to refresh`);
+          : toast.error(`Refresh failed for ${summary.failed} service(s)`);
       }
     } catch (err) {
       if (err?.message !== 'CANCELLED') {
-        toast.error(err?.message || 'Refresh failed');
+        toast.error(`Refresh all failed: ${err?.message || 'Unknown error'}`);
       }
     } finally {
       setRefreshingAll(false);
@@ -112,7 +119,6 @@ export function ElectricityDashboard() {
           <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
           <h1 className="page__title">{t('electricity')}</h1>
         </div>
-        <SessionIndicator />
         {refreshProgress && (
           <div className="refresh-progress">
             <FiRefreshCw size={12} className="spin" />
@@ -158,6 +164,7 @@ export function ElectricityDashboard() {
                 <ServiceCard
                   key={s.id}
                   service={s}
+                  useAccordion={useAccordion}
                   refreshing={refreshingIds.has(s.id)}
                   onRefresh={async () => {
                     const tst = toast.loading('Refreshing…');
@@ -166,7 +173,7 @@ export function ElectricityDashboard() {
                       toast.success('Refreshed', { id: tst });
                     } catch (e) {
                       if (e?.message === 'CANCELLED') toast.dismiss(tst);
-                      else toast.error(e?.message || 'Failed', { id: tst });
+                      else toast.error(`Refresh failed: ${e?.message || 'Unknown error'}`, { id: tst });
                     }
                   }}
                   onEdit={() => setDialog({ open: true, service: s })}
@@ -176,7 +183,7 @@ export function ElectricityDashboard() {
                       title: 'Move to Trash?',
                       description: 'This service will be moved to the Trash.\nYou can restore it later from the Trash section.',
                       isDanger: true,
-                      onConfirm: () => toast.promise(actions.remove(s.id), { loading: 'Moving to trash…', success: 'Moved to trash', error: e => e?.message || 'Failed' })
+                      onConfirm: () => toast.promise(actions.remove(s.id), { loading: 'Moving to trash…', success: 'Moved to trash', error: e => `Failed to move: ${e?.message || 'Unknown error'}` })
                     });
                   }}
                   onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
@@ -191,14 +198,14 @@ export function ElectricityDashboard() {
       {activeView === 'trash' && (
         <TrashView
           services={trash}
-          onRestore={id => toast.promise(actions.restore(id), { loading: 'Restoring…', success: 'Restored', error: 'Failed' })}
+          onRestore={id => toast.promise(actions.restore(id), { loading: 'Restoring…', success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` })}
           onDeletePermanent={id => {
             setConfirmState({
               open: true,
               title: 'Delete permanently?',
               description: 'This action cannot be undone and all history will be lost.',
               isDanger: true,
-              onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: 'Deleted permanently', error: 'Failed' })
+              onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: 'Deleted permanently', error: e => `Delete failed: ${e?.message || 'Unknown error'}` })
             });
           }}
         />

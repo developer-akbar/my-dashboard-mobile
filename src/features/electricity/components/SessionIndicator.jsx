@@ -46,19 +46,19 @@ export function SessionIndicator() {
     toast.success('Session cleared. Next refresh will create a new one.');
   };
 
-  if (!sessionActive) return null;
-
   return (
-    <div className="session-indicator" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: '#e0f2fe', color: '#0369a1', padding: '4px 10px', borderRadius: '12px', marginLeft: 'auto' }}>
+    <div className="session-indicator" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: sessionActive ? '#e0f2fe' : 'var(--surface-2)', color: sessionActive ? '#0369a1' : 'var(--text-3)', padding: '4px 10px', borderRadius: '12px', border: sessionActive ? 'none' : '1px solid var(--border)' }}>
       <FiLink size={12} />
-      <span>Session Active ({timeLeft})</span>
-      <button 
-        onClick={killSession} 
-        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: '#0369a1', marginLeft: '4px' }}
-        title="Kill active session"
-      >
-        <FiXCircle size={14} />
-      </button>
+      <span>{sessionActive ? `Session Active (${timeLeft})` : 'No Active Session'}</span>
+      {sessionActive && (
+        <button 
+          onClick={killSession} 
+          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: '#0369a1', marginLeft: '4px' }}
+          title="Kill active session"
+        >
+          <FiXCircle size={14} />
+        </button>
+      )}
     </div>
   );
 }

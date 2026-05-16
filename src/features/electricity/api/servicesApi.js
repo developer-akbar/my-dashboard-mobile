@@ -55,15 +55,14 @@ export async function apiPost(path, body) {
 
 // ── Snapshot → DB patch mapper ────────────────────────────────────────────────
 
-function snapshotToPatch(snapshot) {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  return {
+function snapshotToPatch(snapshot, existing = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const patch = {
     customerName:      snapshot.customerName,
     lastBillDate:      snapshot.billDate,
     lastDueDate:       snapshot.dueDate,
     lastAmountDue:     snapshot.amountDue,
     lastBilledUnits:   snapshot.billedUnits,
-    lastThreeAmounts:  snapshot.lastThreeAmounts,
     lastStatus:        snapshot.status,
     lastFetchedAt:     snapshot.fetchedAt || new Date().toISOString(),
     lastRefreshedDate: today,
@@ -72,12 +71,36 @@ function snapshotToPatch(snapshot) {
     receiptNumber:     snapshot.receiptNumber,
     paidAmount:        snapshot.paidAmount,
     billBreakup:       snapshot.billBreakup,
-    billHistory:       snapshot.billHistory    || null,
-    paymentHistory:    snapshot.paymentHistory || null,
-    trendData:         snapshot.trendData      || null,
-    insights:          snapshot.insights       || null,
-    lastError:         null,
   };
+
+  // Persist history if successful, otherwise keep existing
+  if (!snapshot.apspdclError) {
+    patch.billHistory      = snapshot.billHistory;
+    patch.paymentHistory   = snapshot.paymentHistory;
+    patch.trendData        = snapshot.trendData;
+    patch.insights         = snapshot.insights;
+    patch.lastThreeAmounts = snapshot.lastThreeAmounts;
+    patch.historyFetchedAt = snapshot.fetchedAt || new Date().toISOString();
+  } else {
+    // Keep existing history if APSPDCL failed
+    patch.billHistory      = existing.billHistory      || null;
+    patch.paymentHistory   = existing.paymentHistory   || null;
+    patch.trendData        = existing.trendData        || null;
+    patch.insights         = existing.insights         || null;
+    patch.lastThreeAmounts = existing.lastThreeAmounts || [];
+    patch.historyFetchedAt = existing.historyFetchedAt || null;
+  }
+
+  // Shorten error messages
+  if (snapshot.apspdclError) {
+    patch.lastError = `APSPDCL history unavailable. Showing Live BillDesk.`;
+  } else if (snapshot.billDeskError) {
+    patch.lastError = `Live BillDesk unavailable. Showing APSPDCL data.`;
+  } else {
+    patch.lastError = null;
+  }
+
+  return patch;
 }
 
 /**
@@ -148,7 +171,7 @@ export async function createService({ serviceNumber, label }, billdeskSession) {
   const { snapshot } = await apiPost('/services/validate', { serviceNumber, billdeskSession });
 
   const service = await db.create({ serviceNumber, label });
-  return db.update(service.id, { ...snapshotToPatch(snapshot), lastError: null });
+  return db.update(service.id, { ...snapshotToPatch(snapshot, service), lastError: null });
 }
 
 /**
@@ -163,7 +186,7 @@ export async function refreshService(id, billdeskSession) {
 
   try {
     const { snapshot } = await apiPost(`/services/${service.serviceNumber}/refresh`, { billdeskSession });
-    return db.update(id, snapshotToPatch(snapshot));
+    return db.update(id, snapshotToPatch(snapshot, service));
   } catch (err) {
     await db.update(id, { lastError: err.message || 'Refresh failed', lastFetchedAt: new Date().toISOString() });
     throw err;
@@ -197,7 +220,7 @@ export async function refreshAllServices(onProgress, billdeskSession) {
     if (!service) return;
 
     if (result.ok && result.snapshot) {
-      await db.update(service.id, snapshotToPatch(result.snapshot));
+      await db.update(service.id, snapshotToPatch(result.snapshot, service));
     } else {
       await db.update(service.id, {
         lastError: result.error || 'Refresh failed',

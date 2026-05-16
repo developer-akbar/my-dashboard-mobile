@@ -38,7 +38,7 @@ function CaptchaModal({ serviceNumber, initialSessionData, resolve, cleanup }) {
       const json = await res.json();
       
       if (!json.ok) {
-        toast.error(json.error || 'Validation failed', { id: validateToast });
+        toast.error(`Validation failed: ${json.error || 'Unknown error'}`, { id: validateToast });
         setCaptcha('');
         
         // Fetch new session because captcha is single-use
@@ -47,7 +47,7 @@ function CaptchaModal({ serviceNumber, initialSessionData, resolve, cleanup }) {
           const initJson = await initRes.json();
           if (initJson.ok) setSessionData(initJson);
         } catch (e) {
-          toast.error('Failed to get new captcha image');
+          toast.error(`Failed to get new captcha image: ${e?.message || 'Unknown'}`);
         }
         
         setValidating(false);
@@ -55,7 +55,7 @@ function CaptchaModal({ serviceNumber, initialSessionData, resolve, cleanup }) {
       }
       toast.success('Validation successful', { id: validateToast });
     } catch (err) {
-      toast.error('Network error during validation', { id: validateToast });
+      toast.error(`Network error during validation: ${err?.message || 'Unknown'}`, { id: validateToast });
       setValidating(false);
       return;
     }
@@ -168,10 +168,10 @@ export async function getValidSession(serviceNumber) {
     }
     
     // If auto failed, dismiss toast and move to fallback
-    toast.error('Auto-solver failed. Please enter manually.', { id: loadToast });
+    toast.error(`Auto-solver failed: ${json.error || 'Unknown reason'}`, { id: loadToast });
   } catch (err) {
     const isTimeout = err.name === 'AbortError' || err.message.includes('Timeout');
-    toast.error(isTimeout ? 'Auto-solver timed out. Please enter manually.' : 'Network error during auto-session. Please enter manually.', { id: loadToast });
+    toast.error(isTimeout ? 'Auto-solver timed out. Please enter manually.' : `Network error during auto-session: ${err.message}`, { id: loadToast });
   }
 
   // 3. Fallback to Manual Modal
@@ -186,7 +186,7 @@ export async function getValidSession(serviceNumber) {
     sessionData = json;
   } catch (err) {
     toast.dismiss(initToast);
-    toast.error('Failed to initialize manual BillDesk session');
+    toast.error(`Failed to initialize manual BillDesk session: ${err.message}`);
     return null;
   }
 

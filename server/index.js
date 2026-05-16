@@ -31,6 +31,8 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import { solveCaptchaImage } from './utils/billdesk/ocr.js';
+
 
 dotenv.config();
 
@@ -61,49 +63,57 @@ async function apspdclPost(endpoint, serviceNumber) {
 }
 
 async function fetchBillDeskBill(serviceNumber, billdeskSession) {
-  const reqtoken = billdeskSession?.reqtoken || process.env.BILLDESK_REQTOKEN || 'jqwnKJzbISLlGFEAytVm';
-  const jcaptchaVal = billdeskSession?.captcha || process.env.BILLDESK_JCAPTCHAVAL || '108296';
-  const cookie = billdeskSession?.cookie || process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
+  if (billdeskSession) {
+    const { reqtoken, captcha, cookie } = billdeskSession;
+    return await executeBillDeskRequest(serviceNumber, reqtoken, captcha, cookie);
+  }
 
+  // Auto-solve with retries if no session provided
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
+      const session = await scrapeBillDeskSession(baseCookie);
+      const captchaText = await solveCaptchaImage(session.cookie);
+      
+      if (!captchaText || captchaText.length < 5) continue;
+
+      const html = await executeBillDeskRequestRaw(serviceNumber, session.reqtoken, captchaText, session.cookie);
+      const htmlLower = html.toLowerCase();
+      
+      if (htmlLower.includes('wrong captcha') || htmlLower.includes('invalid captcha') || htmlLower.includes('incorrect captcha') || htmlLower.includes('enter valid captcha')) {
+         continue;
+      }
+      return parseBillDeskHtml(html);
+    } catch (err) {
+      console.error(`[api] fetchBillDeskBill attempt ${attempt} error:`, err);
+    }
+  }
+  return null;
+}
+
+async function executeBillDeskRequestRaw(serviceNumber, reqtoken, jcaptchaVal, cookie) {
   const headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
     'Origin': 'https://payments.billdesk.com',
     'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController',
     'User-Agent': 'Mozilla/5.0',
   };
-  if (cookie) {
-    headers.Cookie = cookie;
-  }
+  if (cookie) headers.Cookie = cookie;
 
   const body = new URLSearchParams({
     reqid: 'confirm',
-    reqtoken: reqtoken,
+    reqtoken: reqtoken || '',
     txtCustomerID: String(serviceNumber),
-    jcaptchaVal: jcaptchaVal,
+    jcaptchaVal: jcaptchaVal || '',
   }).toString();
 
-  console.log('[api] BillDesk request', {
-    serviceNumber,
-    url: BILLDESK_URL,
-    hasReqToken: !!reqtoken,
-    hasJcaptcha: !!jcaptchaVal,
-    hasCookie: !!cookie,
-  });
-
-  const res = await fetch(BILLDESK_URL, {
-    method: 'POST',
-    headers,
-    body,
-  });
+  const res = await fetch(BILLDESK_URL, { method: 'POST', headers, body });
   if (!res.ok) throw new Error(`BillDesk responded with ${res.status}`);
+  return await res.text();
+}
 
-  const html = await res.text();
-  console.log('[api] BillDesk response', {
-    serviceNumber,
-    status: res.status,
-    length: html.length,
-  });
-  // console.log('[api] BillDesk raw HTML preview', html.slice(0, 4000));
+async function executeBillDeskRequest(serviceNumber, reqtoken, jcaptchaVal, cookie) {
+  const html = await executeBillDeskRequestRaw(serviceNumber, reqtoken, jcaptchaVal, cookie);
   return parseBillDeskHtml(html);
 }
 
@@ -133,11 +143,15 @@ function parseBillDeskHtml(html) {
   const customerName = parseField('Customer Name') || parseField('Consumer Name') || parseField('Name');
   const billAmount = parseNumber(parseField('Bill Amount'));
   const currentDemand = parseNumber(parseField('Current Demand'));
+  const rawBillDate = parseField('Bill Date');
+  const rawDueDate = parseField('Due Date');
 
   console.log('[api] BillDesk parse candidates', {
     customerName,
     billAmount,
     currentDemand,
+    rawBillDate,
+    rawDueDate,
   });
 
   if (billAmount == null && currentDemand == null) {
@@ -159,6 +173,8 @@ function parseBillDeskHtml(html) {
     billDeskBillAmount: billAmount,
     billDeskCurrentDemand: currentDemand,
     billDeskIsPaid: currentDemand === 0,
+    billDeskBillDate: rawBillDate,
+    billDeskDueDate: rawDueDate,
   };
 }
 
@@ -173,11 +189,22 @@ function parseDate(v) {
   if (!v) return null;
   const p = String(v).trim().split(/[-/]/);
   if (p.length === 3) {
-    const [d, m, y] = p;
-    const month = MONTH_MAP[m.toUpperCase()];
-    const year  = String(y).length === 2 ? 2000 + +y : +y;
-    if (month != null && isFinite(year) && isFinite(+d))
-      return new Date(Date.UTC(year, month, +d));
+    let d, m, y;
+    if (p[0].length === 4) {
+      [y, m, d] = p;
+    } else {
+      [d, m, y] = p;
+    }
+
+    let month;
+    if (!isNaN(m)) month = parseInt(m, 10) - 1;
+    else month = MONTH_MAP[m.toUpperCase()];
+
+    const year = String(y).length === 2 ? 2000 + +y : +y;
+    const day = +d;
+
+    if (month != null && isFinite(year) && isFinite(day))
+      return new Date(Date.UTC(year, month, day));
   }
   const ts = Date.parse(String(v).replace(/-/g, ' '));
   return isNaN(ts) ? null : new Date(ts);
@@ -324,21 +351,24 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     apspdclPost('publicpaymenthistory', serviceNumber),
   ]);
 
-  if (billResult.status === 'rejected') throw new Error(`Network error: ${billResult.reason?.message}`);
-
-  const billData    = billResult.value;
+  const billData    = billResult.status === 'fulfilled' ? billResult.value : null;
   const paymentData = paymentResult.status === 'fulfilled' ? paymentResult.value : { data: [] };
 
-  if (!Array.isArray(billData?.data) || !billData.data.length) return null;
+  let apspdclError = null;
+  let bills = [];
+  if (!billData || !Array.isArray(billData.data) || !billData.data.length) {
+    const errorMsg = billData?.message || billData?.error || (billResult.status === 'rejected' ? billResult.reason?.message : '');
+    apspdclError = errorMsg.toLowerCase().includes('not found') 
+      ? 'APSPDCL history servers are down. Please try again later.'
+      : (errorMsg ? `APSPDCL Sync Failed: ${errorMsg}` : 'APSPDCL history servers are down. Please try again later.');
+  } else {
+    bills = billData.data
+      .map(normaliseBill)
+      .filter(b => b.closingDate)
+      .sort((a, b) => b.closingDate - a.closingDate);
+  }
 
-  const bills = billData.data
-    .map(normaliseBill)
-    .filter(b => b.closingDate)
-    .sort((a, b) => b.closingDate - a.closingDate);
-
-  if (!bills.length) return null;
-
-  const latest       = bills[0];
+  const latest       = bills[0] || null;
   const now          = new Date();
   const currentYear  = now.getUTCFullYear();
   const currentMonth = now.getUTCMonth();
@@ -352,43 +382,56 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   let billDeskBillAmount = null;
   let billDeskIsPaid = false;
   let billDeskError = null;
+  let billDeskBillDate = null;
+  let billDeskDueDate = null;
   try {
     billDeskData = await fetchBillDeskBill(serviceNumber, billdeskSession);
     if (billDeskData) {
       billDeskAmount = billDeskData.billDeskAmount;
       billDeskBillAmount = billDeskData.billDeskBillAmount;
       billDeskIsPaid = billDeskData.billDeskIsPaid === true;
+      billDeskBillDate = billDeskData.billDeskBillDate;
+      billDeskDueDate = billDeskData.billDeskDueDate;
       // If BillDesk says paid (currentDemand = 0), don't set error
     } else {
-      billDeskError = 'BillDesk response could not be parsed';
+      billDeskError = 'Response could not be parsed';
     }
   } catch (error) {
-    billDeskError = error?.message || 'BillDesk fetch failed';
+    billDeskError = 'Connection failed';
+  }
+
+  if (!bills.length && !billDeskData) {
+    throw new Error(apspdclError || billDeskError || 'Validation failed. All upstream servers are down. Please try again later.');
   }
 
   const pay = analysePayments(paymentData.data || [], bills, billDeskAmount ?? undefined);
 
   let status;
-  if (!hasCurrentMonthBill)   status = 'NO_DUES';
+  if (!bills.length)          status = billDeskIsPaid ? 'PAID' : ((billDeskAmount > 0) ? 'DUE' : 'UNKNOWN');
+  else if (!hasCurrentMonthBill) status = 'NO_DUES';
   else if (pay.isPaid)        status = 'PAID';
   else if (billDeskIsPaid)    status = 'PAID';  // BillDesk says currentDemand is 0 = paid
   else if ((billDeskAmount ?? latest.billAmount) > 0) status = 'DUE';
   else                        status = 'UNKNOWN';
 
-  const finalDueAmount = billDeskAmount ?? latest.billAmount;
-  const publicDueAmount = latest.billAmount;
-  const billDeskSource = billDeskAmount != null ? 'BILLDESK' : 'APSPDCL';
+  const finalDueAmount = billDeskAmount ?? latest?.billAmount ?? 0;
+  const publicDueAmount = latest?.billAmount ?? 0;
+  const billDeskSource = billDeskAmount != null ? 'BILLDESK' : (bills.length ? 'APSPDCL' : 'UNKNOWN');
 
-  // Calculate Gross Total as sum of components
-  const grossTotal = toNum(latest.ec) + toNum(latest.fixchg) + toNum(latest.cc) + toNum(latest.ed) + toNum(latest.fsa);
-  const roundedGrossTotal = Math.round(grossTotal);
+  let breakup = null;
+  let isdAmount = 0;
+  let amountDue = 0;
 
-  // isdAmount = Original Bill Amount - (Gross Total - Arrears)
-  const originalBillAmountForIsd = billDeskAmount ?? latest.billAmount;
-  const isdAmount = originalBillAmountForIsd != null ? originalBillAmountForIsd - (roundedGrossTotal - pay.arrearsTotal) : 0;
-
-  const breakup = buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount);
-  const amountDue = status === 'DUE' ? (breakup?.netDue ?? finalDueAmount) : 0;
+  if (latest) {
+    const grossTotal = toNum(latest.ec) + toNum(latest.fixchg) + toNum(latest.cc) + toNum(latest.ed) + toNum(latest.fsa);
+    const roundedGrossTotal = Math.round(grossTotal);
+    const originalBillAmountForIsd = billDeskAmount ?? latest.billAmount;
+    isdAmount = originalBillAmountForIsd != null ? originalBillAmountForIsd - (roundedGrossTotal - pay.arrearsTotal) : 0;
+    breakup = buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount);
+    amountDue = status === 'DUE' ? (breakup?.netDue ?? finalDueAmount) : 0;
+  } else {
+    amountDue = status === 'DUE' ? finalDueAmount : 0;
+  }
 
   // ── Parse all payments ────────────────────────────────────────────────────
   const allPayments = (paymentData.data || [])
@@ -618,18 +661,19 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   // ── Clean DTO — only what the UI needs ──────────────────────────────────────
   return {
     serviceNumber,
-    customerName:     billDeskData?.customerName ?? null,
+    customerName:     billDeskData?.customerName ?? latest?.customerName ?? null,
 
     // Current bill
-    billDate:         latest.closingDate.toISOString(),
-    dueDate:          latest.dueDate?.toISOString() || null,
-    billedUnits:      latest.billedUnits,
+    billDate:         (billDeskBillDate && parseDate(billDeskBillDate)) ? parseDate(billDeskBillDate).toISOString() : (latest ? latest.closingDate.toISOString() : new Date().toISOString()),
+    dueDate:          (billDeskDueDate && parseDate(billDeskDueDate)) ? parseDate(billDeskDueDate).toISOString() : (latest?.dueDate?.toISOString() || null),
+    billedUnits:      latest?.billedUnits ?? null,
     billAmount:       finalDueAmount,   // final bill amount from BillDesk when available
     publicBillAmount: publicDueAmount,
     billDeskAmount:   billDeskAmount ?? null,
     billDeskBillAmount: billDeskBillAmount ?? null,
     billDeskCurrentDemand: billDeskData?.billDeskCurrentDemand ?? null,
     billDeskError,
+    apspdclError,
     amountDue,                             // net (after arrears/current payment)
     status,                                // DUE | PAID | NO_DUES | UNKNOWN
 
@@ -882,7 +926,7 @@ app.get('/api/billdesk/captcha-image', async (req, res) => {
   }
 });
 
-import { solveCaptchaImage } from './utils/billdesk/ocr.js';
+
 
 app.post('/api/billdesk/auto-session', async (req, res) => {
   const { serviceNumber } = req.body || {};

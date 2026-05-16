@@ -1,5 +1,6 @@
 import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
+import { SessionIndicator } from './SessionIndicator.jsx';
 
 export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount }) {
   const { t, i18n } = useTranslation();
@@ -64,10 +65,13 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             </button>
           </div>
 
-          <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll}>
-            <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
-            <span className="hide-xs">{t('refresh')}</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+            <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll} style={{ border: 'none', background: 'transparent' }}>
+              <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
+              <span className="hide-xs">{t('refresh')}</span>
+            </button>
+            <SessionIndicator />
+          </div>
         </div>
       </div>
     </div>

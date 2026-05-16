@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
@@ -66,9 +66,14 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay }) {
+export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    setIsExpanded(!useAccordion);
+  }, [useAccordion]);
 
   const status = service.lastStatus || 'UNKNOWN';
   const dueTone = getDueTone(service.lastDueDate, service.isPaid);
@@ -78,46 +83,65 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
   async function copyNum() {
     try { await navigator.clipboard.writeText(service.serviceNumber); toast.success('Copied'); }
-    catch { toast.error('Copy failed'); }
+    catch (e) { toast.error(`Copy failed: ${e?.message || 'Unknown error'}`); }
   }
 
   return (
-    <article className={`scard scard--${status.toLowerCase()}`}>
+    <article className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''}`}>
 
       {/* ── Top bar ──────────────────────────────────────── */}
-      <div className="scard__topbar">
+      <div 
+        className="scard__topbar" 
+        onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} 
+        style={{ cursor: useAccordion ? 'pointer' : 'default' }}
+      >
         <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
         <div className="scard__topbar-info">
           <h3 className="scard__name">{service.label || t('untitled')}</h3>
           <p className="scard__customer">
             {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || t('untitled'))}
           </p>
-          <button className="scard__num" onClick={copyNum}>
+          <button className="scard__num" onClick={(e) => { e.stopPropagation(); copyNum(); }}>
             <FiCopy size={10} />{service.serviceNumber}
           </button>
         </div>
-        <span className={`pill pill--${status.toLowerCase()}`}>{t(`filter_${status.toLowerCase()}`, status.replace('_', ' '))}</span>
-        <div className="scard__actions">
-          <button className={`icon-btn ${refreshing ? 'icon-btn--spin' : ''}`} onClick={onRefresh} disabled={refreshing} title={t('refresh')}>
-            <FiRefreshCw size={15} />
-          </button>
-          <div className="scard__menu-wrap">
-            <button className="icon-btn" onClick={() => setMenuOpen(v => !v)} onBlur={() => setTimeout(() => setMenuOpen(false), 150)}>
-              <FiMoreVertical size={15} />
-            </button>
-            {menuOpen && (
-              <div className="popover">
-                <button onMouseDown={() => { setMenuOpen(false); onTogglePin(); }}>
-                  {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
-                </button>
-                <button onMouseDown={() => { setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
-                <button className="danger" onMouseDown={() => { setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
-              </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          {useAccordion && !isExpanded && (
+            <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-1)', lineHeight: 1 }}>
+              {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {service.lastError && (
+              <FiAlertTriangle size={14} color="var(--amber)" title={service.lastError} />
             )}
+            <span className={`pill pill--${status.toLowerCase()}`}>{t(`filter_${status.toLowerCase()}`, status.replace('_', ' '))}</span>
+            <div className="scard__actions" onClick={e => e.stopPropagation()}>
+              <button className={`icon-btn ${refreshing ? 'icon-btn--spin' : ''}`} onClick={onRefresh} disabled={refreshing} title={t('refresh')}>
+                <FiRefreshCw size={15} />
+              </button>
+              <div className="scard__menu-wrap">
+                <button className="icon-btn" onClick={() => setMenuOpen(v => !v)} onBlur={() => setTimeout(() => setMenuOpen(false), 150)}>
+                  <FiMoreVertical size={15} />
+                </button>
+                {menuOpen && (
+                  <div className="popover">
+                    <button onMouseDown={() => { setMenuOpen(false); onTogglePin(); }}>
+                      {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button onMouseDown={() => { setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
+                    <button className="danger" onMouseDown={() => { setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      <div className={`scard__body ${isExpanded ? 'scard__body--expanded' : ''}`}>
+        <div className="scard__body-inner">
       {/* ── Hero amount ──────────────────────────────────── */}
       <div className="scard__hero">
         <div className="scard__hero-left">
@@ -154,7 +178,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className="kv"><span>{t('due_date')}</span><b>{formatDate(service.lastDueDate)}</b></div>
         <div className="kv">
           <span>{t('units')}</span>
-          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights.vsLastMonth.units} unit="u" percent={insights.vsLastMonth.unitsPct} /></b>
+          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} /></b>
         </div>
         <div className="kv"><span>{t('updated')}</span><b title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</b></div>
       </div>
@@ -172,7 +196,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
       {/* ── Error ────────────────────────────────────────── */}
       {service.lastError && (
-        <div className="scard__error"><FiAlertTriangle size={12} />{service.lastError}</div>
+        <div className="scard__error"><FiAlertTriangle size={12} />{service?.lastError}</div>
       )}
 
       {/* ── Accordions ───────────────────────────────────── */}
@@ -183,7 +207,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
       )}
 
       {Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
-        <Section title={t('recent_bills')}>
+        <Section title={t('recent_bills')} badge={service.historyFetchedAt ? `Fetched ${formatDate(service.historyFetchedAt)}` : null}>
           <div className="hist-list">
             {service.lastThreeAmounts.map((b, i) => (
               <div key={i} className="hist-row">
@@ -217,6 +241,8 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13}/> Pay now</button>
         )}
       </div> */}
+        </div>
+      </div>
     </article>
   );
 }

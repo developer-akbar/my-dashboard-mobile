@@ -130,7 +130,7 @@ export function useElectricityServices() {
     dispatch({ type: 'REFRESHING_ADD', id });
     try {
       await refreshService(id, session);
-      cooldowns.current.set(id, Date.now() + 120_000);
+      cooldowns.current.set(id, Date.now() + 5_000);
     } finally {
       dispatch({ type: 'REFRESHING_REMOVE', id });
       await reload();

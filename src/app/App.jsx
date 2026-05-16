@@ -107,6 +107,12 @@ export function App() {
                 </div>
               </div>
             </div>
+
+            <footer className="dev-footer">
+              <div className="dev-footer__line" />
+              <p className="dev-footer__name">Developed by Akbar</p>
+              <span className="dev-footer__tag">v1.0.0</span>
+            </footer>
           </div>
         )}
       </main>
@@ -126,7 +132,8 @@ export function App() {
       </nav>
 
       <Toaster
-        position="top-center"
+        position="bottom-center"
+        containerClassName="toast-container"
         toastOptions={{
           duration: 3000,
           style: {
