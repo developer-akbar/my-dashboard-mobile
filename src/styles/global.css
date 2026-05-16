@@ -1023,7 +1023,7 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   padding: 2px 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  borderRadius: 12px;
+  border-radius: 12px;
   color: var(--text-3);
 }
 
