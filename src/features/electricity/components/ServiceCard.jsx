@@ -188,8 +188,8 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className="scard__chips">
           <div className="chip"><span>{t('avg_mo')}</span><b>{formatInr(insights.avgAmount)}</b></div>
           {insights.avgUnits6m != null && <div className="chip"><span>{t('avg_units')}</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u - 6m</b><b>{insights.avgUnits12m.toLocaleString('en-IN')} u - 12m</b></div>}
-          {insights.vsSameMonthLastYear && (
-            <div className="chip"><span>{t('vs_last_year')}</span><TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} /></div>
+          {insights?.vsSameMonthLastYear && (
+            <div className="chip"><span>{t('vs_last_year')}</span><TrendBadge value={insights?.vsSameMonthLastYear.amount} unit="₹" percent={insights?.vsSameMonthLastYear.amountPct} /></div>
           )}
         </div>
       )}

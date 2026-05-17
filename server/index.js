@@ -435,7 +435,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
 
   // ── Parse all payments ────────────────────────────────────────────────────
   const allPayments = (paymentData.data || [])
-    .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), receiptNo: p.prno || null }))
+    .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), units: toNum(p.units), receiptNo: p.prno || null }))
     .filter(p => p.date)
     .sort((a, b) => b.date - a.date); // newest first
 
@@ -493,6 +493,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   const paymentHistory12 = allPayments.slice(0, 12).map(p => ({
     date:      p.date.toISOString(),
     amount:    p.amount,
+    units:     p.units,
     receiptNo: p.receiptNo,
   }));
 
