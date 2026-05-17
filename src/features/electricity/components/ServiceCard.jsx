@@ -174,8 +174,8 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
 
       {/* ── Key metrics row ──────────────────────────────── */}
       <div className="scard__kv">
-        <div className="kv"><span>{t('bill_date')}</span><b>{formatDate(service.lastBillDate)}</b></div>
-        <div className="kv"><span>{t('due_date')}</span><b>{formatDate(service.lastDueDate)}</b></div>
+        <div className="kv"><span>{t('bill_date')}</span><b><FiCalendar size={13} />{formatDate(service.lastBillDate)}</b></div>
+        <div className="kv"><span>{t('due_date')}</span><b><FiCalendar size={13} />{formatDate(service.lastDueDate)}</b></div>
         <div className="kv">
           <span>{t('units')}</span>
           <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights?.vsLastMonth?.units} unit="u" percent={insights?.vsLastMonth?.unitsPct} /></b>
@@ -406,6 +406,7 @@ function PaymentsPanel({ payments, t }) {
             <span>{formatDate(p.date)}</span>
           </div>
           <span className="mono-sm pymt__ref">{p.receiptNo || '—'}</span>
+          <span className="mono-sm pymt__units">{p.units || '—'}u</span>
           <b>{formatInr(p.amount)}</b>
         </div>
       ))}

@@ -632,7 +632,7 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   background: var(--surface);
 }
 .kv span { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); }
-.kv b    { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.kv b    { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-1); }
 
 /* Quick chips */
 .scard__chips {
