@@ -148,7 +148,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
           <p className="scard__hero-label">{t('amount_due')}</p>
           <p className="scard__hero-amount">{status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}</p>
           {status === 'DUE' && insights?.vsLastMonth && (
-            <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />
+            <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
           )}
         </div>
         <div className="scard__hero-right">
@@ -178,7 +178,7 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
         <div className="kv"><span>{t('due_date')}</span><b>{formatDate(service.lastDueDate)}</b></div>
         <div className="kv">
           <span>{t('units')}</span>
-          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} /></b>
+          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights?.vsLastMonth?.units} unit="u" percent={insights?.vsLastMonth?.unitsPct} /></b>
         </div>
         <div className="kv"><span>{t('updated')}</span><b title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</b></div>
       </div>
