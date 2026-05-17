@@ -531,8 +531,8 @@ input[type="checkbox"] {
 .select-icon { position: absolute; right: 6px; pointer-events: none; color: var(--text-3); }
 
 /* ── Visibility Utilities ─────────────────────────────────────────────────── */
-.show-xs { display: none; }
-.hide-xs { display: inline-flex; }
+.show-mobile-sm { display: none; }
+.hide-mobile-sm { display: inline-flex; }
 
 /* ── Segmented control ──────────────────────────────────────────────────────── */
 .seg {
@@ -1295,6 +1295,12 @@ input[type="checkbox"] {
   .sidebar { width: 196px; }
 }
 
+/* Small Desktop / Large Tablet with Sidebar */
+@media (min-width: 701px) and (max-width: 850px) {
+  .toolbar__row--bottom { flex-wrap: wrap; gap: 12px; }
+  .toolbar__group { flex-wrap: wrap; }
+}
+
 /* Mobile */
 @media (max-width: 700px) {
   .sidebar     { display: none; }
@@ -1315,12 +1321,9 @@ input[type="checkbox"] {
 
   .toolbar { padding: 10px; top: 0; border-radius: 0; border-left: none; border-right: none; margin-bottom: 12px; gap: 8px; }
   .toolbar__row--bottom { flex-wrap: wrap; gap: 8px; }
-  .toolbar__group { flex: 1; min-width: fit-content; }
+  .toolbar__group { min-width: fit-content; }
   .toolbar__filters { gap: 4px; }
   .select { padding: 0 20px 0 6px; font-size: 11.5px; }
-
-  .show-xs { display: inline-flex; }
-  .hide-xs { display: none !important; }
 
   .sheet { max-width: 100%; }
   .overlay { align-items: flex-end; padding: 0; }
@@ -1331,7 +1334,12 @@ input[type="checkbox"] {
   .scard__hero-amount { font-size: 24px; }
 }
 
+/* Small Mobile */
 @media (max-width: 360px) {
   .summary { grid-template-columns: 1fr 1fr; }
   .stat__value { font-size: 15px; }
+  
+  .show-mobile-sm { display: inline-flex !important; }
+  .hide-mobile-sm { display: none !important; }
+  .toolbar__group { flex-wrap: wrap; }
 }

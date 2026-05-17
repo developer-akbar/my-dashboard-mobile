@@ -32,8 +32,8 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
           </button>
           <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
             <FiGlobe size={15} />
-            <span className="hide-xs" style={{ marginLeft: '4px' }}>{isTelugu ? 'English' : 'తెలుగు'}</span>
-            <span className="show-xs" style={{ marginLeft: '4px', fontSize: '11px', fontWeight: '800' }}>{isTelugu ? 'En' : 'తె'}</span>
+            <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{isTelugu ? 'English' : 'తెలుగు'}</span>
+            <span className="show-mobile-sm" style={{ marginLeft: '4px', fontSize: '11px', fontWeight: '800' }}>{isTelugu ? 'En' : 'తె'}</span>
           </button>
         </div>
       </div>
@@ -65,7 +65,10 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
 
           <div className="seg">
             <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
-               <span>{t('active')}</span>
+               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                 <FiZap size={14} className="show-mobile-sm" />
+                 {t('active')}
+               </span>
             </button>
             <button className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('trash')}>
               <FiTrash2 size={13} />
@@ -74,10 +77,10 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
           </div>
         </div>
 
-        <div className="toolbar__group" style={{ background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+        <div className="toolbar__group toolbar__group--refresh" style={{ background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
           <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll} style={{ border: 'none', background: 'transparent', padding: '0 6px' }}>
             <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
-            <span className="hide-xs" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
+            <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
           </button>
           <SessionIndicator />
         </div>
