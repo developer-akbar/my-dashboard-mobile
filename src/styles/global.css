@@ -256,33 +256,42 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   z-index: 1001;
   background: var(--surface-3);
   color: var(--text-1);
-  padding: 10px 16px;
+  padding: 8px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 10px 10px;
   box-shadow: var(--shadow-lg);
-  margin: -28px -20px 20px -20px;
+  margin: -28px -20px 16px -20px;
   border: 1px solid var(--primary-hi);
   border-top: none;
+  min-height: 48px;
 }
 
 .bulk-bar__info {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-weight: 700;
-  font-size: 14px;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .bulk-bar__info .icon-btn {
+  width: 28px;
+  height: 28px;
   color: var(--primary-hi);
   background: var(--primary-dim);
 }
 
 .bulk-bar__actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+}
+
+.bulk-bar .btn--sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
 }
 
 .bulk-bar .btn--ghost {
@@ -303,8 +312,8 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   background: var(--primary-dim);
 }
 
-.scard--selected .scard__topbar {
-    border-bottom-color: var(--primary-hi);
+.scard--selected::before {
+    opacity: 0.5;
 }
 
 .trash-container {

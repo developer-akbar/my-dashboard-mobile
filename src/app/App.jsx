@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
+import { App as CapApp } from '@capacitor/app';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 
 const NAV = [
@@ -19,6 +20,53 @@ export function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // ── Back Button Handling ───────────────────────────────────────────────────
+  useEffect(() => {
+    const onBack = async () => {
+      // 1. Give priority to child components (like clearing selection)
+      const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
+      window.dispatchEvent(backEvent);
+      
+      if (backEvent.detail.handled) return;
+
+      // 2. If on a sub-page, go back to dashboard
+      if (activePage !== 'electricity') {
+        setActivePage('electricity');
+        return;
+      }
+
+      // 3. Otherwise exit app (on Android)
+      CapApp.exitApp();
+    };
+
+    // Capacitor listener
+    const capHandler = CapApp.addListener('backButton', onBack);
+
+    // Browser listener (popstate)
+    const popHandler = () => {
+       onBack();
+    };
+    window.addEventListener('popstate', popHandler);
+
+    // Push initial state to history so back button has something to pop in browser
+    if (window.history.state !== 'root') {
+      window.history.replaceState('root', '');
+      window.history.pushState('nav', '');
+    }
+
+    return () => {
+      capHandler.then(h => h.remove());
+      window.removeEventListener('popstate', popHandler);
+    };
+  }, [activePage]);
+
+  // Sync browser history with tab changes so browser back works
+  useEffect(() => {
+    if (window.history.state !== 'nav') {
+       window.history.pushState('nav', '');
+    }
+  }, [activePage]);
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);

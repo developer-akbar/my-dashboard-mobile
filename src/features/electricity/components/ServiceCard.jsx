@@ -158,12 +158,12 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
                   <FiMoreVertical size={15} />
                 </button>
                 {menuOpen && (
-                  <div className="popover">
-                    <button onMouseDown={() => { setMenuOpen(false); onTogglePin(); }}>
+                  <div className="popover" onMouseDown={e => e.stopPropagation()}>
+                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onTogglePin(); }}>
                       {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
                     </button>
-                    <button onMouseDown={() => { setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
-                    <button className="danger" onMouseDown={() => { setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
+                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
+                    <button className="danger" onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
                   </div>
                 )}
               </div>

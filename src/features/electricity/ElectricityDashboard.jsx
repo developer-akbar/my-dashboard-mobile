@@ -43,8 +43,32 @@ export function ElectricityDashboard() {
   const clearSelection = () => setSelectedIds(new Set());
 
   useEffect(() => {
+    // Clear selection when view changes to avoid cross-view selection bugs
     clearSelection();
   }, [activeView]);
+
+  // ── Back Button Handling ───────────────────────────────────────────────────
+  useEffect(() => {
+    const handleBack = (e) => {
+      if (e.detail?.handled) return;
+
+      // 1. Priority: Close any open Modal or Dialog
+      if (dialog.open || confirmState.open) {
+        setDialog({ open: false, service: null });
+        setConfirmState(prev => ({ ...prev, open: false }));
+        if (e.detail) e.detail.handled = true;
+        return;
+      }
+
+      // 2. Priority: Clear Selection Mode
+      if (selectedIds.size > 0) {
+        clearSelection();
+        if (e.detail) e.detail.handled = true;
+      }
+    };
+    window.addEventListener('app-back-button', handleBack);
+    return () => window.removeEventListener('app-back-button', handleBack);
+  }, [selectedIds, dialog.open, confirmState.open]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -125,7 +149,7 @@ export function ElectricityDashboard() {
       container.removeEventListener('touchmove', handleTouchMove);
       container.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [pullDistance, isRefreshing]);
+  }, [pullDistance, isRefreshing, actions]);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 700);
   useEffect(() => {
@@ -191,7 +215,6 @@ export function ElectricityDashboard() {
       return;
     }
     
-    // 2. Proceed with API refresh for all services
     setRefreshingAll(true);
     setRefreshProgress({ done: 0, total: currentServices.length });
     try {
@@ -300,6 +323,7 @@ export function ElectricityDashboard() {
                 <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}><FiTrash2 size={13} /> Purge</button>
               </>
             )}
+            <button className="btn btn--ghost btn--sm" onClick={clearSelection} style={{ marginLeft: '4px' }}>Cancel</button>
           </div>
         </div>
       )}
@@ -376,7 +400,16 @@ export function ElectricityDashboard() {
                       title: 'Move to Trash?',
                       description: 'This service will be moved to the Trash.\nYou can restore it later from the Trash section.',
                       isDanger: true,
-                      onConfirm: () => toast.promise(actions.remove(s.id), { loading: 'Moving to trash…', success: 'Moved to trash', error: e => `Failed to move: ${e?.message || 'Unknown error'}` })
+                      onConfirm: async () => {
+                        const tst = toast.loading('Moving to trash…');
+                        try {
+                          await actions.remove(s.id);
+                          toast.success('Moved to trash', { id: tst });
+                          clearSelection();
+                        } catch (e) {
+                          toast.error(`Failed to move: ${e?.message || 'Unknown error'}`, { id: tst });
+                        }
+                      }
                     });
                   }}
                   onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
@@ -395,14 +428,35 @@ export function ElectricityDashboard() {
           selecting={selectedIds.size > 0}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
-          onRestore={id => toast.promise(actions.restore(id), { loading: 'Restoring…', success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` })}
+          onRestore={id => {
+            setConfirmState({
+              open: true,
+              title: 'Restore service?',
+              description: 'This service will be moved back to your active list.',
+              isDanger: false,
+              onConfirm: async () => {
+                const tst = toast.loading('Restoring…');
+                try {
+                  await actions.restore(id);
+                  toast.success('Restored', { id: tst });
+                  clearSelection();
+                } catch (e) {
+                  toast.error(`Restore failed: ${e?.message || 'Unknown error'}`, { id: tst });
+                }
+              }
+            });
+          }}
           onDeletePermanent={id => {
             setConfirmState({
               open: true,
               title: 'Delete permanently?',
               description: 'This action cannot be undone and all history will be lost.',
               isDanger: true,
-              onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: 'Deleted permanently', error: e => `Delete failed: ${e?.message || 'Unknown error'}` })
+              onConfirm: () => toast.promise(actions.purge(id), { 
+                loading: 'Deleting…', 
+                success: () => { clearSelection(); return 'Deleted permanently'; }, 
+                error: e => `Delete failed: ${e?.message || 'Unknown error'}` 
+              })
             });
           }}
         />
