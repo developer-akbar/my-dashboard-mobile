@@ -45,37 +45,32 @@ async function getIdb() {
 
 // ── SQLite (Android) ─────────────────────────────────────────────────────────
 
+let _sqliteConnection = null;
+
 async function getSqlite() {
   if (_sqlite) return _sqlite;
-  const { CapacitorSQLite, SQLiteConnection } = await import(
-    '@capacitor-community/sqlite'
-  );
-  const conn = new SQLiteConnection(CapacitorSQLite);
+  
+  const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
+  if (!_sqliteConnection) {
+    _sqliteConnection = new SQLiteConnection(CapacitorSQLite);
+  }
+  const conn = _sqliteConnection;
 
   let db;
   try {
-    const retCC = await conn.checkConnectionsConsistency();
     const isConn = await conn.isConnection('mydashboard', false);
-    
-    if (retCC.result && isConn.result) {
+    if (isConn.result) {
       db = await conn.retrieveConnection('mydashboard', false);
     } else {
-      db = await conn.createConnection(
-        'mydashboard',
-        false,
-        'no-encryption',
-        1,
-        false
-      );
+      db = await conn.createConnection('mydashboard', false, 'no-encryption', 1, false);
     }
+    
     await db.open();
 
     // Migrate: add historyFetchedAt if missing
     try {
       await db.execute("ALTER TABLE electricity_services ADD COLUMN historyFetchedAt TEXT;");
-    } catch (e) {
-      // Column probably exists, ignore
-    }
+    } catch (e) {}
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS electricity_services (
@@ -110,11 +105,22 @@ async function getSqlite() {
         updatedAt TEXT
       )
     `);
+    
     _sqlite = db;
     return db;
   } catch (err) {
     console.error("SQLite init error:", err);
     throw err;
+  }
+}
+
+async function sqliteSave() {
+  if (_sqlite && (await getPlatform()) === 'android') {
+    try {
+      await _sqlite.saveToStore('mydashboard');
+    } catch (e) {
+      console.warn("SQLite saveToStore failed:", e);
+    }
   }
 }
 
@@ -294,6 +300,7 @@ async function createService(data) {
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.createdAt, ser.updatedAt
       ]
     );
+    await sqliteSave();
   } else {
     const db = await getIdb();
     await db.put(STORE, record);
@@ -328,6 +335,7 @@ async function updateService(id, patch) {
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.updatedAt, ser.id
       ]
     );
+    await sqliteSave();
     return updated;
   } else {
     const db = await getIdb();
@@ -346,6 +354,7 @@ async function deleteService(id, permanent = false) {
       await (await getSqlite()).run(
         `DELETE FROM electricity_services WHERE id=?`, [id]
       );
+      await sqliteSave();
     } else {
       const db = await getIdb();
       await db.delete(STORE, id);
@@ -361,6 +370,15 @@ async function deleteService(id, permanent = false) {
 }
 
 export const db = {
+  init: async () => {
+    const platform = await getPlatform();
+    if (platform === 'android') {
+      await getSqlite();
+    } else {
+      await getIdb();
+    }
+    console.log('[db] initialization complete for platform:', platform);
+  },
   getAll: getAllServices,
   getTrash: getTrashServices,
   getById: getServiceById,

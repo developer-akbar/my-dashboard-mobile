@@ -242,7 +242,12 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
   const billAmount = currentBillAmountOverride ?? latest.billAmount;
 
   const payments = rawPayments
-    .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), receiptNo: p.prno || null }))
+    .map(p => ({
+      date:      parseDate(p.prdate),
+      amount:    toNum(p.billamt),
+      units:     toNum(p.units),
+      receiptNo: p.prno || null
+    }))
     .filter(p => p.date)
     .sort((a, b) => b.date - a.date);
 
@@ -545,7 +550,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   const minUnits    = min(pastUnits);
   const avgCostPerUnit = avgUnits > 0 ? avgAmount / avgUnits : 0;
 
-  const currentInsightAmount = billDeskBillAmount ?? latest.billAmount;
+  const currentInsightAmount = billDeskBillAmount ?? latest?.billAmount ?? 0;
   const currentInsightUnits  = hasCurrentMonthBill ? latest.billedUnits : 0;
 
   // Spike detection: current vs 3-month avg

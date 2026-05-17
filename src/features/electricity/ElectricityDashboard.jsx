@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { SummaryBar } from './components/SummaryBar.jsx';
@@ -20,6 +20,87 @@ export function ElectricityDashboard() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
   const { t } = useTranslation();
+
+  // ── Pull to Refresh ────────────────────────────────────────────────────────
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStart = useRef(0);
+  const isPulling = useRef(false);
+  const pullThreshold = 80;
+
+  useEffect(() => {
+    const container = document.querySelector('.main');
+    if (!container) return;
+
+    const handleTouchStart = (e) => {
+      if (container.scrollTop <= 0) {
+        touchStart.current = e.touches[0].pageY;
+        isPulling.current = true;
+      } else {
+        isPulling.current = false;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isPulling.current || isRefreshing) return;
+      const currentY = e.touches[0].pageY;
+      const diff = currentY - touchStart.current;
+
+      if (diff > 0) {
+        // Apply resistance
+        const dist = Math.min(diff * 0.4, pullThreshold + 20);
+        setPullDistance(dist);
+        if (dist > 10) {
+           // Prevent native bounce/scroll if we are pulling
+           if (e.cancelable) e.preventDefault();
+        }
+      }
+    };
+
+    const handleTouchEnd = async () => {
+      if (!isPulling.current || isRefreshing) return;
+      const finalDist = pullDistance;
+      console.log('[PTR] touchEnd. finalDist:', finalDist, 'threshold:', pullThreshold);
+      isPulling.current = false;
+
+      if (finalDist >= pullThreshold) {
+        console.log('[PTR] Threshold met. Triggering refresh...');
+        setPullDistance(70);
+        setIsRefreshing(true);
+        
+        try {
+          // Always reload from local DB first to recover from missing UI state
+          await actions.reload();
+          console.log('[PTR] Local reload complete.');
+          
+          // Then attempt upstream refresh if there are services
+          await handleRefreshAll();
+          console.log('[PTR] Upstream refresh complete.');
+        } catch (e) {
+          console.error('[PTR] Refresh process failed', e);
+        } finally {
+          console.log('[PTR] Cleaning up PTR state.');
+          setTimeout(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+          }, 500);
+        }
+      } else {
+        console.log('[PTR] Threshold not met. Resetting.');
+        setPullDistance(0);
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [pullDistance, isRefreshing]);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 700);
   useEffect(() => {
@@ -73,10 +154,21 @@ export function ElectricityDashboard() {
     }
   }
 
-  async function handleRefreshAll() {
-    if (!services.length) return;
+  async function handleRefreshAll(options = { skipApi: false }) {
+    console.log('[PTR] handleRefreshAll triggered. skipApi:', options.skipApi);
+    
+    // 1. Always reload from local DB first to update UI immediately
+    const currentServices = await actions.reload();
+    console.log('[PTR] Local reload complete. Services in DB:', currentServices?.length);
+
+    if (!currentServices.length || options.skipApi) {
+      console.log('[PTR] Stopping after local reload.');
+      return;
+    }
+    
+    // 2. Proceed with API refresh for all services
     setRefreshingAll(true);
-    setRefreshProgress({ done: 0, total: services.length });
+    setRefreshProgress({ done: 0, total: currentServices.length });
     try {
       const summary = await actions.refreshAll((done, tot) => setRefreshProgress({ done, total: tot }));
       if (summary) {
@@ -114,6 +206,18 @@ export function ElectricityDashboard() {
 
   return (
     <div className="page">
+      <div 
+        className={`ptr ${pullDistance > 0 || isRefreshing ? 'ptr--visible' : ''} ${isRefreshing ? 'ptr--refreshing' : ''} ${pullDistance >= pullThreshold ? 'ptr--ready' : ''}`}
+        style={{ transform: `translateY(${pullDistance - 70}px)` }}
+      >
+        <div className="ptr__icon" style={{ transform: `rotate(${pullDistance * 3}deg)` }}>
+          <FiRefreshCw size={18} />
+        </div>
+        <span className="ptr__label">
+          {isRefreshing ? 'Refreshing...' : (pullDistance >= pullThreshold ? 'Release to refresh' : 'Pull down to refresh')}
+        </span>
+      </div>
+
       <header className="page__header" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>

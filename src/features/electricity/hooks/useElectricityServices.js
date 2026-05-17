@@ -62,10 +62,11 @@ export function useElectricityServices() {
   const reload = useCallback(async () => {
     try {
       const [services, trash] = await Promise.all([listServices(), listTrash()]);
+      console.log('[useElectricityServices] reload complete. services:', services?.length, 'trash:', trash?.length);
       dispatch({ type: 'LOAD', services, trash });
       return services; // return so auto-refresh can inspect them
     } catch (e) {
-      console.error("Failed to load services:", e);
+      console.error("[useElectricityServices] Failed to load services:", e);
       dispatch({ type: 'LOAD', services: [], trash: [] });
       return [];
     }
@@ -81,7 +82,18 @@ export function useElectricityServices() {
     autoRefreshDone.current = true;
 
     (async () => {
+      // 1. Ensure DB is fully connected
+      try {
+        const { db } = await import('../../../shared/db/storage.js');
+        await db.init();
+      } catch (e) {
+        console.error("[useElectricityServices] DB init failed:", e);
+      }
+
+      // 2. Load initial data
       const services = await reload();
+      
+      // 3. Optional auto-refresh logic
       const stale = services.filter(shouldAutoRefresh);
       if (stale.length === 0) return;
 
@@ -195,6 +207,6 @@ export function useElectricityServices() {
 
   return {
     ...state,
-    actions: { add, refresh, refreshAll, update, remove, restore, purge },
+    actions: { reload, add, refresh, refreshAll, update, remove, restore, purge },
   };
 }
