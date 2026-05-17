@@ -7,6 +7,9 @@
 
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import {
+  bulkDeletePermanently,
+  bulkMoveToTrash,
+  bulkRestoreServices,
   createService,
   deletePermanently,
   listServices,
@@ -198,6 +201,11 @@ export function useElectricityServices() {
     await reload();
   }, [reload]);
 
+  const bulkRestore = useCallback(async (ids) => {
+    await bulkRestoreServices(ids);
+    await reload();
+  }, [reload]);
+
   // ── actions.deletePermanently ───────────────────────────────────────────────
   // DELETE /services/:id/permanent
   const purge = useCallback(async (id) => {
@@ -205,8 +213,18 @@ export function useElectricityServices() {
     await reload();
   }, [reload]);
 
+  const bulkPurge = useCallback(async (ids) => {
+    await bulkDeletePermanently(ids);
+    await reload();
+  }, [reload]);
+
+  const bulkRemove = useCallback(async (ids) => {
+    await bulkMoveToTrash(ids);
+    await reload();
+  }, [reload]);
+
   return {
     ...state,
-    actions: { reload, add, refresh, refreshAll, update, remove, restore, purge },
+    actions: { reload, add, refresh, refreshAll, update, remove, bulkRemove, restore, bulkRestore, purge, bulkPurge },
   };
 }

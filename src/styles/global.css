@@ -249,6 +249,105 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   color: var(--green);
 }
 
+/* ── Bulk Actions Bar ───────────────────────────────────────────────────────── */
+.bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1001;
+  background: var(--surface-3);
+  color: var(--text-1);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0 0 12px 12px;
+  box-shadow: var(--shadow-lg);
+  margin: -28px -20px 20px -20px;
+  border: 1px solid var(--primary-hi);
+  border-top: none;
+}
+
+.bulk-bar__info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.bulk-bar__info .icon-btn {
+  color: var(--primary-hi);
+  background: var(--primary-dim);
+}
+
+.bulk-bar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-bar .btn--ghost {
+  color: var(--text-2);
+  border-color: var(--border-hi);
+}
+
+/* ── Selection UI ──────────────────────────────────────────────────────────── */
+.scard__select {
+  padding-right: 8px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.scard--selected {
+  border-color: var(--primary-hi);
+  background: var(--primary-dim);
+}
+
+.scard--selected .scard__topbar {
+    border-bottom-color: var(--primary-hi);
+}
+
+.trash-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trash-select-all {
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.trash-select-all label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.trash-item__select {
+  padding-right: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.trash-item--selected {
+  background: var(--surface-3);
+  border-color: var(--primary-hi);
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
 .page {
   position: relative;
 }
@@ -1167,6 +1266,8 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
 @media (max-width: 700px) {
   .sidebar     { display: none; }
   .bottom-nav  { display: flex; }
+
+  .bulk-bar { margin: -16px -12px 14px -12px; }
 
   .shell { flex-direction: column; height: 100dvh; }
   .main  { flex: 1; overflow-y: auto; padding-bottom: calc(56px + env(safe-area-inset-bottom)); }

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { SummaryBar } from './components/SummaryBar.jsx';
@@ -20,6 +20,31 @@ export function ElectricityDashboard() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
   const { t } = useTranslation();
+
+  // ── Selection ──────────────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (ids) => {
+    setSelectedIds(prev => {
+      if (prev.size === ids.length) return new Set();
+      return new Set(ids);
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  useEffect(() => {
+    clearSelection();
+  }, [activeView]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -204,6 +229,48 @@ export function ElectricityDashboard() {
     });
   }
 
+  const handleBulkAction = async (actionType) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+
+    let title, description, successMsg, action;
+    if (activeView === 'active') {
+      title = `Trash ${ids.length} service(s)?`;
+      description = `These services will be moved to the Trash.`;
+      successMsg = 'Moved to trash';
+      action = () => actions.bulkRemove(ids);
+    } else {
+      if (actionType === 'restore') {
+        title = `Restore ${ids.length} service(s)?`;
+        description = `These services will be restored to your active list.`;
+        successMsg = 'Restored';
+        action = () => actions.bulkRestore(ids);
+      } else {
+        title = `Delete ${ids.length} service(s)?`;
+        description = `This action cannot be undone and all history will be lost.`;
+        successMsg = 'Deleted permanently';
+        action = () => actions.bulkPurge(ids);
+      }
+    }
+
+    setConfirmState({
+      open: true,
+      title,
+      description,
+      isDanger: actionType !== 'restore',
+      onConfirm: async () => {
+        const tst = toast.loading('Processing…');
+        try {
+          await action();
+          toast.success(successMsg, { id: tst });
+          clearSelection();
+        } catch (e) {
+          toast.error(`Action failed: ${e?.message || 'Unknown error'}`, { id: tst });
+        }
+      }
+    });
+  };
+
   return (
     <div className="page">
       <div 
@@ -217,6 +284,25 @@ export function ElectricityDashboard() {
           {isRefreshing ? 'Refreshing...' : (pullDistance >= pullThreshold ? 'Release to refresh' : 'Pull down to refresh')}
         </span>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="bulk-bar">
+          <div className="bulk-bar__info">
+            <button className="icon-btn" onClick={clearSelection}><FiZap size={14} style={{ transform: 'rotate(45deg)' }} /></button>
+            <span>{selectedIds.size} selected</span>
+          </div>
+          <div className="bulk-bar__actions">
+            {activeView === 'active' ? (
+              <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}><FiTrash2 size={13} /> Trash</button>
+            ) : (
+              <>
+                <button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}><FiRefreshCw size={13} /> Restore</button>
+                <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}><FiTrash2 size={13} /> Purge</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <header className="page__header" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
@@ -270,6 +356,9 @@ export function ElectricityDashboard() {
                   service={s}
                   useAccordion={useAccordion}
                   refreshing={refreshingIds.has(s.id)}
+                  selected={selectedIds.has(s.id)}
+                  selecting={selectedIds.size > 0}
+                  onToggleSelect={toggleSelect}
                   onRefresh={async () => {
                     const tst = toast.loading('Refreshing…');
                     try {
@@ -302,6 +391,10 @@ export function ElectricityDashboard() {
       {activeView === 'trash' && (
         <TrashView
           services={trash}
+          selectedIds={selectedIds}
+          selecting={selectedIds.size > 0}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
           onRestore={id => toast.promise(actions.restore(id), { loading: 'Restoring…', success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` })}
           onDeletePermanent={id => {
             setConfirmState({

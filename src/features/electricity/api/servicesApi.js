@@ -255,6 +255,11 @@ export async function restoreService(id) {
   return db.update(id, { isDeleted: false, deletedAt: null });
 }
 
+export async function bulkRestoreServices(ids) {
+  const tasks = ids.map(id => () => restoreService(id));
+  return runWithConcurrency(tasks, 4);
+}
+
 /**
  * DELETE /services/:id  (local DB only, soft delete)
  */
@@ -262,9 +267,19 @@ export async function moveToTrash(id) {
   await db.delete(id, false);
 }
 
+export async function bulkMoveToTrash(ids) {
+  const tasks = ids.map(id => () => moveToTrash(id));
+  return runWithConcurrency(tasks, 4);
+}
+
 /**
  * DELETE /services/:id/permanent  (local DB only, hard delete)
  */
 export async function deletePermanently(id) {
   await db.delete(id, true);
+}
+
+export async function bulkDeletePermanently(ids) {
+  const tasks = ids.map(id => () => deletePermanently(id));
+  return runWithConcurrency(tasks, 4);
 }

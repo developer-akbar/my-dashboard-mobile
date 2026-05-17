@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
@@ -66,10 +66,11 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion }) {
+export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const { t } = useTranslation();
+  const longPressTimer = useRef(null);
 
   useEffect(() => {
     setIsExpanded(!useAccordion);
@@ -86,15 +87,46 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
     catch (e) { toast.error(`Copy failed: ${e?.message || 'Unknown error'}`); }
   }
 
+  const handlePressStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      if (onToggleSelect && !selecting) {
+        onToggleSelect(service.id);
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+      }
+    }, 600);
+  };
+
+  const handlePressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   return (
-    <article className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''}`}>
+    <article className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''}`}>
 
       {/* ── Top bar ──────────────────────────────────────── */}
       <div 
         className="scard__topbar" 
         onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} 
         style={{ cursor: useAccordion ? 'pointer' : 'default' }}
+        onMouseDown={handlePressStart}
+        onMouseUp={handlePressEnd}
+        onMouseLeave={handlePressEnd}
+        onTouchStart={handlePressStart}
+        onTouchEnd={handlePressEnd}
       >
+        {selecting && onToggleSelect && (
+          <div className="scard__select" onClick={e => e.stopPropagation()}>
+            <input 
+              type="checkbox" 
+              checked={!!selected} 
+              onChange={() => onToggleSelect(service.id)}
+              style={{ width: '15px', height: '15px', margin: 0, padding: 0 }}
+            />
+          </div>
+        )}
         <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
         <div className="scard__topbar-info">
           <h3 className="scard__name">{service.label || t('untitled')}</h3>
