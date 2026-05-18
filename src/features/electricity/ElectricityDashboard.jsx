@@ -19,7 +19,22 @@ export function ElectricityDashboard() {
   const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', isDanger: false, onConfirm: () => {} });
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
+  const [flashingId, setFlashingId] = useState(null);
   const { t } = useTranslation();
+
+  const handleViewChange = (view) => {
+    setActiveView(view);
+    clearSelection();
+  };
+
+  const flashCard = (id) => {
+    setFlashingId(id);
+    setTimeout(() => {
+      const el = document.getElementById(`service-${id}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+    setTimeout(() => setFlashingId(null), 3000);
+  };
 
   // ── Selection ──────────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -177,6 +192,8 @@ export function ElectricityDashboard() {
           onConfirm: async () => {
             await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` });
             setDialog({ open: false, service: null });
+            handleViewChange('active');
+            flashCard(inTrash.id);
           }
         });
         return;
@@ -190,9 +207,11 @@ export function ElectricityDashboard() {
 
       const tst = toast.loading('Validating and fetching bill…');
       try {
-        await actions.add(payload);
+        const newService = await actions.add(payload);
         toast.success('Service added', { id: tst });
         setDialog({ open: false, service: null });
+        handleViewChange('active');
+        if (newService?.id) flashCard(newService.id);
       } catch (e) {
         if (e?.message === 'CANCELLED') {
           toast.dismiss(tst);
@@ -267,7 +286,11 @@ export function ElectricityDashboard() {
         title = `Restore ${ids.length} service(s)?`;
         description = `These services will be restored to your active list.`;
         successMsg = 'Restored';
-        action = () => actions.bulkRestore(ids);
+        action = async () => {
+          await actions.bulkRestore(ids);
+          handleViewChange('active');
+          if (ids.length > 0) flashCard(ids[0]);
+        };
       } else {
         title = `Delete ${ids.length} service(s)?`;
         description = `This action cannot be undone and all history will be lost.`;
@@ -350,8 +373,9 @@ export function ElectricityDashboard() {
         onRefreshAll={handleRefreshAll}
         refreshingAll={refreshingAll}
         activeView={activeView}
-        onViewChange={setActiveView}
+        onViewChange={handleViewChange}
         trashCount={trash.length}
+        hasServices={services.length > 0}
       />
 
       {activeView === 'active' && (
@@ -377,9 +401,11 @@ export function ElectricityDashboard() {
               {visible.map(s => (
                 <ServiceCard
                   key={s.id}
+                  id={`service-${s.id}`}
                   service={s}
                   useAccordion={useAccordion}
                   refreshing={refreshingIds.has(s.id)}
+                  isFlashing={flashingId === s.id}
                   selected={selectedIds.has(s.id)}
                   selecting={selectedIds.size > 0}
                   onToggleSelect={toggleSelect}
@@ -440,6 +466,8 @@ export function ElectricityDashboard() {
                   await actions.restore(id);
                   toast.success('Restored', { id: tst });
                   clearSelection();
+                  handleViewChange('active');
+                  flashCard(id);
                 } catch (e) {
                   toast.error(`Restore failed: ${e?.message || 'Unknown error'}`, { id: tst });
                 }

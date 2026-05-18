@@ -11,7 +11,13 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
 
   useEffect(() => {
     if (open) { setLabel(service?.label || ''); setServiceNumber(service?.serviceNumber || ''); }
-  }, [service, open]);
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && open) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [service, open, onClose]);
 
   const numError = useMemo(() => {
     if (!serviceNumber) return '';
