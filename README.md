@@ -7,14 +7,17 @@ A modern, privacy-first personal tracking dashboard built with **React 18 + Vite
 ## ⚡ Key Features
 
 - **Multi-Service Tracking:** Monitor multiple APSPDCL electricity connections from a single, unified view.
-- **Multi-Language Support:** Full internationalization (i18n) support with dynamically toggleable English and Telugu options available directly from the Settings menu.
+- **Bulk Actions:** Select multiple services via long-press or checkboxes to trash, restore, or purge them in one shot.
+- **Trash & Recovery:** Accidental deletions are a thing of the past. Move services to Trash and restore them anytime with full history preserved.
+- **Visual Feedback:** Smooth auto-scroll and highlight animations when adding or restoring services to help you keep track of your dashboard.
+- **Multi-Language Support:** Full internationalization (i18n) support with dynamically toggleable English and Telugu options available directly from the toolbar.
 - **Rich Visualizations:**
   - 18-month historical trend charts.
   - Granular bill breakups (Energy Charges, Fixed Charges, Fuel Surcharge, Initial Security Deposits, Arrears).
   - Monthly usage predictions and spike detection.
 - **Automated Captcha Solving:** Includes a custom Node.js proxy server utilizing `sharp` and `tesseract.js` (OCR) to automatically read and solve the BillDesk Captcha, fetching the latest live demand without user interaction.
 - **Hybrid Fallback:** If the automated OCR fails, the UI gracefully degrades to a secure manual Captcha entry modal so you are never locked out of your data.
-- **Light / Dark Mode:** A toggleable, clean SaaS aesthetic designed for high readability across devices.
+- **Light / Dark Mode:** Native support for light and dark themes, defaulting to a clean Light mode for maximum day-time readability.
 - **Quick Payments:** "Pay Now" and "Pay More" shortcuts directly open the relevant gateways.
 - **Privacy-First Storage:** No cloud database. All historical and service data is stored locally on your device (IndexedDB for Web, SQLite for Android).
 

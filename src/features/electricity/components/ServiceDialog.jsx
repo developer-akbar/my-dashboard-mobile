@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { FiX, FiZap } from 'react-icons/fi';
 import { isValidServiceNumber } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
@@ -8,9 +8,26 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
   const [serviceNumber, setServiceNumber] = useState('');
   const [saving, setSaving] = useState(false);
   const { t } = useTranslation();
+  const labelRef = useRef(null);
 
   useEffect(() => {
-    if (open) { setLabel(service?.label || ''); setServiceNumber(service?.serviceNumber || ''); }
+    if (open) { 
+      setLabel(service?.label || ''); 
+      setServiceNumber(service?.serviceNumber || ''); 
+      
+      // Auto-focus Label field with a slightly longer delay for reliability
+      const timer = setTimeout(() => {
+        if (labelRef.current) {
+          labelRef.current.focus();
+          // Move cursor to end of text if editing
+          if (service?.label) {
+            const len = service.label.length;
+            labelRef.current.setSelectionRange(len, len);
+          }
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
     
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && open) onClose();
@@ -51,7 +68,13 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
         <form className="sheet__form" onSubmit={handleSubmit}>
           <label className="field">
             <span className="field__label">{t('label')} <span className="field__optional">{t('optional')}</span></span>
-            <input className="field__input" value={label} onChange={e => setLabel(e.target.value)} placeholder={t('label_placeholder')} />
+            <input 
+              ref={labelRef}
+              className="field__input" 
+              value={label} 
+              onChange={e => setLabel(e.target.value)} 
+              placeholder={t('label_placeholder')} 
+            />
           </label>
 
           <label className="field">

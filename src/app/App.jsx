@@ -13,7 +13,7 @@ const NAV = [
 
 export function App() {
   const [activePage, setActivePage] = useState('electricity');
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const { t, i18n } = useTranslation();
 
   useEffect(() => {

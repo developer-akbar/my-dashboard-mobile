@@ -66,7 +66,7 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect }) {
+export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const { t } = useTranslation();
@@ -104,7 +104,10 @@ export function ServiceCard({ service, refreshing, onRefresh, onEdit, onDelete, 
   };
 
   return (
-    <article className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''}`}>
+    <article 
+      id={id}
+      className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''} ${isFlashing ? 'flash' : ''}`}
+    >
 
       {/* ── Top bar ──────────────────────────────────────── */}
       <div 

@@ -2,7 +2,7 @@ import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap 
 import { useTranslation } from 'react-i18next';
 import { SessionIndicator } from './SessionIndicator.jsx';
 
-export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount }) {
+export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices }) {
   const { t, i18n } = useTranslation();
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
@@ -78,7 +78,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         </div>
 
         <div className="toolbar__group toolbar__group--refresh" style={{ background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-          <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll} style={{ border: 'none', background: 'transparent', padding: '0 6px' }}>
+          <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll || !hasServices} style={{ border: 'none', background: 'transparent', padding: '0 6px' }}>
             <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
             <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
           </button>

@@ -5,50 +5,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Core palette ──────────────────────────────────── */
-  --bg:         #0c0e14;
-  --bg-2:       #111318;
-  --bg-3:       #161920;
-  --surface:    #1a1d26;
-  --surface-2:  #1f2230;
-  --surface-3:  #252839;
-  --border:     rgba(255,255,255,0.06);
-  --border-md:  rgba(255,255,255,0.10);
-  --border-hi:  rgba(255,255,255,0.16);
-
-  /* ── Text ──────────────────────────────────────────── */
-  --text-1:  #f0f2f8;
-  --text-2:  #8e93a8;
-  --text-3:  #555c72;
-
-  /* ── Primary — indigo ──────────────────────────────── */
-  --primary:       #6366f1;
-  --primary-hi:    #818cf8;
-  --primary-dim:   rgba(99,102,241,0.12);
-  --primary-glow:  rgba(99,102,241,0.30);
-
-  /* ── Semantic colours ──────────────────────────────── */
-  --red:      #f43f5e;  --red-dim:   rgba(244,63,94,0.12);
-  --amber:    #f59e0b;  --amber-dim: rgba(245,158,11,0.12);
-  --green:    #10b981;  --green-dim: rgba(16,185,129,0.12);
-  --blue:     #3b82f6;  --blue-dim:  rgba(59,130,246,0.12);
-  --cyan:     #06b6d4;  --cyan-dim:  rgba(6,182,212,0.12);
-  --violet:   #8b5cf6;  --violet-dim:rgba(139,92,246,0.12);
-
-  /* ── Misc ──────────────────────────────────────────── */
-  --radius-sm: 8px;
-  --radius:    12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --shadow:    0 4px 16px rgba(0,0,0,0.35);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
-  --font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --mono: 'JetBrains Mono', 'Fira Code', monospace;
-  color-scheme: dark;
-}
-
-/* Light theme */
-[data-theme="light"] {
+  /* ── Core palette (LIGHT THEME - DEFAULT) ──────────────── */
   --bg:         #f4f6f8;
   --bg-2:       #ffffff;
   --bg-3:       #f9fafb;
@@ -59,15 +16,18 @@
   --border-md:  rgba(0,0,0,0.10);
   --border-hi:  rgba(0,0,0,0.16);
 
+  /* ── Text ──────────────────────────────────────────── */
   --text-1:  #0f172a;
   --text-2:  #475569;
   --text-3:  #64748b;
 
+  /* ── Primary — indigo ──────────────────────────────── */
   --primary:       #4f46e5;
   --primary-hi:    #6366f1;
   --primary-dim:   rgba(79,70,229,0.12);
   --primary-glow:  rgba(79,70,229,0.30);
 
+  /* ── Semantic colours ──────────────────────────────── */
   --red:      #e11d48;  --red-dim:   rgba(225,29,72,0.12);
   --amber:    #d97706;  --amber-dim: rgba(217,119,6,0.12);
   --green:    #059669;  --green-dim: rgba(5,150,105,0.12);
@@ -75,9 +35,49 @@
   --cyan:     #0891b2;  --cyan-dim:  rgba(8,145,178,0.12);
   --violet:   #7c3aed;  --violet-dim:rgba(124,58,237,0.12);
 
+  /* ── Misc ──────────────────────────────────────────── */
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --shadow:    0 4px 16px rgba(0,0,0,0.06);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.10);
+  --font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
   color-scheme: light;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg:         #0c0e14;
+  --bg-2:       #111318;
+  --bg-3:       #161920;
+  --surface:    #1a1d26;
+  --surface-2:  #1f2230;
+  --surface-3:  #252839;
+  --border:     rgba(255,255,255,0.06);
+  --border-md:  rgba(255,255,255,0.10);
+  --border-hi:  rgba(255,255,255,0.16);
+
+  --text-1:  #f0f2f8;
+  --text-2:  #8e93a8;
+  --text-3:  #555c72;
+
+  --primary:       #6366f1;
+  --primary-hi:    #818cf8;
+  --primary-dim:   rgba(99,102,241,0.12);
+  --primary-glow:  rgba(99,102,241,0.30);
+
+  --red:      #f43f5e;  --red-dim:   rgba(244,63,94,0.12);
+  --amber:    #f59e0b;  --amber-dim: rgba(245,158,11,0.12);
+  --green:    #10b981;  --green-dim: rgba(16,185,129,0.12);
+  --blue:     #3b82f6;  --blue-dim:  rgba(59,130,246,0.12);
+  --cyan:     #06b6d4;  --cyan-dim:  rgba(6,182,212,0.12);
+  --violet:   #8b5cf6;  --violet-dim:rgba(139,92,246,0.12);
+
+  --shadow:    0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+  color-scheme: dark;
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────────── */
@@ -1306,6 +1306,13 @@ input[type="checkbox"] {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.8s linear infinite; }
+
+@keyframes flash {
+  0%   { background: var(--primary-dim); box-shadow: 0 0 0 2px var(--primary-hi); }
+  50%  { background: var(--primary-dim); box-shadow: 0 0 0 4px var(--primary-hi); }
+  100% { background: var(--surface); box-shadow: none; }
+}
+.flash { animation: flash 1s ease-out 3; z-index: 10; }
 
 /* ═══════════════════════════════════════════════════
    RESPONSIVE

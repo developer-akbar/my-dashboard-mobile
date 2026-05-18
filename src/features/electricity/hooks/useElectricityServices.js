@@ -121,8 +121,9 @@ export function useElectricityServices() {
     const session = await getValidSession(serviceNumber);
     if (!session) throw new Error('CANCELLED');
     
-    await createService({ serviceNumber, label }, session);
+    const newService = await createService({ serviceNumber, label }, session);
     await reload();
+    return newService;
   }, [reload]);
 
   // ── actions.refresh ─────────────────────────────────────────────────────────

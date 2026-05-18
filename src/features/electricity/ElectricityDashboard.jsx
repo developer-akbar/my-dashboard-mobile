@@ -32,8 +32,8 @@ export function ElectricityDashboard() {
     setTimeout(() => {
       const el = document.getElementById(`service-${id}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-    setTimeout(() => setFlashingId(null), 3000);
+    }, 400);
+    setTimeout(() => setFlashingId(null), 4000);
   };
 
   // ── Selection ──────────────────────────────────────────────────────────────
@@ -375,7 +375,7 @@ export function ElectricityDashboard() {
         activeView={activeView}
         onViewChange={handleViewChange}
         trashCount={trash.length}
-        hasServices={services.length > 0}
+        hasServices={services.length > 0 && !loading}
       />
 
       {activeView === 'active' && (
