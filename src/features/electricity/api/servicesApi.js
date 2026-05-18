@@ -80,29 +80,40 @@ function snapshotToPatch(snapshot, existing = {}) {
     console.log(`[servicesApi] Migration detected: ${existing.serviceNumber || snapshot.serviceNumber} → ${patch.serviceNumber}`);
   }
 
-  // Persist history if successful, otherwise keep existing
-  if (!snapshot.apspdclError) {
+  // ── Handle Partial History Success ────────────────────────────────────────
+  // Even if there's an apspdclError (e.g. payment history down), we might still have bill history.
+  // Save whatever new data we got; fallback to existing only if new data is empty/missing.
+  
+  if (!snapshot.apspdclError || (snapshot.billHistory && snapshot.billHistory.length > 0)) {
     patch.billHistory      = snapshot.billHistory;
-    patch.paymentHistory   = snapshot.paymentHistory;
     patch.trendData        = snapshot.trendData;
     patch.insights         = snapshot.insights;
     patch.lastThreeAmounts = snapshot.lastThreeAmounts;
-    patch.historyFetchedAt = snapshot.fetchedAt || new Date().toISOString();
   } else {
-    // Keep existing history if APSPDCL failed
     patch.billHistory      = existing.billHistory      || null;
-    patch.paymentHistory   = existing.paymentHistory   || null;
     patch.trendData        = existing.trendData        || null;
     patch.insights         = existing.insights         || null;
     patch.lastThreeAmounts = existing.lastThreeAmounts || [];
+  }
+
+  if (!snapshot.apspdclError || (snapshot.paymentHistory && snapshot.paymentHistory.length > 0)) {
+    patch.paymentHistory   = snapshot.paymentHistory;
+  } else {
+    patch.paymentHistory   = existing.paymentHistory   || null;
+  }
+
+  // Only update history timestamp if we actually received something
+  if (snapshot.billHistory?.length || snapshot.paymentHistory?.length) {
+    patch.historyFetchedAt = snapshot.fetchedAt || new Date().toISOString();
+  } else {
     patch.historyFetchedAt = existing.historyFetchedAt || null;
   }
 
   // Shorten error messages
   if (snapshot.apspdclError) {
-    patch.lastError = `APSPDCL history unavailable. Showing Live BillDesk.`;
+    patch.lastError = `APSPDCL history unavailable. Few data might be missing.`;
   } else if (snapshot.billDeskError) {
-    patch.lastError = `Live BillDesk unavailable. Showing APSPDCL data.`;
+    patch.lastError = `Live BillDesk unavailable. Showing APSPDCL historical data.`;
   } else {
     patch.lastError = null;
   }
