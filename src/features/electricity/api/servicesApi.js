@@ -73,6 +73,13 @@ function snapshotToPatch(snapshot, existing = {}) {
     billBreakup:       snapshot.billBreakup,
   };
 
+  // ── Handle Service Number Migration ─────────────────────────────────────
+  // If the server detected a migration (via BillDesk or Prefix Map), update it locally.
+  if (snapshot.migratedServiceNumber && snapshot.migratedServiceNumber !== (existing.serviceNumber || snapshot.serviceNumber)) {
+    patch.serviceNumber = snapshot.migratedServiceNumber;
+    console.log(`[servicesApi] Migration detected: ${existing.serviceNumber || snapshot.serviceNumber} → ${patch.serviceNumber}`);
+  }
+
   // Persist history if successful, otherwise keep existing
   if (!snapshot.apspdclError) {
     patch.billHistory      = snapshot.billHistory;

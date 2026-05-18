@@ -152,6 +152,7 @@ function parseBillDeskHtml(html) {
   };
 
   const customerName = parseField('Customer Name') || parseField('Consumer Name') || parseField('Name');
+  const uniqueServiceNumber = parseField('Unique Service Number');
   const billAmount = parseNumber(parseField('Bill Amount'));
   const currentDemand = parseNumber(parseField('Current Demand'));
   const rawBillDate = parseField('Bill Date');
@@ -159,6 +160,7 @@ function parseBillDeskHtml(html) {
 
   console.log('[api] BillDesk parse candidates', {
     customerName,
+    uniqueServiceNumber,
     billAmount,
     currentDemand,
     rawBillDate,
@@ -180,6 +182,7 @@ function parseBillDeskHtml(html) {
 
   return {
     customerName,
+    uniqueServiceNumber,
     billDeskAmount,
     billDeskBillAmount: billAmount,
     billDeskCurrentDemand: currentDemand,
@@ -362,9 +365,33 @@ function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 
  * Throws only on network failures.
  */
 async function buildSnapshot(serviceNumber, billdeskSession) {
+  // 1. Initial BillDesk check to find Unique Service Number (Primary Migration source)
+  let billDeskData = null;
+  let billDeskError = null;
+  try {
+    billDeskData = await fetchBillDeskBill(serviceNumber, billdeskSession);
+  } catch (error) {
+    billDeskError = 'Connection failed';
+  }
+
+  // 2. Resolve target number for history calls
+  // We strictly trust BillDesk for migration info. 
+  // If BillDesk returns a different "Unique Service Number", we use that for everything.
+  const billDeskUnique = billDeskData?.uniqueServiceNumber;
+  
+  let targetNumber = serviceNumber;
+  let migratedServiceNumber = null;
+
+  if (billDeskUnique && billDeskUnique !== serviceNumber) {
+    targetNumber = billDeskUnique;
+    migratedServiceNumber = billDeskUnique;
+    console.log(`[api] BillDesk migration detected: ${serviceNumber} -> ${targetNumber}`);
+  }
+
+  // 3. Fetch History
   const [billResult, paymentResult] = await Promise.allSettled([
-    apspdclPost('publicbillhistory', serviceNumber),
-    apspdclPost('publicpaymenthistory', serviceNumber),
+    apspdclPost('publicbillhistory', targetNumber),
+    apspdclPost('publicpaymenthistory', targetNumber),
   ]);
 
   const billData    = billResult.status === 'fulfilled' ? billResult.value : null;
@@ -388,6 +415,17 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     apspdclError = 'APSPDCL history servers are down. Please try again later.';
   }
 
+  if (!bills.length && !billDeskData) {
+    throw new Error(apspdclError || billDeskError || 'Validation failed. All upstream servers are down. Please try again later.');
+  }
+
+  // 4. Extract data and build DTO
+  const billDeskAmount = billDeskData?.billDeskAmount ?? null;
+  const billDeskBillAmount = billDeskData?.billDeskBillAmount ?? null;
+  const billDeskIsPaid = billDeskData?.billDeskIsPaid === true;
+  const billDeskBillDate = billDeskData?.billDeskBillDate;
+  const billDeskDueDate = billDeskData?.billDeskDueDate;
+
   const latest       = bills[0] || null;
   const now          = new Date();
   const currentYear  = now.getUTCFullYear();
@@ -397,40 +435,13 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     b => b.closingDate.getUTCFullYear() === currentYear && b.closingDate.getUTCMonth() === currentMonth
   );
 
-  let billDeskData = null;
-  let billDeskAmount = null;
-  let billDeskBillAmount = null;
-  let billDeskIsPaid = false;
-  let billDeskError = null;
-  let billDeskBillDate = null;
-  let billDeskDueDate = null;
-  try {
-    billDeskData = await fetchBillDeskBill(serviceNumber, billdeskSession);
-    if (billDeskData) {
-      billDeskAmount = billDeskData.billDeskAmount;
-      billDeskBillAmount = billDeskData.billDeskBillAmount;
-      billDeskIsPaid = billDeskData.billDeskIsPaid === true;
-      billDeskBillDate = billDeskData.billDeskBillDate;
-      billDeskDueDate = billDeskData.billDeskDueDate;
-      // If BillDesk says paid (currentDemand = 0), don't set error
-    } else {
-      billDeskError = 'Response could not be parsed';
-    }
-  } catch (error) {
-    billDeskError = 'Connection failed';
-  }
-
-  if (!bills.length && !billDeskData) {
-    throw new Error(apspdclError || billDeskError || 'Validation failed. All upstream servers are down. Please try again later.');
-  }
-
   const pay = analysePayments(paymentData.data || [], bills, billDeskAmount ?? undefined);
 
   let status;
   if (!bills.length)          status = billDeskIsPaid ? 'PAID' : ((billDeskAmount > 0) ? 'DUE' : 'UNKNOWN');
   else if (!hasCurrentMonthBill) status = 'NO_DUES';
   else if (pay.isPaid)        status = 'PAID';
-  else if (billDeskIsPaid)    status = 'PAID';  // BillDesk says currentDemand is 0 = paid
+  else if (billDeskIsPaid)    status = 'PAID';
   else if ((billDeskAmount ?? latest.billAmount) > 0) status = 'DUE';
   else                        status = 'UNKNOWN';
 
@@ -466,10 +477,6 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     b => !(b.closingDate.getUTCFullYear() === currentYear && b.closingDate.getUTCMonth() === currentMonth)
   );
 
-  /**
-   * For each past bill, find the payment date by accumulating payments
-   * that fall between this bill's closing date and the next bill's closing date.
-   */
   function findSettlementDate(bill, nextBillClosingDate) {
     const windowEnd = nextBillClosingDate ?? new Date(8640000000000000);
     let accum = 0;
@@ -480,10 +487,9 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
       lastDate = p.date;
       if (accum >= bill.billAmount) break;
     }
-    return lastDate; // null = not yet paid
+    return lastDate;
   }
 
-  // last 3 for the card history strip
   const history = pastBills.slice(0, 3).map((bill, i) => {
     const nextClose = pastBills[i - 1]?.closingDate ?? (hasCurrentMonthBill ? latest.closingDate : null);
     const paidDate = findSettlementDate(bill, nextClose);
@@ -495,7 +501,6 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     };
   });
 
-  // full 18-month history for charts & payment history table
   const billHistory18 = pastBills.slice(0, 18).map((bill, i) => {
     const nextClose = pastBills[i - 1]?.closingDate ?? (hasCurrentMonthBill ? latest.closingDate : null);
     const paidDate = findSettlementDate(bill, nextClose);
@@ -509,7 +514,6 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     };
   });
 
-  // ── Payment history (up to 12 recent payments) ────────────────────────────
   const paymentHistory12 = allPayments.slice(0, 12).map((p, i) => ({
     counter:   p.counter,
     date:      p.date.toISOString(),
@@ -517,8 +521,6 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     receiptNo: p.receiptNo,
   }));
 
-  // ── Trend data — 18-month monthly series for charts ──────────────────────
-  // Combine current month + past bills, sorted oldest→newest for chart display
   const hasCurrentMonthBillData = hasCurrentMonthBill || billDeskBillAmount != null;
   const trendMonths = [
     ...(hasCurrentMonthBill ? [{
@@ -541,7 +543,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
       billedUnits: b.billedUnits,
       status:      'PAID',
     })),
-  ].reverse(); // oldest first
+  ].reverse();
 
   // ── Insights ──────────────────────────────────────────────────────────────
   const pastAmounts  = trendMonths.map((m) => m.billAmount);
@@ -568,12 +570,10 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   const currentInsightAmount = billDeskBillAmount ?? latest?.billAmount ?? 0;
   const currentInsightUnits  = hasCurrentMonthBill ? latest.billedUnits : 0;
 
-  // Spike detection: current vs 3-month avg
   const recent3Avg  = avg(pastAmounts.slice(-3));
   const unitSpike   = avgUnits > 0 && currentInsightUnits > avgUnits * 1.25;
   const amountSpike = recent3Avg > 0 && currentInsightAmount > recent3Avg * 1.25;
 
-  // Prediction uses same month last year when available, otherwise recent trend
   const targetMonthNumber = ((currentMonth + 1) % 12) + 1;
   const targetMonthYear = currentMonth === 11 ? currentYear : currentYear - 1;
   const sameMonthHistory = trendMonths.filter((m) => {
@@ -595,40 +595,25 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   const predictedNextBill = sameMonthHistory.length
     ? Math.round(avg(sameMonthHistory.map((m) => m.billAmount)))
     : fallbackBillValues.length >= 2
-      ? Math.max(0, Math.round(avg(fallbackBillValues)
-        + ((fallbackBillValues[0] - fallbackBillValues[fallbackBillValues.length - 1]) / fallbackBillValues.length) * 0.3))
+      ? Math.round(avg(fallbackBillValues))
       : null;
 
   const predictedNextUnits = sameMonthHistory.length
     ? Math.round(avg(sameMonthHistory.map((m) => m.billedUnits)))
     : fallbackUnitValues.length >= 2
-      ? Math.max(0, Math.round(avg(fallbackUnitValues)))
+      ? Math.round(avg(fallbackUnitValues))
       : null;
 
-  const predictedNextBillRange = sameMonthHistory.length
-    ? rangeFor(sameMonthHistory.map((m) => m.billAmount))
-    : fallbackBillValues.length >= 2
-      ? rangeFor(fallbackBillValues)
-      : null;
-
-  const predictedNextUnitsRange = sameMonthHistory.length
-    ? rangeFor(sameMonthHistory.map((m) => m.billedUnits))
-    : fallbackUnitValues.length >= 2
-      ? rangeFor(fallbackUnitValues)
-      : null;
+  const predictedNextBillRange = rangeFor(sameMonthHistory.length ? sameMonthHistory.map(m => m.billAmount) : fallbackBillValues);
+  const predictedNextUnitsRange = rangeFor(sameMonthHistory.length ? sameMonthHistory.map(m => m.billedUnits) : fallbackUnitValues);
 
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthLabel = `${MONTHS[targetMonthNumber - 1]}-${targetMonthYear}`;
-  const predictedBasis = sameMonthHistory.length
-    ? `based on ${monthLabel} last year`
-    : 'based on recent trend';
+  const predictedBasis = sameMonthHistory.length ? `based on ${monthLabel} last year` : 'based on recent trend';
 
   const maxBill = trendMonths.reduce((best, month) => !best || month.billAmount > best.billAmount ? month : best, null);
   const minBill = trendMonths.reduce((best, month) => !best || month.billAmount < best.billAmount ? month : best, null);
-  const maxAmountMonth = maxBill?.month || null;
-  const minAmountMonth = minBill?.month || null;
 
-  // Comparison: current vs previous month vs same month last year
   const prevMonthBill = pastBills[0] || null;
   const sameMonthLastYear = pastBills.find(b => {
     const d = b.closingDate;
@@ -641,92 +626,55 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   }
 
   const insights = {
-    avgAmount:         Math.round(avgAmount),
-    avgAmount6m:       Math.round(avgAmount6m),
-    avgAmount12m:      Math.round(avgAmount12m),
-    avgUnits:          Math.round(avgUnits),
-    avgUnits6m:        Math.round(avgUnits6m),
-    avgUnits12m:       Math.round(avgUnits12m),
-    maxAmount,
-    minAmount,
-    maxUnits,
-    minUnits,
-    avgCostPerUnit:    Number(avgCostPerUnit.toFixed(2)),
-    predictedNextBill,
-    predictedNextBillRange,
-    predictedNextUnits,
-    predictedNextUnitsRange,
-    predictedBasis,
-    maxAmountMonth,
-    minAmountMonth,
-    unitSpike,
-    amountSpike,
-    vsLastMonth:       prevMonthBill
-      ? {
-          amount:  latest.billAmount - prevMonthBill.billAmount,
-          amountPct: pct(latest.billAmount - prevMonthBill.billAmount, prevMonthBill.billAmount),
-          units:   latest.billedUnits - prevMonthBill.billedUnits,
-          unitsPct: pct(latest.billedUnits - prevMonthBill.billedUnits, prevMonthBill.billedUnits),
-        }
-      : null,
-    vsSameMonthLastYear: sameMonthLastYear
-      ? {
-          amount:  latest.billAmount - sameMonthLastYear.billAmount,
-          amountPct: pct(latest.billAmount - sameMonthLastYear.billAmount, sameMonthLastYear.billAmount),
-          units:   latest.billedUnits - sameMonthLastYear.billedUnits,
-          unitsPct: pct(latest.billedUnits - sameMonthLastYear.billedUnits, sameMonthLastYear.billedUnits),
-        }
-      : null,
+    avgAmount: Math.round(avgAmount), avgAmount6m: Math.round(avgAmount6m), avgAmount12m: Math.round(avgAmount12m),
+    avgUnits: Math.round(avgUnits), avgUnits6m: Math.round(avgUnits6m), avgUnits12m: Math.round(avgUnits12m),
+    maxAmount, minAmount, maxUnits, minUnits, avgCostPerUnit: Number(avgCostPerUnit.toFixed(2)),
+    predictedNextBill, predictedNextBillRange, predictedNextUnits, predictedNextUnitsRange, predictedBasis,
+    maxAmountMonth: maxBill?.month || null, minAmountMonth: minBill?.month || null,
+    unitSpike, amountSpike,
+    vsLastMonth: prevMonthBill ? {
+      amount: latest.billAmount - prevMonthBill.billAmount,
+      amountPct: pct(latest.billAmount - prevMonthBill.billAmount, prevMonthBill.billAmount),
+      units: latest.billedUnits - prevMonthBill.billedUnits,
+      unitsPct: pct(latest.billedUnits - prevMonthBill.billedUnits, prevMonthBill.billedUnits),
+    } : null,
+    vsSameMonthLastYear: sameMonthLastYear ? {
+      amount: latest.billAmount - sameMonthLastYear.billAmount,
+      amountPct: pct(latest.billAmount - sameMonthLastYear.billAmount, sameMonthLastYear.billAmount),
+      units: latest.billedUnits - sameMonthLastYear.billedUnits,
+      unitsPct: pct(latest.billedUnits - sameMonthLastYear.billedUnits, sameMonthLastYear.billedUnits),
+    } : null,
   };
 
-  // ── Clean DTO — only what the UI needs ──────────────────────────────────────
   return {
     serviceNumber,
-    customerName:     billDeskData?.customerName ?? latest?.customerName ?? null,
-
-    // Current bill
-    billDate:         (billDeskBillDate && parseDate(billDeskBillDate)) ? parseDate(billDeskBillDate).toISOString() : (latest ? latest.closingDate.toISOString() : new Date().toISOString()),
-    dueDate:          (billDeskDueDate && parseDate(billDeskDueDate)) ? parseDate(billDeskDueDate).toISOString() : (latest?.dueDate?.toISOString() || null),
-    billedUnits:      latest?.billedUnits ?? null,
-    billAmount:       finalDueAmount,   // final bill amount from BillDesk when available
+    migratedServiceNumber,
+    customerName: billDeskData?.customerName ?? latest?.customerName ?? null,
+    billDate: (billDeskBillDate && parseDate(billDeskBillDate)) ? parseDate(billDeskBillDate).toISOString() : (latest ? latest.closingDate.toISOString() : new Date().toISOString()),
+    dueDate: (billDeskDueDate && parseDate(billDeskDueDate)) ? parseDate(billDeskDueDate).toISOString() : (latest?.dueDate?.toISOString() || null),
+    billedUnits: latest?.billedUnits ?? null,
+    billAmount: finalDueAmount,
     publicBillAmount: publicDueAmount,
-    billDeskAmount:   billDeskAmount ?? null,
+    billDeskAmount: billDeskAmount ?? null,
     billDeskBillAmount: billDeskBillAmount ?? null,
     billDeskCurrentDemand: billDeskData?.billDeskCurrentDemand ?? null,
     billDeskError,
     apspdclError,
-    amountDue,                             // net (after arrears/current payment)
-    status,                                // DUE | PAID | NO_DUES | UNKNOWN
-
-    // Payment status
-    isPaid:           status === 'PAID' || status === 'NO_DUES',
-    paidDate:         pay.paidDate?.toISOString() || null,
-    receiptNumber:    pay.receiptNumber,
-    paidAmount:       pay.isPaid ? pay.paidAmount : (status === 'PAID' ? (billDeskBillAmount ?? latest?.billAmount ?? 0) : null),
-
-    // Bill breakup (null unless DUE)
-    billBreakup:      breakup,
-
-    // Last 3 bills summary for card history strip
+    amountDue,
+    status,
+    isPaid: status === 'PAID' || status === 'NO_DUES',
+    paidDate: pay.paidDate?.toISOString() || null,
+    receiptNumber: pay.receiptNumber,
+    paidAmount: pay.isPaid ? pay.paidAmount : (status === 'PAID' ? (billDeskBillAmount ?? latest?.billAmount ?? 0) : null),
+    billBreakup: breakup,
     lastThreeAmounts: history,
-
-    // Full 12-month bill history for charts and detail panel
-    billHistory:      billHistory18,
-
-    // Last 12 payment transactions
-    paymentHistory:   paymentHistory12,
-
-    // Monthly trend series for charts (oldest→newest)
-    trendData:        trendMonths,
-
-    // BillDesk reconciliation
+    billHistory: billHistory18,
+    paymentHistory: paymentHistory12,
+    trendData: trendMonths,
     isdAmount,
     billDeskSource,
-
-    // Derived insights
     insights,
-
-    fetchedAt:        new Date().toISOString(),
+    fetchedAt: new Date().toISOString(),
   };
 }
 
