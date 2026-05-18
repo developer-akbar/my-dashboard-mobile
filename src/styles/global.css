@@ -908,7 +908,7 @@ input[type="checkbox"] {
 }
 .acc__chevron { color: var(--text-3); transition: transform 0.2s; }
 .acc--open .acc__chevron { transform: rotate(180deg); }
-.acc__body { padding: 4px 14px 14px; }
+.acc__body { padding: 0 0 14px; }
 
 /* ── Breakup panel ──────────────────────────────────────────────────────────── */
 .bp__bar {
@@ -1004,22 +1004,45 @@ input[type="checkbox"] {
 .ctip p { margin: 0; color: var(--text-2); font-size: 11.5px; }
 
 /* ── Payments panel ─────────────────────────────────────────────────────────── */
-.pymt { display: flex; flex-direction: column; }
+.pymt { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
 .pymt__row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: var(--radius-sm);
-  font-size: 12.5px;
-  border-bottom: 1px solid var(--border);
-  transition: background 0.1s;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
 }
-.pymt__row:last-child { border-bottom: none; }
-.pymt__row:hover { background: var(--surface-2); }
-.pymt__left { display: flex; align-items: center; gap: 5px; flex: 1; color: var(--text-2); }
-.pymt__ref { flex: 1.2; color: var(--text-3); }
-.pymt__row b { font-weight: 700; color: var(--text-1); }
+.pymt__left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 110px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.pymt__counter {
+  width: 18px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-size: 10px;
+}
+.pymt__ref {
+  flex: 1;
+  color: var(--text-3);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.pymt__row b {
+  flex: 0 0 75px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--text-1);
+}
 
 /* ── Trend badges ───────────────────────────────────────────────────────────── */
 .tbadge {

@@ -256,7 +256,7 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
     .map(p => ({
       date:      parseDate(p.prdate),
       amount:    toNum(p.billamt),
-      units:     toNum(p.units),
+      counter:   p.counter,
       receiptNo: p.prno || null
     }))
     .filter(p => p.date)
@@ -455,7 +455,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
 
   // ── Parse all payments ────────────────────────────────────────────────────
   const allPayments = (paymentData.data || [])
-    .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), units: toNum(p.units), receiptNo: p.prno || null }))
+    .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), counter: p.counter, receiptNo: p.prno || null }))
     .filter(p => p.date)
     .sort((a, b) => b.date - a.date); // newest first
 
@@ -510,10 +510,10 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   });
 
   // ── Payment history (up to 12 recent payments) ────────────────────────────
-  const paymentHistory12 = allPayments.slice(0, 12).map(p => ({
+  const paymentHistory12 = allPayments.slice(0, 12).map((p, i) => ({
+    counter:   p.counter,
     date:      p.date.toISOString(),
     amount:    p.amount,
-    units:     p.units,
     receiptNo: p.receiptNo,
   }));
 

@@ -437,8 +437,8 @@ function PaymentsPanel({ payments, t }) {
             <FiCalendar size={11} />
             <span>{formatDate(p.date)}</span>
           </div>
-          <span className="mono-sm pymt__ref">{p.receiptNo || '—'}</span>
-          <span className="mono-sm pymt__units">{p.units || '—'}u</span>
+          <span className="mono-sm pymt__ref" title={p.receiptNo || '—'}>{p.receiptNo || '—'}</span>
+          <span className="mono-sm pymt__counter">{p.counter || '—'}</span>
           <b>{formatInr(p.amount)}</b>
         </div>
       ))}
