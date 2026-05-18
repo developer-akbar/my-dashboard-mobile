@@ -1280,7 +1280,6 @@ input[type="checkbox"] {
 /* ── Utilities ──────────────────────────────────────────────────────────────── */
 .mono  { font-family: var(--mono); }
 .right { text-align: right; }
-.hide-xs { }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.8s linear infinite; }

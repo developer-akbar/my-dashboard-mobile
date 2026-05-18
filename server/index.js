@@ -58,8 +58,19 @@ async function apspdclPost(endpoint, serviceNumber) {
   if (!res.ok) throw new Error(`APSPDCL ${endpoint} responded with ${res.status}`);
   const text = await res.text();
   if (!text || !text.trim()) return { data: [] };
-  try { return JSON.parse(text); }
-  catch { return { data: [] }; }
+  try { 
+    const data = JSON.parse(text);
+    if (data.status === 'error' && data.message) {
+      const err = new Error(data.message);
+      err.apiStatus = 'error';
+      throw err;
+    }
+    return data;
+  }
+  catch (err) {
+    if (err.apiStatus === 'error') throw err;
+    throw new Error(`APSPDCL ${endpoint} returned invalid response`);
+  }
 }
 
 async function fetchBillDeskBill(serviceNumber, billdeskSession) {
@@ -373,6 +384,10 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
       .sort((a, b) => b.closingDate - a.closingDate);
   }
 
+  if (paymentResult.status === 'rejected' && !apspdclError) {
+    apspdclError = 'APSPDCL history servers are down. Please try again later.';
+  }
+
   const latest       = bills[0] || null;
   const now          = new Date();
   const currentYear  = now.getUTCFullYear();
@@ -684,10 +699,10 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     status,                                // DUE | PAID | NO_DUES | UNKNOWN
 
     // Payment status
-    isPaid:           pay.isPaid,
+    isPaid:           status === 'PAID' || status === 'NO_DUES',
     paidDate:         pay.paidDate?.toISOString() || null,
     receiptNumber:    pay.receiptNumber,
-    paidAmount:       pay.paidAmount,
+    paidAmount:       pay.isPaid ? pay.paidAmount : (status === 'PAID' ? (billDeskBillAmount ?? latest?.billAmount ?? 0) : null),
 
     // Bill breakup (null unless DUE)
     billBreakup:      breakup,
