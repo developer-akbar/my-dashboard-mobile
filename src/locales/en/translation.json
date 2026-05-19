@@ -80,5 +80,14 @@
   "theme": "Theme",
   "dark": "Dark",
   "light": "Light",
-  "app_language": "App Language"
+  "app_language": "App Language",
+  "calculate_next_bill": "Calculate next bill",
+  "last_reading": "Last Reading",
+  "current_reading": "Current Reading",
+  "enter_current_reading": "Enter current reading",
+  "units_consumed": "Units Consumed",
+  "est_total": "Estimated Total",
+  "calculator_note": "Excludes FSA and other seasonal adjustments.",
+  "rdg_less_than_last": "Reading cannot be less than last ({{last}})",
+  "close": "Close"
 }

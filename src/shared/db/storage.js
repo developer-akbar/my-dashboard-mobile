@@ -67,9 +67,18 @@ async function getSqlite() {
     
     await db.open();
 
-    // Migrate: add historyFetchedAt if missing
+    // Migrate: add missing columns
     try {
       await db.execute("ALTER TABLE electricity_services ADD COLUMN historyFetchedAt TEXT;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN category TEXT;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN closingRdg REAL;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN ctrLoad REAL;");
     } catch (e) {}
 
     await db.execute(`
@@ -97,6 +106,9 @@ async function getSqlite() {
         paymentHistory TEXT,
         trendData TEXT,
         insights TEXT,
+        category TEXT,
+        closingRdg REAL,
+        ctrLoad REAL,
         pinned INTEGER DEFAULT 0,
         pinnedAt TEXT,
         isDeleted INTEGER DEFAULT 0,
@@ -272,6 +284,9 @@ async function createService(data) {
     paymentHistory: null,
     trendData: null,
     insights: null,
+    category: null,
+    closingRdg: null,
+    ctrLoad: null,
     pinned: false,
     pinnedAt: null,
     isDeleted: false,
@@ -289,14 +304,16 @@ async function createService(data) {
          lastAmountDue, lastBilledUnits, lastThreeAmounts, lastStatus, lastFetchedAt,
          historyFetchedAt, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
          billBreakup, billHistory, paymentHistory, trendData, insights,
+         category, closingRdg, ctrLoad,
          pinned, pinnedAt, isDeleted, deletedAt, createdAt, updatedAt)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         ser.id, ser.serviceNumber, ser.label, ser.customerName,
         ser.lastBillDate, ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits,
         ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastRefreshedDate,
         ser.lastError, ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
+        ser.category, ser.closingRdg, ser.ctrLoad,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.createdAt, ser.updatedAt
       ]
     );
@@ -324,6 +341,7 @@ async function updateService(id, patch) {
         lastFetchedAt=?, historyFetchedAt=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
         receiptNumber=?, paidAmount=?, billBreakup=?, billHistory=?,
         paymentHistory=?, trendData=?, insights=?,
+        category=?, closingRdg=?, ctrLoad=?,
         pinned=?, pinnedAt=?, isDeleted=?, deletedAt=?, updatedAt=?
        WHERE id=?`,
       [
@@ -332,6 +350,7 @@ async function updateService(id, patch) {
         ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastRefreshedDate, ser.lastError,
         ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
+        ser.category, ser.closingRdg, ser.ctrLoad,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.updatedAt, ser.id
       ]
     );

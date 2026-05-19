@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
+import { BillCalculator } from './components/BillCalculator.jsx';
 import { SummaryBar } from './components/SummaryBar.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
@@ -16,6 +17,7 @@ export function ElectricityDashboard() {
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [activeView, setActiveView] = useState('active');
   const [dialog, setDialog] = useState({ open: false, service: null });
+  const [calculator, setCalculator] = useState({ open: false, service: null });
   const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', isDanger: false, onConfirm: () => {} });
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
@@ -68,8 +70,9 @@ export function ElectricityDashboard() {
       if (e.detail?.handled) return;
 
       // 1. Priority: Close any open Modal or Dialog
-      if (dialog.open || confirmState.open) {
+      if (dialog.open || calculator.open || confirmState.open) {
         setDialog({ open: false, service: null });
+        setCalculator({ open: false, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
         if (e.detail) e.detail.handled = true;
         return;
@@ -83,7 +86,7 @@ export function ElectricityDashboard() {
     };
     window.addEventListener('app-back-button', handleBack);
     return () => window.removeEventListener('app-back-button', handleBack);
-  }, [selectedIds, dialog.open, confirmState.open]);
+  }, [selectedIds, dialog.open, calculator.open, confirmState.open]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -175,6 +178,10 @@ export function ElectricityDashboard() {
 
   const visible = useMemo(() => filterServices(services, filters), [services, filters]);
   const useAccordion = isMobile ? visible.length > 1 : visible.length > 3;
+
+  const handleCalculateBill = (service) => {
+    setCalculator({ open: true, service });
+  };
 
   async function submitService(payload) {
     if (dialog.service) {
@@ -439,6 +446,7 @@ export function ElectricityDashboard() {
                     });
                   }}
                   onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
+                  onCalculateBill={handleCalculateBill}
                   onPay={() => handlePay(s)}
                 />
               ))}
@@ -495,6 +503,12 @@ export function ElectricityDashboard() {
         service={dialog.service}
         onClose={() => setDialog({ open: false, service: null })}
         onSubmit={submitService}
+      />
+
+      <BillCalculator
+        open={calculator.open}
+        service={calculator.service}
+        onClose={() => setCalculator({ open: false, service: null })}
       />
 
       <ConfirmDialog

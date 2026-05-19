@@ -244,6 +244,9 @@ function normaliseBill(row) {
     othchg:toNum(row.othchg),
     sur:   toNum(row.sur),
     isd:   toNum(row.isd),  // Initial Security Deposit
+    category: row.category,
+    closingRdg: toNum(row.closingRdg),
+    ctrLoad: toNum(row.ctrLoad),
   };
 }
 
@@ -667,6 +670,9 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     receiptNumber: pay.receiptNumber,
     paidAmount: pay.isPaid ? pay.paidAmount : (status === 'PAID' ? (billDeskBillAmount ?? latest?.billAmount ?? 0) : null),
     billBreakup: breakup,
+    category:    latest?.category ?? null,
+    closingRdg:  latest?.closingRdg ?? null,
+    ctrLoad:     latest?.ctrLoad ?? null,
     lastThreeAmounts: history,
     billHistory: billHistory18,
     paymentHistory: paymentHistory12,

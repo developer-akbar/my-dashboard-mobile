@@ -80,5 +80,14 @@
   "theme": "థీమ్",
   "dark": "డార్క్",
   "light": "లైట్",
-  "app_language": "యాప్ భాష"
+  "app_language": "యాప్ భాష",
+  "calculate_next_bill": "తదుపరి బిల్లును లెక్కించు",
+  "last_reading": "చివరి రీడింగ్",
+  "current_reading": "ప్రస్తుత రీడింగ్",
+  "enter_current_reading": "ప్రస్తుత రీడింగ్‌ని నమోదు చేయండి",
+  "units_consumed": "వినియోగించిన యూనిట్లు",
+  "est_total": "అంచనా మొత్తం",
+  "calculator_note": "FSA మరియు ఇతర సర్దుబాట్లు మినహాయించబడ్డాయి.",
+  "rdg_less_than_last": "రీడింగ్ చివరిది ({{last}}) కంటే తక్కువగా ఉండకూడదు",
+  "close": "మూసివేయి"
 }

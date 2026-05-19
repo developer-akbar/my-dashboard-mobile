@@ -71,6 +71,9 @@ function snapshotToPatch(snapshot, existing = {}) {
     receiptNumber:     snapshot.receiptNumber,
     paidAmount:        snapshot.paidAmount,
     billBreakup:       snapshot.billBreakup,
+    category:          snapshot.category,
+    closingRdg:        snapshot.closingRdg,
+    ctrLoad:           snapshot.ctrLoad,
   };
 
   // ── Handle Service Number Migration ─────────────────────────────────────

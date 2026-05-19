@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
-  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap,
+  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap
 } from 'react-icons/fi';
+import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill } from 'react-icons/bs';
 import toast from 'react-hot-toast';
 import {
@@ -66,7 +67,7 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect }) {
+export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const { t } = useTranslation();
@@ -166,6 +167,11 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                       {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
                     </button>
                     <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
+                    {(service.category === 'LT1' || !service.category) && (
+                      <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
+                        <LuCalculator size={13} /> {t('calculate_next_bill')}
+                      </button>
+                    )}
                     <button className="danger" onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
                   </div>
                 )}
