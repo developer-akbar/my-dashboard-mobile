@@ -89,5 +89,16 @@
   "est_total": "అంచనా మొత్తం",
   "calculator_note": "FSA మరియు ఇతర సర్దుబాట్లు మినహాయించబడ్డాయి.",
   "rdg_less_than_last": "రీడింగ్ చివరిది ({{last}}) కంటే తక్కువగా ఉండకూడదు",
-  "close": "మూసివేయి"
+  "close": "మూసివేయి",
+  "about": "వివరాలు",
+  "about_service": "సర్వీస్ వివరాలు",
+  "service_info": "సర్వీస్ సమాచారం",
+  "unique_service_number": "ప్రత్యేక సర్వీస్ నంబర్",
+  "customer_name": "వినియోగదారుని పేరు",
+  "division_code": "డివిజన్ కోడ్",
+  "division_name": "డివిజన్ పేరు",
+  "circle_name": "సర్కిల్ పేరు",
+  "section_name": "సెక్షన్ పేరు",
+  "category": "కేటగిరీ",
+  "current_load": "ప్రస్తుత లోడ్"
 }

@@ -89,5 +89,16 @@
   "est_total": "Estimated Total",
   "calculator_note": "Excludes FSA and other seasonal adjustments.",
   "rdg_less_than_last": "Reading cannot be less than last ({{last}})",
-  "close": "Close"
+  "close": "Close",
+  "about": "About",
+  "about_service": "About Service",
+  "service_info": "Service Info",
+  "unique_service_number": "Unique Service Number",
+  "customer_name": "Customer Name",
+  "division_code": "Division Code",
+  "division_name": "Division Name",
+  "circle_name": "Circle Name",
+  "section_name": "Section Name",
+  "category": "Category",
+  "current_load": "Current Load"
 }

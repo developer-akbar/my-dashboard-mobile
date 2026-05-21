@@ -74,6 +74,11 @@ function snapshotToPatch(snapshot, existing = {}) {
     category:          snapshot.category,
     closingRdg:        snapshot.closingRdg,
     ctrLoad:           snapshot.ctrLoad,
+    divisionCode:      snapshot.divisionCode,
+    circleName:        snapshot.circleName,
+    divisionName:      snapshot.divisionName,
+    sectionName:       snapshot.sectionName,
+    uniqueServiceNumber: snapshot.uniqueServiceNumber,
   };
 
   // ── Handle Service Number Migration ─────────────────────────────────────

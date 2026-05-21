@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
-  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap
+  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo
 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill } from 'react-icons/bs';
@@ -67,7 +67,7 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill }) {
+export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const { t } = useTranslation();
@@ -137,9 +137,14 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
           <p className="scard__customer">
             {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || t('untitled'))}
           </p>
-          <button className="scard__num" onClick={(e) => { e.stopPropagation(); copyNum(); }}>
-            <FiCopy size={10} />{service.serviceNumber}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button className="scard__num" onClick={(e) => { e.stopPropagation(); copyNum(); }}>
+              <FiCopy size={10} />{service.serviceNumber}
+            </button>
+            <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onAbout(); }} title={t('about')} style={{ width: '20px', height: '20px', padding: 0 }}>
+              <FiInfo size={14} />
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>

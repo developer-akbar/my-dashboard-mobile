@@ -131,28 +131,37 @@ async function executeBillDeskRequest(serviceNumber, reqtoken, jcaptchaVal, cook
 function parseBillDeskHtml(html) {
   const parseField = (label) => {
     const patterns = [
-      new RegExp(`${label}\\s*:\\s*</td>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
-      new RegExp(`<td[^>]*>\\s*${label}\\s*</td>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
-      new RegExp(`<th[^>]*>\\s*${label}\\s*</th>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
-      new RegExp(`${label}\\s*:\\s*([^<\\n]+)`, 'i'),
-      new RegExp(`${label}[^>]*>\\s*([^<]+)</td>`, 'i'),
+      // 1. Label in TD, Value in next TD (with or without colon)
+      new RegExp(`<td[^>]*>\\s*${label}\\s*[:\\-]?\\s*</td>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
+      // 2. Label in TH, Value in next TD
+      new RegExp(`<th[^>]*>\\s*${label}\\s*[:\\-]?\\s*</th>\\s*<td[^>]*>([^<]+)</td>`, 'i'),
+      // 3. Label and Value in same cell or text block (e.g. "Label: Value")
+      // Must follow a tag closing or newline to avoid attribute matching
+      new RegExp(`(?:>|\\n)\\s*${label}\\s*[:\\-]\\s*([^<\\n\\(]+)`, 'i'),
     ];
 
     for (const pattern of patterns) {
       const match = html.match(pattern);
-      if (match) return match[1].trim();
+      if (match && match[1].trim()) {
+        const val = match[1].trim().replace(/\s+/g, ' ');
+        // Final safety check: if it looks like HTML code, skip it
+        if (val.includes('<') || val.includes('="') || val.includes('viewport')) continue;
+        return val;
+      }
     }
     return null;
   };
 
   const parseNumber = (value) => {
-    if (!value) return null;
-    const normalized = String(value).replace(/,/g, '').trim();
+    if (value == null) return null;
+    const normalized = String(value).replace(/[^0-9.]/g, '').trim();
     return normalized === '' ? null : Number(normalized);
   };
 
-  const customerName = parseField('Customer Name') || parseField('Consumer Name') || parseField('Name');
-  const uniqueServiceNumber = parseField('Unique Service Number');
+  const customerName = parseField('Customer Name') || parseField('Consumer Name');
+  const uniqueServiceNumber = parseField('Unique Service Number') || parseField('Service Number');
+  const divisionCode = parseField('Division Code');
+  const circleName = parseField('Circle Name');
   const billAmount = parseNumber(parseField('Bill Amount'));
   const currentDemand = parseNumber(parseField('Current Demand'));
   const rawBillDate = parseField('Bill Date');
@@ -161,28 +170,21 @@ function parseBillDeskHtml(html) {
   console.log('[api] BillDesk parse candidates', {
     customerName,
     uniqueServiceNumber,
+    divisionCode,
+    circleName,
     billAmount,
     currentDemand,
     rawBillDate,
     rawDueDate,
   });
 
-  if (billAmount == null && currentDemand == null) {
-    const htmlSnippet = html.slice(0, 1200).replace(/\s+/g, ' ');
-    console.warn('[api] BillDesk parse failed: no bill amount found', {
-      customerName,
-      billAmount,
-      currentDemand,
-      htmlSnippet,
-    });
-    return null;
-  }
-
-  const billDeskAmount = currentDemand === 0 ? 0 : currentDemand ?? billAmount;
+  const billDeskAmount = currentDemand === 0 ? 0 : (currentDemand ?? billAmount ?? null);
 
   return {
     customerName,
     uniqueServiceNumber,
+    divisionCode,
+    circleName,
     billDeskAmount,
     billDeskBillAmount: billAmount,
     billDeskCurrentDemand: currentDemand,
@@ -251,8 +253,13 @@ function normaliseBill(row) {
 }
 
 function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
-  const empty = { isPaid:false, paidDate:null, receiptNumber:null, paidAmount:null, currentPaymentTotal:0, arrears:[], arrearsTotal:0 };
-  if (!Array.isArray(rawPayments) || !rawPayments.length || !bills?.length) return empty;
+  const empty = { isPaid:false, paidDate:null, receiptNumber:null, paidAmount:null, currentPaymentTotal:0, arrears:[], arrearsTotal:0, divname: null, secname: null };
+  if (!Array.isArray(rawPayments) || !rawPayments.length || !bills?.length) {
+    if (Array.isArray(rawPayments) && rawPayments.length > 0) {
+       return { ...empty, divname: rawPayments[0].divname, secname: rawPayments[0].secname };
+    }
+    return empty;
+  }
 
   const latest     = bills[0];
   const billDate   = latest.closingDate;
@@ -292,6 +299,8 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
       currentPaymentTotal: currentTotal,
       arrears: [],
       arrearsTotal: 0,
+      divname: rawPayments[0].divname,
+      secname: rawPayments[0].secname
     };
   }
 
@@ -332,6 +341,8 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
     currentPaymentTotal: currentTotal,
     arrears,
     arrearsTotal,
+    divname: rawPayments[0].divname,
+    secname: rawPayments[0].secname
   };
 }
 
@@ -362,36 +373,62 @@ function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 
   };
 }
 
+function getMigratedNumber(sn) {
+  if (!sn || sn.length !== 13) return null;
+  // The user specifically requested: 23233... -> 55513...
+  if (sn.startsWith('23233')) {
+    return '55513' + sn.substring(5);
+  }
+  return null;
+}
+
 /**
  * Core processor: given a service number, fetch from APSPDCL and return a clean snapshot DTO.
  * Returns null if the service number is unknown / has no data.
  * Throws only on network failures.
  */
 async function buildSnapshot(serviceNumber, billdeskSession) {
-  // 1. Initial BillDesk check to find Unique Service Number (Primary Migration source)
+  // 1. Initial BillDesk check with original number
   let billDeskData = null;
   let billDeskError = null;
+  let activeNumber = serviceNumber;
+  let migratedServiceNumber = null;
+
   try {
     billDeskData = await fetchBillDeskBill(serviceNumber, billdeskSession);
   } catch (error) {
     billDeskError = 'Connection failed';
   }
 
-  // 2. Resolve target number for history calls
-  // We strictly trust BillDesk for migration info. 
-  // If BillDesk returns a different "Unique Service Number", we use that for everything.
-  const billDeskUnique = billDeskData?.uniqueServiceNumber;
-  
-  let targetNumber = serviceNumber;
-  let migratedServiceNumber = null;
-
-  if (billDeskUnique && billDeskUnique !== serviceNumber) {
-    targetNumber = billDeskUnique;
-    migratedServiceNumber = billDeskUnique;
-    console.log(`[api] BillDesk migration detected: ${serviceNumber} -> ${targetNumber}`);
+  // 2. Migration Logic: If original fails, try migrated number
+  if (!billDeskData) {
+    const candidate = getMigratedNumber(serviceNumber);
+    if (candidate) {
+      console.log(`[api] Attempting migration check: ${serviceNumber} -> ${candidate}`);
+      try {
+        const migratedData = await fetchBillDeskBill(candidate, billdeskSession);
+        if (migratedData) {
+          billDeskData = migratedData;
+          activeNumber = candidate;
+          migratedServiceNumber = candidate;
+          console.log(`[api] Migration confirmed: ${serviceNumber} -> ${activeNumber}`);
+        }
+      } catch (err) {
+        console.warn(`[api] Migration check failed for ${candidate}`, err);
+      }
+    }
   }
 
-  // 3. Fetch History
+  // Also check if the successful BillDesk call itself suggested a migration
+  const billDeskUnique = billDeskData?.uniqueServiceNumber;
+  if (billDeskUnique && billDeskUnique !== activeNumber && billDeskUnique !== serviceNumber) {
+    migratedServiceNumber = billDeskUnique;
+    activeNumber = billDeskUnique;
+    console.log(`[api] BillDesk internal migration detected: ${serviceNumber} -> ${activeNumber}`);
+  }
+
+  // 3. Fetch History using the active (potentially migrated) number
+  const targetNumber = activeNumber;
   const [billResult, paymentResult] = await Promise.allSettled([
     apspdclPost('publicbillhistory', targetNumber),
     apspdclPost('publicpaymenthistory', targetNumber),
@@ -673,6 +710,11 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     category:    latest?.category ?? null,
     closingRdg:  latest?.closingRdg ?? null,
     ctrLoad:     latest?.ctrLoad ?? null,
+    divisionCode: billDeskData?.divisionCode ?? pay.divname ?? null,
+    circleName:  billDeskData?.circleName ?? null,
+    divisionName: pay.divname ?? null,
+    sectionName: pay.secname ?? null,
+    uniqueServiceNumber: billDeskData?.uniqueServiceNumber ?? serviceNumber,
     lastThreeAmounts: history,
     billHistory: billHistory18,
     paymentHistory: paymentHistory12,

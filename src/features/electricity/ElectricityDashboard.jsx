@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
+import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
 import { BillCalculator } from './components/BillCalculator.jsx';
 import { SummaryBar } from './components/SummaryBar.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
@@ -17,6 +18,7 @@ export function ElectricityDashboard() {
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [activeView, setActiveView] = useState('active');
   const [dialog, setDialog] = useState({ open: false, service: null });
+  const [aboutDialog, setAboutDialog] = useState({ open: false, service: null });
   const [calculator, setCalculator] = useState({ open: false, service: null });
   const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', isDanger: false, onConfirm: () => {} });
   const [refreshingAll, setRefreshingAll] = useState(false);
@@ -70,8 +72,9 @@ export function ElectricityDashboard() {
       if (e.detail?.handled) return;
 
       // 1. Priority: Close any open Modal or Dialog
-      if (dialog.open || calculator.open || confirmState.open) {
+      if (dialog.open || aboutDialog.open || calculator.open || confirmState.open) {
         setDialog({ open: false, service: null });
+        setAboutDialog({ open: false, service: null });
         setCalculator({ open: false, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
         if (e.detail) e.detail.handled = true;
@@ -86,7 +89,7 @@ export function ElectricityDashboard() {
     };
     window.addEventListener('app-back-button', handleBack);
     return () => window.removeEventListener('app-back-button', handleBack);
-  }, [selectedIds, dialog.open, calculator.open, confirmState.open]);
+  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, confirmState.open]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -427,6 +430,7 @@ export function ElectricityDashboard() {
                     }
                   }}
                   onEdit={() => setDialog({ open: true, service: s })}
+                  onAbout={() => setAboutDialog({ open: true, service: s })}
                   onDelete={() => {
                     setConfirmState({
                       open: true,
@@ -505,6 +509,12 @@ export function ElectricityDashboard() {
         onSubmit={submitService}
       />
 
+      <ServiceAboutDialog
+        open={aboutDialog.open}
+        service={aboutDialog.service}
+        onClose={() => setAboutDialog({ open: false, service: null })}
+      />
+
       <BillCalculator
         open={calculator.open}
         service={calculator.service}
@@ -522,3 +532,4 @@ export function ElectricityDashboard() {
     </div>
   );
 }
+
