@@ -26,6 +26,8 @@ export async function solveCaptchaImage(cookie) {
     'eng',
     { 
       logger: m => {},
+      langPath: './', // Look for eng.traineddata in the current/root directory
+      gzip: false,    // Use the raw traineddata file
       tessedit_char_whitelist: '0123456789'
     }
   );

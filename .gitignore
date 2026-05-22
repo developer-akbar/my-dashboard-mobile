@@ -4,6 +4,11 @@ android/
 ios/
 .env
 .env.local
+.env.test
+.env.production
 *.local
 .DS_Store
 Thumbs.db
+
+.vercel
+!.env.example
