@@ -61,14 +61,35 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (isBulk) {
-      const numbers = bulkInput.split(/[\s,]+/).map(s => s.trim()).filter(s => s.length === 13 && /^\d+$/.test(s));
-      if (numbers.length === 0) {
+      // Parse bulk input. Format: "Label:Number" or just "Number"
+      // Split by newlines, commas, or semicolons first
+      const lines = bulkInput.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
+      
+      const entries = lines.map(line => {
+        let label = '';
+        let number = '';
+        
+        if (line.includes(':')) {
+          const parts = line.split(':');
+          number = parts.pop().trim();
+          label = parts.join(':').trim(); // Handle multiple colons by re-joining
+        } else {
+          number = line.trim();
+        }
+        
+        // Clean number and check if valid
+        number = number.replace(/\D/g, '');
+        return { label, number };
+      }).filter(entry => entry.number.length === 13);
+
+      if (entries.length === 0) {
         toast.error('No valid 13-digit service numbers found');
         return;
       }
+      
       setSaving(true);
       try {
-        await onSubmit({ isBulk: true, numbers });
+        await onSubmit({ isBulk: true, entries });
         onClose();
       } finally {
         setSaving(false);

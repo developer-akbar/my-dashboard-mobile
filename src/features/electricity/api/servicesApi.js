@@ -190,14 +190,36 @@ export async function listTrash() {
  * No second refresh needed.
  */
 export async function createService({ serviceNumber, label }, billdeskSession) {
-  const existing = await db.getByNumber(serviceNumber);
-  if (existing && !existing.isDeleted) throw new Error('This service number is already added');
+  const results = await createBulkServices([{ number: serviceNumber, label }], billdeskSession);
+  return results[0];
+}
 
-  // One server call = validation + initial data fetch combined
-  const { snapshot } = await apiPost('/services/validate', { serviceNumber, billdeskSession });
+/**
+ * Bulk create services
+ * @param {Array<{number: string, label: string}>} entries 
+ * @param {object} billdeskSession 
+ */
+export async function createBulkServices(entries, billdeskSession) {
+  const results = [];
+  
+  for (const entry of entries) {
+    try {
+      const existing = await db.getByNumber(entry.number);
+      if (existing && !existing.isDeleted) {
+        results.push({ ...existing, _error: 'Already added' });
+        continue;
+      }
 
-  const service = await db.create({ serviceNumber, label });
-  return db.update(service.id, { ...snapshotToPatch(snapshot, service), lastError: null });
+      const { snapshot } = await apiPost('/services/validate', { serviceNumber: entry.number, billdeskSession });
+      const service = await db.create({ serviceNumber: entry.number, label: entry.label });
+      const updated = await db.update(service.id, { ...snapshotToPatch(snapshot, service), lastError: null });
+      results.push(updated);
+    } catch (err) {
+      results.push({ number: entry.number, _error: err.message || 'Failed to add' });
+    }
+  }
+  
+  return results;
 }
 
 /**

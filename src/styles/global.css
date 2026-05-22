@@ -1304,8 +1304,16 @@ input[type="checkbox"] {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.trash-item__info h4   { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 3px; }
-.trash-item__info small { font-size: 11px; color: var(--text-3); }
+.trash-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.trash-item__info h4   { font-size: 14px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trash-item__info .mono-sm { font-size: 11px; color: var(--text-2); display: block; }
+.trash-item__info small { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.02em; }
 .trash-item__actions   { display: flex; gap: 6px; }
 .mono-sm { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
 

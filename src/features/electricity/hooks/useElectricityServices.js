@@ -10,6 +10,7 @@ import {
   bulkDeletePermanently,
   bulkMoveToTrash,
   bulkRestoreServices,
+  createBulkServices,
   createService,
   deletePermanently,
   listServices,
@@ -117,13 +118,22 @@ export function useElectricityServices() {
   // ── actions.add ─────────────────────────────────────────────────────────────
   // POST /services
   // Validates + fetches in one shot (2 APSPDCL calls total), then reloads.
-  const add = useCallback(async ({ serviceNumber, label }) => {
-    const session = await getValidSession(serviceNumber);
+  const add = useCallback(async (params) => {
+    const { isBulk, entries, serviceNumber, label } = params;
+    const snForSession = isBulk ? entries[0].number : serviceNumber;
+    
+    const session = await getValidSession(snForSession);
     if (!session) throw new Error('CANCELLED');
     
-    const newService = await createService({ serviceNumber, label }, session);
+    let result;
+    if (isBulk) {
+      result = await createBulkServices(entries, session);
+    } else {
+      result = await createService({ serviceNumber, label }, session);
+    }
+    
     await reload();
-    return newService;
+    return result;
   }, [reload]);
 
   // ── actions.refresh ─────────────────────────────────────────────────────────

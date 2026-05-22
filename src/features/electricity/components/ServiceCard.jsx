@@ -84,7 +84,12 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
   const breakup = service.billBreakup;
 
   async function copyNum() {
-    try { await navigator.clipboard.writeText(service.serviceNumber); toast.success('Copied'); }
+    try { 
+      const name = service.label || service.customerName || t('untitled');
+      const text = `${name}:${service.serviceNumber}`;
+      await navigator.clipboard.writeText(text); 
+      toast.success('Copied'); 
+    }
     catch (e) { toast.error(`Copy failed: ${e?.message || 'Unknown error'}`); }
   }
 

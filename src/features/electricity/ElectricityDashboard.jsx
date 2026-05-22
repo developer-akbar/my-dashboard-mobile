@@ -71,10 +71,16 @@ export function ElectricityDashboard() {
   const handleCopySelected = async () => {
     const selectedServices = currentItems.filter(s => selectedIds.has(s.id));
     if (selectedServices.length === 0) return;
-    const numbers = selectedServices.map(s => s.serviceNumber).join(', ');
+    
+    const text = selectedServices.map(s => {
+      const name = s.label || s.customerName || t('untitled');
+      return `${name}:${s.serviceNumber}`;
+    }).join(', ');
+
     try {
-      await navigator.clipboard.writeText(numbers);
-      toast.success(t('copied_all', 'Service numbers copied'));
+      await navigator.clipboard.writeText(text);
+      const msg = selectedServices.length === 1 ? 'Copied 1 service' : `Copied ${selectedServices.length} services`;
+      toast.success(t('copied_count', msg));
     } catch (e) {
       toast.error('Failed to copy');
     }
@@ -230,8 +236,8 @@ export function ElectricityDashboard() {
 
   async function submitService(payload) {
     if (payload.isBulk) {
-      const { numbers } = payload;
-      const tst = toast.loading(`Validating ${numbers.length} services...`);
+      const { entries } = payload;
+      const tst = toast.loading(`Validating ${entries.length} services...`);
       
       const results = {
         succeeded: [],
@@ -240,7 +246,8 @@ export function ElectricityDashboard() {
         inTrash: []
       };
 
-      for (const sn of numbers) {
+      for (const entry of entries) {
+        const sn = entry.number;
         const inActive = services.find(s => s.serviceNumber === sn);
         const inTrash = trash.find(t => t.serviceNumber === sn);
         
@@ -254,9 +261,9 @@ export function ElectricityDashboard() {
         }
 
         try {
-          await actions.add({ serviceNumber: sn });
+          await actions.add({ isBulk: false, serviceNumber: sn, label: entry.label });
           results.succeeded.push(sn);
-          toast.loading(`Added ${results.succeeded.length}/${numbers.length}...`, { id: tst });
+          toast.loading(`Added ${results.succeeded.length}/${entries.length}...`, { id: tst });
         } catch (e) {
           if (e?.message === 'CANCELLED') {
             toast.error(`Cancelled. Processed ${results.succeeded.length + results.failed.length + results.alreadyExists.length + results.inTrash.length} services.`, { id: tst });

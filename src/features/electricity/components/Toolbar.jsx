@@ -43,6 +43,10 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             <span style={{ marginLeft: '4px' }}>{t('add')}</span>
           </button>
           
+          <button className="btn btn--ghost btn--sm" onClick={copyAllNumbers} disabled={!hasServices} title="Copy All Service Numbers" style={{ padding: '0 8px' }}>
+            <FiCopy size={15} />
+          </button>
+
           <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
             <FiGlobe size={15} />
             <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{isTelugu ? 'English' : 'తెలుగు'}</span>
