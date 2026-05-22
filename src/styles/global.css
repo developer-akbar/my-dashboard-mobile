@@ -683,6 +683,18 @@ input[type="checkbox"] {
   border-bottom: 1px solid var(--primary);
 }
 
+.scard__status-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.scard__pin {
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
 .scard__status-dot {
   width: 8px; height: 8px;
   border-radius: 50%;

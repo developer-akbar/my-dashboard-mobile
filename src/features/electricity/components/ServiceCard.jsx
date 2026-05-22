@@ -157,9 +157,14 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
             />
           </div>
         )}
-        <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
+        <div className="scard__status-col">
+          {service.pinned && <BsPinFill size={15} className="scard__pin" style={{ color: 'var(--primary-hi)', marginBottom: '2px' }} />}
+          <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
+        </div>
         <div className="scard__topbar-info">
-          <h3 className="scard__name">{service.label || t('untitled')}</h3>
+          <h3 className="scard__name">
+            {service.label || t('untitled')}
+          </h3>
           <p className="scard__customer">
             {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || t('untitled'))}
           </p>
