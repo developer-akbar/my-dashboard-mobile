@@ -88,13 +88,20 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
     catch (e) { toast.error(`Copy failed: ${e?.message || 'Unknown error'}`); }
   }
 
-  const handlePressStart = () => {
+  const touchPos = useRef({ x: 0, y: 0 });
+
+  const handlePressStart = (e) => {
+    // Track start position to allow small movement (jitter)
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    touchPos.current = { x: clientX, y: clientY };
+
     longPressTimer.current = setTimeout(() => {
       if (onToggleSelect && !selecting) {
         onToggleSelect(service.id);
         if (window.navigator.vibrate) window.navigator.vibrate(50);
       }
-    }, 600);
+    }, 700); // Slightly longer for reliability
   };
 
   const handlePressEnd = () => {
@@ -104,30 +111,49 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
     }
   };
 
+  const handlePressMove = (e) => {
+    if (!longPressTimer.current) return;
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const dx = Math.abs(clientX - touchPos.current.x);
+    const dy = Math.abs(clientY - touchPos.current.y);
+
+    // If moved more than 10px, cancel the long press (it's a scroll or swipe)
+    if (dx > 10 || dy > 10) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   return (
     <article 
       id={id}
       className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''} ${isFlashing ? 'flash' : ''}`}
+      onContextMenu={e => { if (longPressTimer.current || selecting) e.preventDefault(); }}
     >
 
       {/* ── Top bar ──────────────────────────────────────── */}
       <div 
         className="scard__topbar" 
         onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} 
-        style={{ cursor: useAccordion ? 'pointer' : 'default' }}
+        style={{ cursor: useAccordion ? 'pointer' : 'default', userSelect: 'none', WebkitUserSelect: 'none' }}
         onMouseDown={handlePressStart}
         onMouseUp={handlePressEnd}
         onMouseLeave={handlePressEnd}
+        onMouseMove={handlePressMove}
         onTouchStart={handlePressStart}
         onTouchEnd={handlePressEnd}
+        onTouchMove={handlePressMove}
       >
-        {selecting && onToggleSelect && (
+        {selecting && (
           <div className="scard__select" onClick={e => e.stopPropagation()}>
             <input 
               type="checkbox" 
               checked={!!selected} 
               onChange={() => onToggleSelect(service.id)}
-              style={{ width: '15px', height: '15px', margin: 0, padding: 0 }}
+              style={{ width: '18px', height: '18px', margin: 0, padding: 0 }}
             />
           </div>
         )}

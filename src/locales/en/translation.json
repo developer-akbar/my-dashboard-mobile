@@ -100,5 +100,12 @@
   "circle_name": "Circle Name",
   "section_name": "Section Name",
   "category": "Category",
-  "current_load": "Current Load"
+  "current_load": "Current Load",
+  "copied_all": "All service numbers copied to clipboard",
+  "bulk_add": "Bulk Add",
+  "single_mode": "Single Mode",
+  "bulk_mode": "Bulk Mode",
+  "add_multiple_services": "Add Multiple Services",
+  "service_numbers_comma": "Service Numbers (comma separated)",
+  "bulk_hint": "Paste multiple numbers separated by commas or spaces. Only 13-digit numbers will be added."
 }

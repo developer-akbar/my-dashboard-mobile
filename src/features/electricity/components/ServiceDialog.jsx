@@ -6,21 +6,27 @@ import { useTranslation } from 'react-i18next';
 export function ServiceDialog({ open, service, onClose, onSubmit }) {
   const [label, setLabel] = useState('');
   const [serviceNumber, setServiceNumber] = useState('');
+  const [isBulk, setIsBulk] = useState(false);
+  const [bulkInput, setBulkInput] = useState('');
   const [saving, setSaving] = useState(false);
   const { t } = useTranslation();
   const labelRef = useRef(null);
+  const bulkRef = useRef(null);
 
   useEffect(() => {
     if (open) { 
       setLabel(service?.label || ''); 
       setServiceNumber(service?.serviceNumber || ''); 
+      setIsBulk(false);
+      setBulkInput('');
       
       // Auto-focus Label field with a slightly longer delay for reliability
       const timer = setTimeout(() => {
-        if (labelRef.current) {
-          labelRef.current.focus();
-          // Move cursor to end of text if editing
-          if (service?.label) {
+        if (!service && !isBulk) {
+           if (labelRef.current) labelRef.current.focus();
+        } else if (service) {
+          if (labelRef.current) {
+            labelRef.current.focus();
             const len = service.label.length;
             labelRef.current.setSelectionRange(len, len);
           }
@@ -36,15 +42,40 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [service, open, onClose]);
 
+  // Focus bulk textarea when switching to bulk mode
+  useEffect(() => {
+    if (isBulk) {
+      setTimeout(() => {
+        if (bulkRef.current) bulkRef.current.focus();
+      }, 100);
+    }
+  }, [isBulk]);
+
   const numError = useMemo(() => {
-    if (!serviceNumber) return '';
+    if (isBulk || !serviceNumber) return '';
     return isValidServiceNumber(serviceNumber) ? '' : t('must_be_13_digits');
-  }, [serviceNumber, t]);
+  }, [serviceNumber, isBulk, t]);
 
   if (!open) return null;
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (isBulk) {
+      const numbers = bulkInput.split(/[\s,]+/).map(s => s.trim()).filter(s => s.length === 13 && /^\d+$/.test(s));
+      if (numbers.length === 0) {
+        toast.error('No valid 13-digit service numbers found');
+        return;
+      }
+      setSaving(true);
+      try {
+        await onSubmit({ isBulk: true, numbers });
+        onClose();
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (!isValidServiceNumber(serviceNumber)) return;
     setSaving(true);
     try { await onSubmit({ label: label.trim(), serviceNumber }); onClose(); }
@@ -58,47 +89,75 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
 
         <div className="sheet__header">
           <div className="sheet__icon"><FiZap size={16} /></div>
-          <div>
-            <p className="sheet__eyebrow">{service ? t('edit_service') : t('new_service')}</p>
-            <h2 className="sheet__title">{service ? t('update_details') : t('add_apspdcl_service')}</h2>
+          <div style={{ flex: 1 }}>
+            <p className="sheet__eyebrow">{service ? t('edit_service') : (isBulk ? t('bulk_add') : t('new_service'))}</p>
+            <h2 className="sheet__title">{service ? t('update_details') : (isBulk ? t('add_multiple_services') : t('add_apspdcl_service'))}</h2>
           </div>
+          {!service && (
+            <button 
+              type="button" 
+              className={`btn btn--xs ${isBulk ? 'btn--primary' : 'btn--ghost'}`} 
+              onClick={() => setIsBulk(!isBulk)}
+              style={{ marginRight: '8px' }}
+            >
+              {isBulk ? t('single_mode') : t('bulk_mode')}
+            </button>
+          )}
           <button className="icon-btn sheet__close" onClick={onClose}><FiX size={18} /></button>
         </div>
 
         <form className="sheet__form" onSubmit={handleSubmit}>
-          <label className="field">
-            <span className="field__label">{t('label')} <span className="field__optional">{t('optional')}</span></span>
-            <input 
-              ref={labelRef}
-              className="field__input" 
-              value={label} 
-              onChange={e => setLabel(e.target.value)} 
-              placeholder={t('label_placeholder')} 
-            />
-          </label>
+          {isBulk ? (
+            <label className="field">
+              <span className="field__label">{t('service_numbers_comma')}</span>
+              <textarea
+                ref={bulkRef}
+                className="field__input"
+                style={{ height: '120px', fontFamily: 'monospace', paddingTop: '10px' }}
+                value={bulkInput}
+                onChange={e => setBulkInput(e.target.value)}
+                placeholder="23233..., 23233..."
+                required
+              />
+              <span className="field__hint">{t('bulk_hint')}</span>
+            </label>
+          ) : (
+            <>
+              <label className="field">
+                <span className="field__label">{t('label')} <span className="field__optional">{t('optional')}</span></span>
+                <input 
+                  ref={labelRef}
+                  className="field__input" 
+                  value={label} 
+                  onChange={e => setLabel(e.target.value)} 
+                  placeholder={t('label_placeholder')} 
+                />
+              </label>
 
-          <label className="field">
-            <span className="field__label">{t('service_number')}</span>
-            <input
-              className={`field__input field__input--mono ${numError ? 'field__input--error' : ''}`}
-              value={serviceNumber}
-              inputMode="numeric"
-              maxLength={13}
-              onChange={e => setServiceNumber(e.target.value.replace(/\D/g, ''))}
-              placeholder="0000000000000"
-              required
-            />
-            {serviceNumber && (
-              <span className={`field__hint ${numError ? 'field__hint--error' : 'field__hint--ok'}`}>
-                {numError || t('valid_format')}
-              </span>
-            )}
-          </label>
+              <label className="field">
+                <span className="field__label">{t('service_number')}</span>
+                <input
+                  className={`field__input field__input--mono ${numError ? 'field__input--error' : ''}`}
+                  value={serviceNumber}
+                  inputMode="numeric"
+                  maxLength={13}
+                  onChange={e => setServiceNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0000000000000"
+                  required
+                />
+                {serviceNumber && (
+                  <span className={`field__hint ${numError ? 'field__hint--error' : 'field__hint--ok'}`}>
+                    {numError || t('valid_format')}
+                  </span>
+                )}
+              </label>
+            </>
+          )}
 
           <div className="sheet__footer">
             <button type="button" className="btn btn--ghost" onClick={onClose}>{t('cancel')}</button>
-            <button type="submit" className="btn btn--primary" disabled={saving || !!numError || serviceNumber.length !== 13}>
-              {saving ? t('saving') : service ? t('save_changes') : t('add_service')}
+            <button type="submit" className="btn btn--primary" disabled={saving || (!isBulk && (!!numError || serviceNumber.length !== 13)) || (isBulk && !bulkInput.trim())}>
+              {saving ? t('saving') : (service ? t('save_changes') : t('add_service'))}
             </button>
           </div>
         </form>

@@ -249,8 +249,8 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   color: var(--green);
 }
 
-/* ── Bulk Actions Bar ───────────────────────────────────────────────────────── */
-.bulk-bar {
+/* ── Selection Bar ──────────────────────────────────────────────────────────── */
+.selection-bar {
   position: sticky;
   top: 0;
   z-index: 1001;
@@ -266,35 +266,32 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   border: 1px solid var(--primary-hi);
   border-top: none;
   min-height: 48px;
+  gap: 12px;
 }
 
-.bulk-bar__info {
+.selection-bar__left {
   display: flex;
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 13.5px;
+  flex-shrink: 0;
 }
 
-.bulk-bar__info .icon-btn {
-  width: 28px;
-  height: 28px;
-  color: var(--primary-hi);
-  background: var(--primary-dim);
-}
-
-.bulk-bar__actions {
+.selection-bar__actions {
   display: flex;
+  align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
-.bulk-bar .btn--sm {
+.selection-bar .btn--sm {
   height: 28px;
   padding: 0 10px;
   font-size: 11.5px;
 }
 
-.bulk-bar .btn--ghost {
+.selection-bar .btn--ghost {
   color: var(--text-2);
   border-color: var(--border-hi);
 }
@@ -1335,7 +1332,7 @@ input[type="checkbox"] {
   .sidebar     { display: none; }
   .bottom-nav  { display: flex; }
 
-  .bulk-bar { margin: -16px -12px 14px -12px; }
+  .selection-bar { margin: -16px -12px 14px -12px; }
 
   .shell { flex-direction: column; height: 100dvh; }
   .main  { flex: 1; overflow-y: auto; padding-bottom: calc(56px + env(safe-area-inset-bottom)); }

@@ -80,6 +80,21 @@ async function getSqlite() {
     try {
       await db.execute("ALTER TABLE electricity_services ADD COLUMN ctrLoad REAL;");
     } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN divisionCode TEXT;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN divisionName TEXT;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN circleName TEXT;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN sectionName TEXT;");
+    } catch (e) {}
+    try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN uniqueServiceNumber TEXT;");
+    } catch (e) {}
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS electricity_services (
@@ -109,6 +124,11 @@ async function getSqlite() {
         category TEXT,
         closingRdg REAL,
         ctrLoad REAL,
+        divisionCode TEXT,
+        divisionName TEXT,
+        circleName TEXT,
+        sectionName TEXT,
+        uniqueServiceNumber TEXT,
         pinned INTEGER DEFAULT 0,
         pinnedAt TEXT,
         isDeleted INTEGER DEFAULT 0,
@@ -287,6 +307,11 @@ async function createService(data) {
     category: null,
     closingRdg: null,
     ctrLoad: null,
+    divisionCode: null,
+    divisionName: null,
+    circleName: null,
+    sectionName: null,
+    uniqueServiceNumber: null,
     pinned: false,
     pinnedAt: null,
     isDeleted: false,
@@ -305,8 +330,9 @@ async function createService(data) {
          historyFetchedAt, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
          billBreakup, billHistory, paymentHistory, trendData, insights,
          category, closingRdg, ctrLoad,
+         divisionCode, divisionName, circleName, sectionName, uniqueServiceNumber,
          pinned, pinnedAt, isDeleted, deletedAt, createdAt, updatedAt)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         ser.id, ser.serviceNumber, ser.label, ser.customerName,
         ser.lastBillDate, ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits,
@@ -314,6 +340,7 @@ async function createService(data) {
         ser.lastError, ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.category, ser.closingRdg, ser.ctrLoad,
+        ser.divisionCode, ser.divisionName, ser.circleName, ser.sectionName, ser.uniqueServiceNumber,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.createdAt, ser.updatedAt
       ]
     );
@@ -342,6 +369,7 @@ async function updateService(id, patch) {
         receiptNumber=?, paidAmount=?, billBreakup=?, billHistory=?,
         paymentHistory=?, trendData=?, insights=?,
         category=?, closingRdg=?, ctrLoad=?,
+        divisionCode=?, divisionName=?, circleName=?, sectionName=?, uniqueServiceNumber=?,
         pinned=?, pinnedAt=?, isDeleted=?, deletedAt=?, updatedAt=?
        WHERE id=?`,
       [
@@ -351,6 +379,7 @@ async function updateService(id, patch) {
         ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.category, ser.closingRdg, ser.ctrLoad,
+        ser.divisionCode, ser.divisionName, ser.circleName, ser.sectionName, ser.uniqueServiceNumber,
         ser.pinned, ser.pinnedAt, ser.isDeleted, ser.deletedAt, ser.updatedAt, ser.id
       ]
     );

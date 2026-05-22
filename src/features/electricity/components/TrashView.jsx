@@ -1,9 +1,12 @@
 import { FiRefreshCw, FiTrash2, FiPackage } from 'react-icons/fi';
 import { formatDate } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
+import { useRef } from 'react';
 
-export function TrashView({ services, onRestore, onDeletePermanent, selectedIds, onToggleSelect, onToggleSelectAll }) {
+export function TrashView({ services, onRestore, onDeletePermanent, selectedIds, onToggleSelect, selecting }) {
   const { t } = useTranslation();
+  const longPressTimer = useRef(null);
+  const touchPos = useRef({ x: 0, y: 0 });
 
   if (!services.length) return (
     <div className="empty-state">
@@ -13,31 +16,63 @@ export function TrashView({ services, onRestore, onDeletePermanent, selectedIds,
     </div>
   );
 
-  const allSelected = services.length > 0 && selectedIds.size === services.length;
+  const handlePressStart = (id) => (e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    touchPos.current = { x: clientX, y: clientY };
+
+    longPressTimer.current = setTimeout(() => {
+      if (onToggleSelect && !selecting) {
+        onToggleSelect(id);
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+      }
+    }, 700);
+  };
+
+  const handlePressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handlePressMove = (e) => {
+    if (!longPressTimer.current) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = Math.abs(clientX - touchPos.current.x);
+    const dy = Math.abs(clientY - touchPos.current.y);
+    if (dx > 10 || dy > 10) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   return (
     <div className="trash-container">
-      {services.length > 0 && onToggleSelectAll && (
-        <div className="trash-select-all">
-          <label>
-            <input 
-              type="checkbox" 
-              checked={allSelected} 
-              onChange={() => onToggleSelectAll(services.map(s => s.id))}
-            />
-            <span>{allSelected ? t('deselect_all') : t('select_all')} ({services.length})</span>
-          </label>
-        </div>
-      )}
       <div className="trash-list">
         {services.map(s => (
-          <div key={s.id} className={`trash-item ${selectedIds.has(s.id) ? 'trash-item--selected' : ''}`}>
-            {onToggleSelect && (
-              <div className="trash-item__select">
+          <div 
+            key={s.id} 
+            className={`trash-item ${selectedIds.has(s.id) ? 'trash-item--selected' : ''}`}
+            onMouseDown={handlePressStart(s.id)}
+            onMouseUp={handlePressEnd}
+            onMouseLeave={handlePressEnd}
+            onMouseMove={handlePressMove}
+            onTouchStart={handlePressStart(s.id)}
+            onTouchEnd={handlePressEnd}
+            onTouchMove={handlePressMove}
+            onContextMenu={e => { if (longPressTimer.current || selecting) e.preventDefault(); }}
+            onClick={() => selecting ? onToggleSelect(s.id) : undefined}
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          >
+            {selecting && (
+              <div className="trash-item__select" style={{ paddingRight: '12px', display: 'flex', alignItems: 'center' }}>
                 <input 
                   type="checkbox" 
                   checked={selectedIds.has(s.id)} 
-                  onChange={() => onToggleSelect(s.id)}
+                  readOnly
+                  style={{ width: '18px', height: '18px', margin: 0, pointerEvents: 'none' }}
                 />
               </div>
             )}
@@ -47,8 +82,8 @@ export function TrashView({ services, onRestore, onDeletePermanent, selectedIds,
               <small>{t('deleted')} {formatDate(s.deletedAt)}</small>
             </div>
             <div className="trash-item__actions">
-              <button className="btn btn--ghost btn--xs" onClick={() => onRestore(s.id)}><FiRefreshCw size={12} /> {t('restore')}</button>
-              <button className="btn btn--danger btn--xs" onClick={() => onDeletePermanent(s.id)}><FiTrash2 size={12} /></button>
+              <button className="btn btn--ghost btn--xs" onClick={(e) => { e.stopPropagation(); onRestore(s.id); }}><FiRefreshCw size={12} /> {t('restore')}</button>
+              <button className="btn btn--danger btn--xs" onClick={(e) => { e.stopPropagation(); onDeletePermanent(s.id); }}><FiTrash2 size={12} /></button>
             </div>
           </div>
         ))}

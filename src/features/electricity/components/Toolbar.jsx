@@ -1,8 +1,9 @@
-import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { SessionIndicator } from './SessionIndicator.jsx';
+import toast from 'react-hot-toast';
 
-export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices }) {
+export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services }) {
   const { t, i18n } = useTranslation();
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
@@ -10,6 +11,17 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
 
   const toggleLanguage = () => {
     i18n.changeLanguage(isTelugu ? 'en' : 'te');
+  };
+
+  const copyAllNumbers = async () => {
+    if (!services || services.length === 0) return;
+    const numbers = services.map(s => s.serviceNumber).join(', ');
+    try {
+      await navigator.clipboard.writeText(numbers);
+      toast.success(t('copied_all', 'All service numbers copied'));
+    } catch (e) {
+      toast.error('Failed to copy');
+    }
   };
 
   return (
@@ -30,6 +42,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             <FiPlus size={15} />
             <span style={{ marginLeft: '4px' }}>{t('add')}</span>
           </button>
+          
           <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
             <FiGlobe size={15} />
             <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{isTelugu ? 'English' : 'తెలుగు'}</span>

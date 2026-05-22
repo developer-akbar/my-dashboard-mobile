@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -25,6 +25,8 @@ export function ElectricityDashboard() {
   const [refreshProgress, setRefreshProgress] = useState(null);
   const [flashingId, setFlashingId] = useState(null);
   const { t } = useTranslation();
+
+  const [bulkResult, setBulkResult] = useState(null);
 
   const handleViewChange = (view) => {
     setActiveView(view);
@@ -52,19 +54,51 @@ export function ElectricityDashboard() {
     });
   };
 
-  const toggleSelectAll = (ids) => {
-    setSelectedIds(prev => {
-      if (prev.size === ids.length) return new Set();
-      return new Set(ids);
-    });
+  const visible = useMemo(() => filterServices(services, filters), [services, filters]);
+  const currentItems = activeView === 'active' ? visible : trash;
+  const allSelected = currentItems.length > 0 && selectedIds.size === currentItems.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(currentItems.map(s => s.id)));
+    }
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const handleCopySelected = async () => {
+    const selectedServices = currentItems.filter(s => selectedIds.has(s.id));
+    if (selectedServices.length === 0) return;
+    const numbers = selectedServices.map(s => s.serviceNumber).join(', ');
+    try {
+      await navigator.clipboard.writeText(numbers);
+      toast.success(t('copied_all', 'Service numbers copied'));
+    } catch (e) {
+      toast.error('Failed to copy');
+    }
+  };
 
   useEffect(() => {
     // Clear selection when view changes to avoid cross-view selection bugs
     clearSelection();
   }, [activeView]);
+
+  // ── Keydown Handling (Esc) ────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (selectedIds.size > 0) {
+          clearSelection();
+        } else if (bulkResult) {
+          setBulkResult(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedIds, bulkResult]);
 
   // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
@@ -72,11 +106,12 @@ export function ElectricityDashboard() {
       if (e.detail?.handled) return;
 
       // 1. Priority: Close any open Modal or Dialog
-      if (dialog.open || aboutDialog.open || calculator.open || confirmState.open) {
+      if (dialog.open || aboutDialog.open || calculator.open || confirmState.open || bulkResult) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         setCalculator({ open: false, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
+        setBulkResult(null);
         if (e.detail) e.detail.handled = true;
         return;
       }
@@ -85,11 +120,19 @@ export function ElectricityDashboard() {
       if (selectedIds.size > 0) {
         clearSelection();
         if (e.detail) e.detail.handled = true;
+        return;
+      }
+
+      // 3. Priority: Back to Active View from Trash
+      if (activeView === 'trash') {
+        setActiveView('active');
+        if (e.detail) e.detail.handled = true;
+        return;
       }
     };
     window.addEventListener('app-back-button', handleBack);
     return () => window.removeEventListener('app-back-button', handleBack);
-  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, confirmState.open]);
+  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, confirmState.open, bulkResult]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -179,7 +222,6 @@ export function ElectricityDashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const visible = useMemo(() => filterServices(services, filters), [services, filters]);
   const useAccordion = isMobile ? visible.length > 1 : visible.length > 3;
 
   const handleCalculateBill = (service) => {
@@ -187,6 +229,50 @@ export function ElectricityDashboard() {
   };
 
   async function submitService(payload) {
+    if (payload.isBulk) {
+      const { numbers } = payload;
+      const tst = toast.loading(`Validating ${numbers.length} services...`);
+      
+      const results = {
+        succeeded: [],
+        failed: [],
+        alreadyExists: [],
+        inTrash: []
+      };
+
+      for (const sn of numbers) {
+        const inActive = services.find(s => s.serviceNumber === sn);
+        const inTrash = trash.find(t => t.serviceNumber === sn);
+        
+        if (inActive) {
+          results.alreadyExists.push(sn);
+          continue;
+        }
+        if (inTrash) {
+          results.inTrash.push(sn);
+          continue;
+        }
+
+        try {
+          await actions.add({ serviceNumber: sn });
+          results.succeeded.push(sn);
+          toast.loading(`Added ${results.succeeded.length}/${numbers.length}...`, { id: tst });
+        } catch (e) {
+          if (e?.message === 'CANCELLED') {
+            toast.error(`Cancelled. Processed ${results.succeeded.length + results.failed.length + results.alreadyExists.length + results.inTrash.length} services.`, { id: tst });
+            setBulkResult(results);
+            return;
+          }
+          results.failed.push({ number: sn, error: e?.message || 'Unknown error' });
+        }
+      }
+
+      toast.dismiss(tst);
+      setBulkResult(results);
+      if (activeView !== 'active') setActiveView('active');
+      return;
+    }
+
     if (dialog.service) {
       await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
         loading: t('saving'), success: 'Updated', error: e => `Update failed: ${e?.message || 'Unknown error'}`,
@@ -342,18 +428,36 @@ export function ElectricityDashboard() {
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="bulk-bar">
-          <div className="bulk-bar__info">
-            <button className="icon-btn" onClick={clearSelection}><FiZap size={14} style={{ transform: 'rotate(45deg)' }} /></button>
+        <div className="selection-bar">
+          <div className="selection-bar__left">
+            <input 
+              type="checkbox" 
+              checked={allSelected} 
+              onChange={toggleSelectAll}
+              style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
+            />
             <span>{selectedIds.size} selected</span>
           </div>
-          <div className="bulk-bar__actions">
+          <div className="selection-bar__actions">
+            <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected">
+              <FiCopy size={13} />
+              {!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}
+            </button>
             {activeView === 'active' ? (
-              <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}><FiTrash2 size={13} /> Trash</button>
+              <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}>
+                <FiTrash2 size={13} />
+                {!isMobile && <span style={{ marginLeft: '4px' }}>Trash</span>}
+              </button>
             ) : (
               <>
-                <button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}><FiRefreshCw size={13} /> Restore</button>
-                <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}><FiTrash2 size={13} /> Purge</button>
+                <button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}>
+                  <FiRefreshCw size={13} />
+                  {!isMobile && <span style={{ marginLeft: '4px' }}>Restore</span>}
+                </button>
+                <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}>
+                  <FiTrash2 size={13} />
+                  {!isMobile && <span style={{ marginLeft: '4px' }}>Purge</span>}
+                </button>
               </>
             )}
             <button className="btn btn--ghost btn--sm" onClick={clearSelection} style={{ marginLeft: '4px' }}>Cancel</button>
@@ -386,6 +490,7 @@ export function ElectricityDashboard() {
         onViewChange={handleViewChange}
         trashCount={trash.length}
         hasServices={services.length > 0 && !loading}
+        services={services}
       />
 
       {activeView === 'active' && (
@@ -465,7 +570,6 @@ export function ElectricityDashboard() {
           selectedIds={selectedIds}
           selecting={selectedIds.size > 0}
           onToggleSelect={toggleSelect}
-          onToggleSelectAll={toggleSelectAll}
           onRestore={id => {
             setConfirmState({
               open: true,
@@ -481,7 +585,7 @@ export function ElectricityDashboard() {
                   handleViewChange('active');
                   flashCard(id);
                 } catch (e) {
-                  toast.error(`Restore failed: ${e?.message || 'Unknown error'}`, { id: tst });
+                  toast.error(`Restore failed: ${e?.message || 'Unknown error'}` , { id: tst });
                 }
               }
             });
@@ -521,6 +625,45 @@ export function ElectricityDashboard() {
         onClose={() => setCalculator({ open: false, service: null })}
       />
 
+      {bulkResult && (
+        <div className="overlay overlay--center" onClick={() => setBulkResult(null)}>
+          <div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}>
+            <h2 className="dialog__title">Bulk Add Results</h2>
+            <div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>
+              {bulkResult.succeeded.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p>
+                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p>
+                </div>
+              )}
+              {bulkResult.inTrash.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped - Already in Trash ({bulkResult.inTrash.length})</p>
+                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p>
+                </div>
+              )}
+              {bulkResult.alreadyExists.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Skipped - Already Active ({bulkResult.alreadyExists.length})</p>
+                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.alreadyExists.join(', ')}</p>
+                </div>
+              )}
+              {bulkResult.failed.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>
+                  {bulkResult.failed.map((f, i) => (
+                    <p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="dialog__footer">
+              <button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog
         open={confirmState.open}
         title={confirmState.title}
@@ -532,4 +675,3 @@ export function ElectricityDashboard() {
     </div>
   );
 }
-
