@@ -66,7 +66,6 @@ export function useElectricityServices() {
   const reload = useCallback(async () => {
     try {
       const [services, trash] = await Promise.all([listServices(), listTrash()]);
-      console.log('[useElectricityServices] reload complete. services:', services?.length, 'trash:', trash?.length);
       dispatch({ type: 'LOAD', services, trash });
       return services; // return so auto-refresh can inspect them
     } catch (e) {

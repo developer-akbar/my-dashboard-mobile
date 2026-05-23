@@ -7,7 +7,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'my-dashboard';
-const DB_VERSION = 2;  // bumped: adds billHistory, paymentHistory, trendData, insights, lastRefreshedDate
+const DB_VERSION = 3;  // bumped: adds lastReportedBillDate
 const STORE = 'electricity_services';
 
 let _idb = null;
@@ -72,6 +72,9 @@ async function getSqlite() {
       await db.execute("ALTER TABLE electricity_services ADD COLUMN historyFetchedAt TEXT;");
     } catch (e) {}
     try {
+      await db.execute("ALTER TABLE electricity_services ADD COLUMN lastReportedBillDate TEXT;");
+    } catch (e) {}
+    try {
       await db.execute("ALTER TABLE electricity_services ADD COLUMN category TEXT;");
     } catch (e) {}
     try {
@@ -110,6 +113,7 @@ async function getSqlite() {
         lastStatus TEXT DEFAULT 'UNKNOWN',
         lastFetchedAt TEXT,
         historyFetchedAt TEXT,
+        lastReportedBillDate TEXT,
         lastRefreshedDate TEXT,
         lastError TEXT,
         isPaid INTEGER DEFAULT 0,
@@ -293,6 +297,7 @@ async function createService(data) {
     lastStatus: 'UNKNOWN',
     lastFetchedAt: null,
     historyFetchedAt: null,
+    lastReportedBillDate: null,
     lastRefreshedDate: null,
     lastError: null,
     isPaid: false,
@@ -327,7 +332,7 @@ async function createService(data) {
       `INSERT INTO electricity_services
         (id, serviceNumber, label, customerName, lastBillDate, lastDueDate,
          lastAmountDue, lastBilledUnits, lastThreeAmounts, lastStatus, lastFetchedAt,
-         historyFetchedAt, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
+         historyFetchedAt, lastReportedBillDate, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
          billBreakup, billHistory, paymentHistory, trendData, insights,
          category, closingRdg, ctrLoad,
          divisionCode, divisionName, circleName, sectionName, uniqueServiceNumber,
@@ -336,7 +341,7 @@ async function createService(data) {
       [
         ser.id, ser.serviceNumber, ser.label, ser.customerName,
         ser.lastBillDate, ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits,
-        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastRefreshedDate,
+        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastReportedBillDate, ser.lastRefreshedDate,
         ser.lastError, ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.category, ser.closingRdg, ser.ctrLoad,
@@ -365,7 +370,7 @@ async function updateService(id, patch) {
       `UPDATE electricity_services SET
         serviceNumber=?, label=?, customerName=?, lastBillDate=?, lastDueDate=?,
         lastAmountDue=?, lastBilledUnits=?, lastThreeAmounts=?, lastStatus=?,
-        lastFetchedAt=?, historyFetchedAt=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
+        lastFetchedAt=?, historyFetchedAt=?, lastReportedBillDate=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
         receiptNumber=?, paidAmount=?, billBreakup=?, billHistory=?,
         paymentHistory=?, trendData=?, insights=?,
         category=?, closingRdg=?, ctrLoad=?,
@@ -375,7 +380,7 @@ async function updateService(id, patch) {
       [
         ser.serviceNumber, ser.label, ser.customerName, ser.lastBillDate,
         ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits, ser.lastThreeAmounts,
-        ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastRefreshedDate, ser.lastError,
+        ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastReportedBillDate, ser.lastRefreshedDate, ser.lastError,
         ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.category, ser.closingRdg, ser.ctrLoad,
@@ -425,7 +430,6 @@ export const db = {
     } else {
       await getIdb();
     }
-    console.log('[db] initialization complete for platform:', platform);
   },
   getAll: getAllServices,
   getTrash: getTrashServices,

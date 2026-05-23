@@ -12,6 +12,7 @@ import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { useTranslation } from 'react-i18next';
+import { usePostHog } from '@posthog/react';
 
 export function ElectricityDashboard() {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
@@ -25,8 +26,23 @@ export function ElectricityDashboard() {
   const [refreshProgress, setRefreshProgress] = useState(null);
   const [flashingId, setFlashingId] = useState(null);
   const { t } = useTranslation();
+  const ph = usePostHog();
 
   const [bulkResult, setBulkResult] = useState(null);
+
+  const trackBill = async (service, snapshot) => {
+    if (!ph || !snapshot || !snapshot.billDate) return;
+    
+    if (service.lastReportedBillDate !== snapshot.billDate) {
+      ph.capture('bill_refreshed', {
+        id: service.id,
+        circle: snapshot.circleName || service.circleName,
+        amount: Number(snapshot.amountDue || 0),
+        bill_date: snapshot.billDate
+      });
+      await actions.update(service.id, { lastReportedBillDate: snapshot.billDate });
+    }
+  };
 
   const handleViewChange = (view) => {
     setActiveView(view);
@@ -179,33 +195,27 @@ export function ElectricityDashboard() {
     const handleTouchEnd = async () => {
       if (!isPulling.current || isRefreshing) return;
       const finalDist = pullDistance;
-      console.log('[PTR] touchEnd. finalDist:', finalDist, 'threshold:', pullThreshold);
       isPulling.current = false;
 
       if (finalDist >= pullThreshold) {
-        console.log('[PTR] Threshold met. Triggering refresh...');
         setPullDistance(70);
         setIsRefreshing(true);
         
         try {
           // Always reload from local DB first to recover from missing UI state
           await actions.reload();
-          console.log('[PTR] Local reload complete.');
           
           // Then attempt upstream refresh if there are services
           await handleRefreshAll();
-          console.log('[PTR] Upstream refresh complete.');
         } catch (e) {
           console.error('[PTR] Refresh process failed', e);
         } finally {
-          console.log('[PTR] Cleaning up PTR state.');
           setTimeout(() => {
             setIsRefreshing(false);
             setPullDistance(0);
           }, 500);
         }
       } else {
-        console.log('[PTR] Threshold not met. Resetting.');
         setPullDistance(0);
       }
     };
@@ -237,6 +247,7 @@ export function ElectricityDashboard() {
   async function submitService(payload) {
     if (payload.isBulk) {
       const { entries } = payload;
+      if (ph) ph.capture('bulk_add_started', { count: entries.length });
       const tst = toast.loading(`Validating ${entries.length} services...`);
       
       const results = {
@@ -267,6 +278,7 @@ export function ElectricityDashboard() {
         } catch (e) {
           if (e?.message === 'CANCELLED') {
             toast.error(`Cancelled. Processed ${results.succeeded.length + results.failed.length + results.alreadyExists.length + results.inTrash.length} services.`, { id: tst });
+            if (ph) ph.capture('bulk_add_cancelled');
             setBulkResult(results);
             return;
           }
@@ -275,6 +287,11 @@ export function ElectricityDashboard() {
       }
 
       toast.dismiss(tst);
+      if (ph) ph.capture('bulk_add_completed', { 
+        succeeded: results.succeeded.length, 
+        failed: results.failed.length,
+        alreadyExists: results.alreadyExists.length 
+      });
       setBulkResult(results);
       if (activeView !== 'active') setActiveView('active');
       return;
@@ -284,6 +301,7 @@ export function ElectricityDashboard() {
       await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
         loading: t('saving'), success: 'Updated', error: e => `Update failed: ${e?.message || 'Unknown error'}`,
       });
+      if (ph) ph.capture('service_updated', { id: dialog.service.id });
     } else {
       const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
       if (inTrash) {
@@ -294,6 +312,7 @@ export function ElectricityDashboard() {
           isDanger: false,
           onConfirm: async () => {
             await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` });
+            if (ph) ph.capture('service_restored', { id: inTrash.id });
             setDialog({ open: false, service: null });
             handleViewChange('active');
             flashCard(inTrash.id);
@@ -312,6 +331,22 @@ export function ElectricityDashboard() {
       try {
         const newService = await actions.add(payload);
         toast.success('Service added', { id: tst });
+        if (ph) {
+          ph.capture('service_added', { 
+            circle: newService.circleName, 
+            amount: Number(newService.lastAmountDue || 0)
+          });
+          // Also track as a bill record if it has a date
+          if (newService.lastBillDate) {
+             ph.capture('bill_refreshed', {
+               id: newService.id,
+               circle: newService.circleName,
+               amount: Number(newService.lastAmountDue || 0),
+               bill_date: newService.lastBillDate
+             });
+             await actions.update(newService.id, { lastReportedBillDate: newService.lastBillDate });
+          }
+        }
         setDialog({ open: false, service: null });
         handleViewChange('active');
         if (newService?.id) flashCard(newService.id);
@@ -320,28 +355,36 @@ export function ElectricityDashboard() {
           toast.dismiss(tst);
         } else {
           toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
+          if (ph) ph.capture('service_add_failed', { error: e?.message });
         }
       }
     }
   }
 
   async function handleRefreshAll(options = { skipApi: false }) {
-    console.log('[PTR] handleRefreshAll triggered. skipApi:', options.skipApi);
-    
     // 1. Always reload from local DB first to update UI immediately
     const currentServices = await actions.reload();
-    console.log('[PTR] Local reload complete. Services in DB:', currentServices?.length);
 
     if (!currentServices.length || options.skipApi) {
-      console.log('[PTR] Stopping after local reload.');
       return;
     }
     
     setRefreshingAll(true);
     setRefreshProgress({ done: 0, total: currentServices.length });
+    if (ph) ph.capture('refresh_all_started', { count: currentServices.length });
     try {
       const summary = await actions.refreshAll((done, tot) => setRefreshProgress({ done, total: tot }));
       if (summary) {
+        if (ph) {
+          ph.capture('refresh_all_completed', { succeeded: summary.succeeded, failed: summary.failed });
+          // Track the latest amounts for all successfully refreshed services (deduplicated)
+          for (const res of summary.results) {
+            if (res.ok && res.snapshot) {
+              const svc = services.find(sv => sv.id === res.id);
+              if (svc) await trackBill(svc, res.snapshot);
+            }
+          }
+        }
         summary.failed === 0
           ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
           : toast.error(`Refresh failed for ${summary.failed} service(s)`);
@@ -534,11 +577,16 @@ export function ElectricityDashboard() {
                   onRefresh={async () => {
                     const tst = toast.loading('Refreshing…');
                     try {
-                      await actions.refresh(s.id);
+                      const updated = await actions.refresh(s.id);
                       toast.success('Refreshed', { id: tst });
+                      if (ph) ph.capture('service_refreshed', { id: s.id });
+                      if (updated) await trackBill(s, updated);
                     } catch (e) {
                       if (e?.message === 'CANCELLED') toast.dismiss(tst);
-                      else toast.error(`Refresh failed: ${e?.message || 'Unknown error'}`, { id: tst });
+                      else {
+                        toast.error(`Refresh failed: ${e?.message || 'Unknown error'}`, { id: tst });
+                        if (ph) ph.capture('service_refresh_failed', { id: s.id, error: e?.message });
+                      }
                     }
                   }}
                   onEdit={() => setDialog({ open: true, service: s })}
@@ -554,6 +602,7 @@ export function ElectricityDashboard() {
                         try {
                           await actions.remove(s.id);
                           toast.success('Moved to trash', { id: tst });
+                          if (ph) ph.capture('service_trashed', { id: s.id });
                           clearSelection();
                         } catch (e) {
                           toast.error(`Failed to move: ${e?.message || 'Unknown error'}`, { id: tst });
@@ -561,9 +610,19 @@ export function ElectricityDashboard() {
                       }
                     });
                   }}
-                  onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })}
-                  onCalculateBill={handleCalculateBill}
-                  onPay={() => handlePay(s)}
+                  onTogglePin={() => {
+                    const nextPinned = !s.pinned;
+                    actions.update(s.id, { pinned: nextPinned });
+                    if (ph) ph.capture('service_pinned_toggled', { id: s.id, pinned: nextPinned });
+                  }}
+                  onCalculateBill={(svc) => {
+                    handleCalculateBill(svc);
+                    if (ph) ph.capture('calculator_opened', { id: svc.id });
+                  }}
+                  onPay={() => {
+                    handlePay(s);
+                    if (ph) ph.capture('pay_clicked', { id: s.id });
+                  }}
                 />
               ))}
             </div>
@@ -588,6 +647,7 @@ export function ElectricityDashboard() {
                 try {
                   await actions.restore(id);
                   toast.success('Restored', { id: tst });
+                  if (ph) ph.capture('service_restored_from_trash', { id });
                   clearSelection();
                   handleViewChange('active');
                   flashCard(id);
@@ -603,7 +663,10 @@ export function ElectricityDashboard() {
               title: 'Delete permanently?',
               description: 'This action cannot be undone and all history will be lost.',
               isDanger: true,
-              onConfirm: () => toast.promise(actions.purge(id), { 
+              onConfirm: () => toast.promise(actions.purge(id).then(res => {
+                if (ph) ph.capture('service_purged', { id });
+                return res;
+              }), { 
                 loading: 'Deleting…', 
                 success: () => { clearSelection(); return 'Deleted permanently'; }, 
                 error: e => `Delete failed: ${e?.message || 'Unknown error'}` 

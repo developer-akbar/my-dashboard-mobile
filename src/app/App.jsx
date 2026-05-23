@@ -3,7 +3,20 @@ import { Toaster } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { App as CapApp } from '@capacitor/app';
+import { Analytics } from '@vercel/analytics/react';
+import posthog from 'posthog-js';
+import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
+
+// ── PostHog Initialization ──────────────────────────────────────────────────
+if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
+  posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
+    api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+    person_profiles: 'identified_only',
+    capture_pageview: false, 
+    autocapture: false, // Disable automatic click tracking
+  });
+}
 
 const NAV = [
   { id: 'electricity', icon: FiZap },
@@ -11,15 +24,23 @@ const NAV = [
   { id: 'settings',    icon: FiSettings },
 ];
 
-export function App() {
+function AppContent() {
   const [activePage, setActivePage] = useState('electricity');
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const { t, i18n } = useTranslation();
+  const ph = usePostHog();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // ── Analytics: Track Page View ─────────────────────────────────────────────
+  useEffect(() => {
+    if (ph) {
+      ph.capture('$pageview', { page: activePage });
+    }
+  }, [activePage, ph]);
 
   // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
@@ -70,6 +91,7 @@ export function App() {
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
+    if (ph) ph.capture('language_changed', { language: lng });
   };
 
   return (
@@ -119,14 +141,20 @@ export function App() {
                 <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
                   <button 
                     className={`seg__btn ${theme === 'dark' ? 'seg__btn--active' : ''}`}
-                    onClick={() => setTheme('dark')}
+                    onClick={() => {
+                      setTheme('dark');
+                      if (ph) ph.capture('theme_changed', { theme: 'dark' });
+                    }}
                     style={{ padding: '0 16px' }}
                   >
                     {t('dark')}
                   </button>
                   <button 
                     className={`seg__btn ${theme === 'light' ? 'seg__btn--active' : ''}`}
-                    onClick={() => setTheme('light')}
+                    onClick={() => {
+                      setTheme('light');
+                      if (ph) ph.capture('theme_changed', { theme: 'light' });
+                    }}
                     style={{ padding: '0 16px' }}
                   >
                     {t('light')}
@@ -196,6 +224,16 @@ export function App() {
           },
         }}
       />
+      
+      <Analytics />
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <PostHogProvider client={posthog}>
+      <AppContent />
+    </PostHogProvider>
   );
 }
