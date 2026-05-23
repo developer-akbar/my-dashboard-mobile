@@ -42,10 +42,6 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             <FiPlus size={15} />
             <span style={{ marginLeft: '4px' }}>{t('add')}</span>
           </button>
-          
-          <button className="btn btn--ghost btn--sm" onClick={copyAllNumbers} disabled={!hasServices} title="Copy All Service Numbers" style={{ padding: '0 8px' }}>
-            <FiCopy size={15} />
-          </button>
 
           <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
             <FiGlobe size={15} />
@@ -58,6 +54,19 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
       {/* ── Bottom Row: Filters, Navigation, Refresh ── */}
       <div className="toolbar__row toolbar__row--bottom">
         <div className="toolbar__group" style={{ flex: 1, justifyContent: 'space-between' }}>
+          <div className="seg">
+            <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
+               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                 <FiZap size={14} className="show-mobile-sm" />
+                 {t('active')}
+               </span>
+            </button>
+            <button className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('trash')}>
+              <FiTrash2 size={13} />
+              {trashCount > 0 && <span className="badge">{trashCount}</span>}
+            </button>
+          </div>
+
           <div className="toolbar__filters">
             <div className="select-wrap">
               <select className="select" value={filters.status} onChange={e => onFiltersChange({ ...filters, status: e.target.value })}>
@@ -78,19 +87,6 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
               </select>
               <FiChevronDown size={12} className="select-icon" />
             </div>
-          </div>
-
-          <div className="seg">
-            <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
-               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                 <FiZap size={14} className="show-mobile-sm" />
-                 {t('active')}
-               </span>
-            </button>
-            <button className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('trash')}>
-              <FiTrash2 size={13} />
-              {trashCount > 0 && <span className="badge">{trashCount}</span>}
-            </button>
           </div>
         </div>
 

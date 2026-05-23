@@ -447,18 +447,18 @@ export function ElectricityDashboard() {
           </div>
           <div className="selection-bar__actions">
             <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected">
-              <FiCopy size={13} />
+              <FiCopy size={16} />
               {!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}
             </button>
             {activeView === 'active' ? (
               <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}>
-                <FiTrash2 size={13} />
+                <FiTrash2 size={16} />
                 {!isMobile && <span style={{ marginLeft: '4px' }}>Trash</span>}
               </button>
             ) : (
               <>
                 <button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}>
-                  <FiRefreshCw size={13} />
+                  <FiRefreshCw size={16} />
                   {!isMobile && <span style={{ marginLeft: '4px' }}>Restore</span>}
                 </button>
                 <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}>
