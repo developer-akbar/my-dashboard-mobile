@@ -919,6 +919,10 @@ input[type="checkbox"] {
 .acc--open .acc__chevron { transform: rotate(180deg); }
 .acc__body { padding: 0 0 14px; }
 
+.bp, .trend {
+  padding: 10px;
+}
+
 /* ── Breakup panel ──────────────────────────────────────────────────────────── */
 .bp__bar {
   display: flex;
