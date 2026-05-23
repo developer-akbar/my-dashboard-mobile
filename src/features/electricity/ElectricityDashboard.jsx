@@ -357,6 +357,7 @@ export function ElectricityDashboard() {
           toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
           if (ph) ph.capture('service_add_failed', { error: e?.message });
         }
+        throw e; // Re-throw to keep dialog open
       }
     }
   }
@@ -679,6 +680,7 @@ export function ElectricityDashboard() {
       <ServiceDialog
         open={dialog.open}
         service={dialog.service}
+        services={services}
         onClose={() => setDialog({ open: false, service: null })}
         onSubmit={submitService}
       />

@@ -85,10 +85,8 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
 
   async function copyNum() {
     try { 
-      const name = service.label || service.customerName || t('untitled');
-      const text = `${name}:${service.serviceNumber}`;
-      await navigator.clipboard.writeText(text); 
-      toast.success('Copied'); 
+      await navigator.clipboard.writeText(service.serviceNumber); 
+      toast.success('Service number copied'); 
     }
     catch (e) { toast.error(`Copy failed: ${e?.message || 'Unknown error'}`); }
   }

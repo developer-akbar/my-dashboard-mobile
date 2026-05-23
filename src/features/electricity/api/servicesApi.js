@@ -191,7 +191,11 @@ export async function listTrash() {
  */
 export async function createService({ serviceNumber, label }, billdeskSession) {
   const results = await createBulkServices([{ number: serviceNumber, label }], billdeskSession);
-  return results[0];
+  const result = results[0];
+  if (result && result._error) {
+    throw new Error(result._error);
+  }
+  return result;
 }
 
 /**
@@ -211,6 +215,13 @@ export async function createBulkServices(entries, billdeskSession) {
       }
 
       const { snapshot } = await apiPost('/services/validate', { serviceNumber: entry.number, billdeskSession });
+      
+      // FINAL GUARD: If both BillDesk and APSPDCL return nothing, reject it.
+      if (!snapshot || snapshot.billDeskSource === 'UNKNOWN') {
+        results.push({ number: entry.number, _error: 'Invalid APSPDCL service number' });
+        continue;
+      }
+
       const service = await db.create({ serviceNumber: entry.number, label: entry.label });
       const updated = await db.update(service.id, { ...snapshotToPatch(snapshot, service), lastError: null });
       results.push(updated);

@@ -1,17 +1,42 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { FiX, FiZap } from 'react-icons/fi';
+import { FiX, FiZap, FiChevronDown } from 'react-icons/fi';
 import { isValidServiceNumber } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 
-export function ServiceDialog({ open, service, onClose, onSubmit }) {
+export function ServiceDialog({ open, service, onClose, onSubmit, services = [] }) {
   const [label, setLabel] = useState('');
   const [serviceNumber, setServiceNumber] = useState('');
   const [isBulk, setIsBulk] = useState(false);
   const [bulkInput, setBulkInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showPrefixes, setShowPrefixes] = useState(false);
   const { t } = useTranslation();
   const labelRef = useRef(null);
+  const numRef = useRef(null);
   const bulkRef = useRef(null);
+  const prefixRef = useRef(null);
+
+  // Extract unique 9-digit prefixes from existing services
+  const prefixes = useMemo(() => {
+    if (!services || services.length === 0) return [];
+    const set = new Set();
+    services.forEach(s => {
+      if (s.serviceNumber && s.serviceNumber.length >= 8) {
+        set.add(s.serviceNumber.substring(0, 9)); 
+      }
+    });
+    return Array.from(set).sort();
+  }, [services]);
+
+  // Filter prefixes based on what user has already typed
+  const filteredPrefixes = useMemo(() => {
+    if (!serviceNumber) return prefixes;
+    const filtered = prefixes.filter(p => p.startsWith(serviceNumber));
+    // If exact match found, hide suggestions
+    if (filtered.length === 1 && filtered[0] === serviceNumber) return [];
+    return filtered;
+  }, [prefixes, serviceNumber]);
 
   useEffect(() => {
     if (open) { 
@@ -19,15 +44,16 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
       setServiceNumber(service?.serviceNumber || ''); 
       setIsBulk(false);
       setBulkInput('');
+      setShowPrefixes(false);
       
-      // Auto-focus Label field with a slightly longer delay for reliability
+      // Auto-focus Label field
       const timer = setTimeout(() => {
         if (!service && !isBulk) {
            if (labelRef.current) labelRef.current.focus();
         } else if (service) {
           if (labelRef.current) {
             labelRef.current.focus();
-            const len = service.label.length;
+            const len = (service.label || '').length;
             labelRef.current.setSelectionRange(len, len);
           }
         }
@@ -41,6 +67,17 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [service, open, onClose]);
+
+  // Handle clicking outside prefix dropdown
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (prefixRef.current && !prefixRef.current.contains(e.target)) {
+        setShowPrefixes(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   // Focus bulk textarea when switching to bulk mode
   useEffect(() => {
@@ -61,23 +98,17 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (isBulk) {
-      // Parse bulk input. Format: "Label:Number" or just "Number"
-      // Split by newlines, commas, or semicolons first
       const lines = bulkInput.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
-      
       const entries = lines.map(line => {
         let label = '';
         let number = '';
-        
         if (line.includes(':')) {
           const parts = line.split(':');
           number = parts.pop().trim();
-          label = parts.join(':').trim(); // Handle multiple colons by re-joining
+          label = parts.join(':').trim();
         } else {
           number = line.trim();
         }
-        
-        // Clean number and check if valid
         number = number.replace(/\D/g, '');
         return { label, number };
       }).filter(entry => entry.number.length === 13);
@@ -91,6 +122,8 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
       try {
         await onSubmit({ isBulk: true, entries });
         onClose();
+      } catch (err) {
+        // Error toast handled by onSubmit in Dashboard
       } finally {
         setSaving(false);
       }
@@ -99,8 +132,14 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
 
     if (!isValidServiceNumber(serviceNumber)) return;
     setSaving(true);
-    try { await onSubmit({ label: label.trim(), serviceNumber }); onClose(); }
-    finally { setSaving(false); }
+    try { 
+      await onSubmit({ label: label.trim(), serviceNumber }); 
+      onClose(); 
+    } catch (err) {
+      // Error toast handled by onSubmit in Dashboard
+    } finally { 
+      setSaving(false); 
+    }
   }
 
   return (
@@ -137,7 +176,7 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
                 style={{ height: '120px', fontFamily: 'monospace', paddingTop: '10px' }}
                 value={bulkInput}
                 onChange={e => setBulkInput(e.target.value)}
-                placeholder="23233..., 23233..."
+                placeholder="name1:0000000000000, name2:0000000000000"
                 required
               />
               <span className="field__hint">{t('bulk_hint')}</span>
@@ -157,15 +196,64 @@ export function ServiceDialog({ open, service, onClose, onSubmit }) {
 
               <label className="field">
                 <span className="field__label">{t('service_number')}</span>
-                <input
-                  className={`field__input field__input--mono ${numError ? 'field__input--error' : ''}`}
-                  value={serviceNumber}
-                  inputMode="numeric"
-                  maxLength={13}
-                  onChange={e => setServiceNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="0000000000000"
-                  required
-                />
+                <div style={{ position: 'relative' }} ref={prefixRef}>
+                  <input
+                    ref={numRef}
+                    className={`field__input field__input--mono ${numError ? 'field__input--error' : ''}`}
+                    value={serviceNumber}
+                    inputMode="numeric"
+                    maxLength={13}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setServiceNumber(val);
+                      if (!service && !isBulk && val.length < 9) setShowPrefixes(true);
+                      else setShowPrefixes(false);
+                    }}
+                    onFocus={() => {
+                      if (!service && !isBulk && prefixes.length > 0 && serviceNumber.length < 9) {
+                        setShowPrefixes(true);
+                      }
+                    }}
+                    placeholder="0000000000000"
+                    required
+                    disabled={saving}
+                  />
+                  {!service && !isBulk && prefixes.length > 0 && (
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPrefixes(!showPrefixes)}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', padding: '4px', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <FiChevronDown size={14} style={{ transform: showPrefixes ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                    </button>
+                  )}
+                  {showPrefixes && filteredPrefixes.length > 0 && (
+                    <div className="dropdown-menu" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', marginTop: '4px', maxHeight: '160px', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
+                      {filteredPrefixes.map(p => (
+                        <button
+                          key={p}
+                          type="button"
+                          className="dropdown-item"
+                          onClick={() => {
+                            setServiceNumber(p);
+                            setShowPrefixes(false);
+                            if (numRef.current) {
+                              numRef.current.focus();
+                              // Move cursor to end
+                              setTimeout(() => {
+                                const len = p.length;
+                                numRef.current.setSelectionRange(len, len);
+                              }, 10);
+                            }
+                          }}
+                          style={{ width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: '13px', border: 'none', background: 'none', color: 'var(--text-1)', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                        >
+                          {p}<span style={{ color: 'var(--text-3)', fontSize: '11px', marginLeft: '6px' }}>... (prefix)</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {serviceNumber && (
                   <span className={`field__hint ${numError ? 'field__hint--error' : 'field__hint--ok'}`}>
                     {numError || t('valid_format')}

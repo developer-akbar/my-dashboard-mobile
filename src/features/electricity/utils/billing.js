@@ -5,9 +5,9 @@
  */
 
 const DOMESTIC_SLABS = [
-  { limit: 30,  rate: 2.19 },
-  { limit: 75,  rate: 3.27 },
-  { limit: 125, rate: 4.58 },
+  { limit: 30,  rate: 1.9 },
+  { limit: 75,  rate: 3.00 },
+  { limit: 125, rate: 4.50 },
   { limit: 225, rate: 6.00 },
   { limit: 400, rate: 8.75 },
   { limit: Infinity, rate: 9.75 },

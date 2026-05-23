@@ -427,6 +427,23 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     console.log(`[api] BillDesk internal migration detected: ${serviceNumber} -> ${activeNumber}`);
   }
 
+  // 2.5 Validation: If BillDesk found nothing meaningful, ABORT.
+  // This prevents adding invalid numbers that just happen to be 13 digits.
+  const isPlaceholder = (name) => {
+    if (!name) return true;
+    const n = name.toUpperCase().trim();
+    return n === 'UNKNOWN' || n === 'N/A' || n === 'NA' || n === '-' || n === '—' || n === '.';
+  };
+
+  if (!billDeskData || isPlaceholder(billDeskData.customerName) || !billDeskData.uniqueServiceNumber) {
+    console.warn(`[api] Snapshot aborted: BillDesk data incomplete or placeholder for ${serviceNumber}`, { 
+      hasData: !!billDeskData, 
+      name: billDeskData?.customerName,
+      uniqueNo: billDeskData?.uniqueServiceNumber 
+    });
+    return null;
+  }
+
   // 3. Fetch History using the active (potentially migrated) number
   const targetNumber = activeNumber;
   const [billResult, paymentResult] = await Promise.allSettled([
@@ -686,10 +703,19 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     } : null,
   };
 
+  const finalCustomerName = billDeskData?.customerName ?? latest?.customerName ?? null;
+  
+  // FINAL HARD VALIDATION: If we have no customer name AND no bill history, 
+  // it is not a valid APSPDCL service number. ABORT.
+  if (isPlaceholder(finalCustomerName) && bills.length === 0) {
+    console.warn(`[api] Final validation failed for ${serviceNumber}: No customer name and no history.`);
+    return null;
+  }
+
   return {
     serviceNumber,
     migratedServiceNumber,
-    customerName: billDeskData?.customerName ?? latest?.customerName ?? null,
+    customerName: finalCustomerName,
     billDate: (billDeskBillDate && parseDate(billDeskBillDate)) ? parseDate(billDeskBillDate).toISOString() : (latest ? latest.closingDate.toISOString() : new Date().toISOString()),
     dueDate: (billDeskDueDate && parseDate(billDeskDueDate)) ? parseDate(billDeskDueDate).toISOString() : (latest?.dueDate?.toISOString() || null),
     billedUnits: latest?.billedUnits ?? null,
