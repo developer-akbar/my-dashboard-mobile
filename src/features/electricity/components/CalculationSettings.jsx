@@ -101,7 +101,7 @@ export function CalculationSettings({ onBack }) {
 
   return (
     <div className="page">
-      <header className="page__header" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '-8px' }}>
+      <header className="page__header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '-8px' }}>
         <button className="icon-btn" onClick={onBack} style={{ width: '40px', height: '40px' }}><FiArrowLeft size={20} /></button>
         <div style={{ flex: 1 }}>
           <h1 className="page__title" style={{ fontSize: '20px' }}>{t('calc_settings')}</h1>
@@ -109,7 +109,16 @@ export function CalculationSettings({ onBack }) {
         </div>
       </header>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '20px', paddingBottom: '40px', marginTop: '10px' }}>
+      <div className="grid" style={{ 
+        gridTemplateColumns: '1fr', 
+        gap: '20px', 
+        paddingBottom: '40px', 
+        marginTop: '10px',
+        maxWidth: '600px',
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        width: '100%'
+      }}>
         <ConfigCard 
           title={t('domestic_slabs')}
           config={domestic}
@@ -240,7 +249,7 @@ function ConfigCard({ title, config, isEditing, onEdit, onSave, onCancel, onRese
               <th style={{ padding: '8px 4px' }}>Min</th>
               <th style={{ padding: '8px 4px' }}>Max</th>
               <th style={{ padding: '8px 4px' }}>Rate</th>
-              <th style={{ padding: '8px 4px', textAlign: 'right' }}>Action</th>
+              <th style={{ padding: '8px 4px' }}>Action</th>
             </tr>
           </thead>
           <tbody>

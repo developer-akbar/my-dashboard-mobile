@@ -356,6 +356,7 @@ input[type="checkbox"] {
 
 .page {
   position: relative;
+  padding: 24px;
 }
 
 .coming-soon { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; min-height: 40vh; color: var(--text-2); }
