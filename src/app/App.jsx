@@ -128,7 +128,7 @@ function AppContent() {
           </div>
         )}
         {activePage === 'settings' && (
-          <div className="page">
+          <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
             <div className="page__header">
               <div>
                 <h2 className="page__title">{t('settings')}</h2>
@@ -136,57 +136,73 @@ function AppContent() {
               </div>
             </div>
             
-            <div className="scard" style={{ padding: '20px' }}>
-              <h3 style={{ marginBottom: '16px', fontSize: '15px' }}>{t('appearance')}</h3>
-              <div className="field">
-                <label className="field__label">{t('theme')}</label>
-                <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
-                  <button 
-                    className={`seg__btn ${theme === 'dark' ? 'seg__btn--active' : ''}`}
-                    onClick={() => {
-                      setTheme('dark');
-                      if (ph) ph.capture('theme_changed', { theme: 'dark' });
-                    }}
-                    style={{ padding: '0 16px' }}
-                  >
-                    {t('dark')}
-                  </button>
-                  <button 
-                    className={`seg__btn ${theme === 'light' ? 'seg__btn--active' : ''}`}
-                    onClick={() => {
-                      setTheme('light');
-                      if (ph) ph.capture('theme_changed', { theme: 'light' });
-                    }}
-                    style={{ padding: '0 16px' }}
-                  >
-                    {t('light')}
-                  </button>
+            <div style={{ flex: 1 }}>
+              <div className="scard" style={{ padding: '20px' }}>
+                <h3 style={{ marginBottom: '16px', fontSize: '15px' }}>{t('appearance')}</h3>
+                <div className="field">
+                  <label className="field__label">{t('theme')}</label>
+                  <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                    <button 
+                      className={`seg__btn ${theme === 'dark' ? 'seg__btn--active' : ''}`}
+                      onClick={() => {
+                        setTheme('dark');
+                        if (ph) ph.capture('theme_changed', { theme: 'dark' });
+                      }}
+                      style={{ padding: '0 16px' }}
+                    >
+                      {t('dark')}
+                    </button>
+                    <button 
+                      className={`seg__btn ${theme === 'light' ? 'seg__btn--active' : ''}`}
+                      onClick={() => {
+                        setTheme('light');
+                        if (ph) ph.capture('theme_changed', { theme: 'light' });
+                      }}
+                      style={{ padding: '0 16px' }}
+                    >
+                      {t('light')}
+                    </button>
+                  </div>
+                </div>
+                
+                <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '15px' }}>{t('language')}</h3>
+                <div className="field">
+                  <label className="field__label">{t('app_language')}</label>
+                  <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                    <button 
+                      className={`seg__btn ${i18n.language === 'en' ? 'seg__btn--active' : ''}`}
+                      onClick={() => changeLanguage('en')}
+                      style={{ padding: '0 16px' }}
+                    >
+                      English
+                    </button>
+                    <button 
+                      className={`seg__btn ${i18n.language === 'te' ? 'seg__btn--active' : ''}`}
+                      onClick={() => changeLanguage('te')}
+                      style={{ padding: '0 16px' }}
+                    >
+                      తెలుగు
+                    </button>
+                  </div>
                 </div>
               </div>
-              
-              <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '15px' }}>{t('language')}</h3>
-              <div className="field">
-                <label className="field__label">{t('app_language')}</label>
-                <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
-                  <button 
-                    className={`seg__btn ${i18n.language === 'en' ? 'seg__btn--active' : ''}`}
-                    onClick={() => changeLanguage('en')}
-                    style={{ padding: '0 16px' }}
-                  >
-                    English
-                  </button>
-                  <button 
-                    className={`seg__btn ${i18n.language === 'te' ? 'seg__btn--active' : ''}`}
-                    onClick={() => changeLanguage('te')}
-                    style={{ padding: '0 16px' }}
-                  >
-                    తెలుగు
-                  </button>
-                </div>
+
+              <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
+                <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>Feedback & Support</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
+                  Have suggestions, encountered a bug, or need help? We value your feedback to make My Dashboard better.
+                </p>
+                <a 
+                  href="mailto:mail.akbarmulla@gmail.com?subject=My Dashboard App Feedback"
+                  className="btn btn--ghost"
+                  style={{ marginTop: '16px', width: '100%', justifyContent: 'center', color: 'var(--primary)' }}
+                >
+                  Contact Developer
+                </a>
               </div>
             </div>
 
-            <footer className="dev-footer">
+            <footer className="dev-footer" style={{ marginTop: '40px', paddingBottom: '20px' }}>
               <div className="dev-footer__line" />
               <p className="dev-footer__name">Developed by Akbar</p>
               <span className="dev-footer__tag">v1.0.0</span>
