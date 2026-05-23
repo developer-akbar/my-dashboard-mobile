@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiTrash2, FiSave, FiRefreshCw } from 'react-icons/fi';
 import { db } from '../../../shared/db/storage.js';
 import { DEFAULT_DOMESTIC_CONFIG, DEFAULT_COMMERCIAL_CONFIG } from '../utils/billing.js';
+import { ConfirmDialog } from '../../../shared/components/ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +12,7 @@ export function CalculationSettings({ onBack }) {
   const [commercial, setCommercial] = useState(null);
   const [editingId, setEditingId] = useState(null); // 'domestic' or 'commercial'
   const [loading, setLoading] = useState(true);
+  const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', onConfirm: () => {} });
 
   useEffect(() => {
     async function load() {
@@ -27,13 +29,17 @@ export function CalculationSettings({ onBack }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (editingId) setEditingId(null);
+        if (confirmState.open) setConfirmState(prev => ({ ...prev, open: false }));
+        else if (editingId) setEditingId(null);
         else onBack();
       }
     };
     const handleBack = (e) => {
       if (e.detail?.handled) return;
-      if (editingId) {
+      if (confirmState.open) {
+        setConfirmState(prev => ({ ...prev, open: false }));
+        if (e.detail) e.detail.handled = true;
+      } else if (editingId) {
         setEditingId(null);
         if (e.detail) e.detail.handled = true;
       } else {
@@ -47,25 +53,48 @@ export function CalculationSettings({ onBack }) {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('app-back-button', handleBack);
     };
-  }, [editingId, onBack]);
+  }, [editingId, onBack, confirmState.open]);
 
-  const handleSave = async (id, config) => {
-    try {
-      await db.setSetting(`calc_config_${id}`, config);
-      toast.success(t('settings_saved', 'Settings saved successfully'));
-      setEditingId(null);
-      if (id === 'domestic') setDomestic(config);
-      else setCommercial(config);
-    } catch (e) {
-      toast.error(t('save_failed', 'Failed to save settings'));
-    }
+  const handleSave = (id, config) => {
+    setConfirmState({
+      open: true,
+      title: t('confirm_save_settings'),
+      description: t('save_settings_desc'),
+      onConfirm: async () => {
+        try {
+          await db.setSetting(`calc_config_${id}`, config);
+          toast.success(t('settings_saved'));
+          setEditingId(null);
+          if (id === 'domestic') setDomestic(config);
+          else setCommercial(config);
+        } catch (e) {
+          toast.error(t('save_failed'));
+        } finally {
+          setConfirmState(prev => ({ ...prev, open: false }));
+        }
+      }
+    });
   };
 
   const resetToDefault = (id) => {
-    const defaultConfig = id === 'domestic' ? DEFAULT_DOMESTIC_CONFIG : DEFAULT_COMMERCIAL_CONFIG;
-    if (id === 'domestic') setDomestic({ ...defaultConfig });
-    else setCommercial({ ...defaultConfig });
-    toast.success(t('reset_to_defaults', 'Reset to defaults'));
+    setConfirmState({
+      open: true,
+      title: t('confirm_reset_settings'),
+      description: t('reset_settings_desc'),
+      onConfirm: async () => {
+        const defaultConfig = id === 'domestic' ? DEFAULT_DOMESTIC_CONFIG : DEFAULT_COMMERCIAL_CONFIG;
+        try {
+          await db.setSetting(`calc_config_${id}`, defaultConfig);
+          if (id === 'domestic') setDomestic({ ...defaultConfig });
+          else setCommercial({ ...defaultConfig });
+          toast.success(t('reset_to_defaults'));
+        } catch (e) {
+          toast.error(t('reset_failed'));
+        } finally {
+          setConfirmState(prev => ({ ...prev, open: false }));
+        }
+      }
+    });
   };
 
   if (loading) return <div className="state-box"><FiRefreshCw className="spin" /></div>;
@@ -75,14 +104,14 @@ export function CalculationSettings({ onBack }) {
       <header className="page__header" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '-8px' }}>
         <button className="icon-btn" onClick={onBack} style={{ width: '40px', height: '40px' }}><FiArrowLeft size={20} /></button>
         <div style={{ flex: 1 }}>
-          <h1 className="page__title" style={{ fontSize: '20px' }}>{t('calc_settings', 'Calculation Settings')}</h1>
-          <p style={{ fontSize: '12px' }}>{t('calc_settings_desc', 'Configure slabs and charges for billing')}</p>
+          <h1 className="page__title" style={{ fontSize: '20px' }}>{t('calc_settings')}</h1>
+          <p style={{ fontSize: '12px' }}>{t('calc_settings_desc')}</p>
         </div>
       </header>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '20px', paddingBottom: '80px', marginTop: '10px' }}>
+      <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '20px', paddingBottom: '40px', marginTop: '10px' }}>
         <ConfigCard 
-          title={t('domestic_slabs', 'Domestic (LT-I)')}
+          title={t('domestic_slabs')}
           config={domestic}
           isEditing={editingId === 'domestic'}
           onEdit={() => setEditingId('domestic')}
@@ -92,7 +121,7 @@ export function CalculationSettings({ onBack }) {
         />
 
         <ConfigCard 
-          title={t('commercial_slabs', 'Commercial (LT-II)')}
+          title={t('commercial_slabs')}
           config={commercial}
           isEditing={editingId === 'commercial'}
           onEdit={() => setEditingId('commercial')}
@@ -103,6 +132,14 @@ export function CalculationSettings({ onBack }) {
       </div>
 
       <HelpFooter t={t} />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        description={confirmState.description}
+        onClose={() => setConfirmState(prev => ({ ...prev, open: false }))}
+        onConfirm={confirmState.onConfirm}
+      />
     </div>
   );
 }
@@ -138,18 +175,19 @@ function ConfigCard({ title, config, isEditing, onEdit, onSave, onCancel, onRese
   if (!isEditing) {
     return (
       <div className="scard" style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
           <h3 style={{ fontSize: '16px' }}>{title}</h3>
-          <button className="btn btn--ghost btn--xs" onClick={onEdit}>{t('edit_slabs', 'Edit Slabs')}</button>
+          <button className="btn btn--ghost btn--xs" onClick={onEdit}>{t('edit_slabs')}</button>
         </div>
+        <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '16px', fontWeight: '500' }}>{t('rates_effective_date')}</p>
 
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-          <ReadOnlyField label="Fixed Charges" value={`₹${config.fixedChargesPerKW} / kW`} />
-          <ReadOnlyField label="Electricity Duty" value={`${config.electricityDutyPct}%`} />
+          <ReadOnlyField label={t('fixed_charges')} value={`₹${config.fixedChargesPerKW} / kW`} />
+          <ReadOnlyField label={t('electricity_duty')} value={`${config.electricityDutyPct}%`} />
           <ReadOnlyField label="FAC / Unit" value={`₹${config.facPerUnit}`} />
         </div>
 
-        <h4 style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Slab Presets</h4>
+        <h4 style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>Slab Presets</h4>
         <div style={{ background: 'var(--surface-2)', borderRadius: '8px', overflow: 'hidden' }}>
           {config.slabs.map((s, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 12px', borderBottom: i < config.slabs.length - 1 ? '1px solid var(--border)' : 'none' }}>
@@ -165,21 +203,24 @@ function ConfigCard({ title, config, isEditing, onEdit, onSave, onCancel, onRese
   return (
     <div className="scard" style={{ padding: '20px', borderColor: 'var(--primary)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h3 style={{ fontSize: '16px' }}>{title}</h3>
+        <div style={{ flex: 1 }}>
+          <h3 style={{ fontSize: '16px' }}>{title}</h3>
+          <p style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '500' }}>{t('rates_effective_date')}</p>
+        </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-           <button className="btn btn--ghost btn--xs" onClick={onReset}>{t('reset', 'Reset')}</button>
-           <button className="btn btn--ghost btn--xs" onClick={onCancel}>{t('cancel', 'Cancel')}</button>
+           <button className="btn btn--ghost btn--xs" onClick={onReset}>{t('reset')}</button>
+           <button className="btn btn--ghost btn--xs" onClick={onCancel}>{t('cancel')}</button>
         </div>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
         <EditableField 
-          label="Fixed Charges (₹/kW)" 
+          label={`${t('fixed_charges')} (₹/kW)`} 
           value={local.fixedChargesPerKW} 
           onChange={v => setLocal({...local, fixedChargesPerKW: parseFloat(v) || 0})} 
         />
         <EditableField 
-          label="Electricity Duty %" 
+          label={`${t('electricity_duty')} %`} 
           value={local.electricityDutyPct} 
           onChange={v => setLocal({...local, electricityDutyPct: parseFloat(v) || 0})} 
         />
@@ -190,7 +231,7 @@ function ConfigCard({ title, config, isEditing, onEdit, onSave, onCancel, onRese
         />
       </div>
 
-      <h4 style={{ fontSize: '13px', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '12px' }}>Slabs</h4>
+      <h4 style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '12px', fontWeight: '700' }}>Slabs</h4>
 
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -251,7 +292,7 @@ function ConfigCard({ title, config, isEditing, onEdit, onSave, onCancel, onRese
         style={{ width: '100%', marginTop: '24px' }} 
         onClick={() => onSave(local)}
       >
-        <FiSave style={{ marginRight: '8px' }} /> {t('save_configuration', 'Save Configuration')}
+        <FiSave style={{ marginRight: '8px' }} /> {t('save_configuration')}
       </button>
     </div>
   );
@@ -284,9 +325,9 @@ function EditableField({ label, value, onChange }) {
 
 export function HelpFooter({ t }) {
   return (
-    <div style={{ marginTop: '40px', padding: '20px', background: 'var(--red-dim)', borderRadius: '12px', border: '1px solid var(--red-glow)', textAlign: 'center' }}>
-      <h4 style={{ color: 'var(--red)', fontSize: '14px', marginBottom: '8px' }}>Asking for Bribe?</h4>
-      <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>Call <b style={{ color: 'var(--text-1)' }}>1064</b> or send a mail to <br/> <a href="mailto:complaints.acb@ap.gov.in" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>complaints.acb@ap.gov.in</a></p>
+    <div style={{ marginTop: '40px', marginBottom: '20px', padding: '20px', background: 'var(--red-dim)', borderRadius: '12px', border: '1px solid var(--red-glow)', textAlign: 'center' }}>
+      <h4 style={{ color: 'var(--red)', fontSize: '14px', marginBottom: '8px' }}>{t('bribe_asking')}</h4>
+      <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>{t('bribe_contact')} <br/> <a href="mailto:complaints.acb@ap.gov.in" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>complaints.acb@ap.gov.in</a></p>
     </div>
   );
 }

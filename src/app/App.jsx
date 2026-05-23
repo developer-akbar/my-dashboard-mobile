@@ -188,23 +188,23 @@ function AppContent() {
               </div>
 
               <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
-                <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>Feedback & Support</h3>
+                <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>{t('feedback_support')}</h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
-                  Have suggestions, encountered a bug, or need help? We value your feedback to make My Dashboard better.
+                  {t('feedback_desc')}
                 </p>
                 <a 
                   href="mailto:mail.akbarmulla@gmail.com?subject=My Dashboard App Feedback"
                   className="btn btn--ghost"
                   style={{ marginTop: '16px', width: '100%', justifyContent: 'center', color: 'var(--primary)' }}
                 >
-                  Contact Developer
+                  {t('contact_developer')}
                 </a>
               </div>
             </div>
 
             <footer className="dev-footer" style={{ marginTop: '40px', paddingBottom: '20px' }}>
               <div className="dev-footer__line" />
-              <p className="dev-footer__name">Developed by Akbar</p>
+              <p className="dev-footer__name">{t('developed_by')} Akbar</p>
               <span className="dev-footer__tag">v1.0.0</span>
             </footer>
           </div>
