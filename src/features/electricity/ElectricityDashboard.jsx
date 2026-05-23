@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -13,8 +13,9 @@ import { filterServices } from './utils/filters.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { useTranslation } from 'react-i18next';
 import { usePostHog } from '@posthog/react';
+import { HelpFooter } from './components/CalculationSettings.jsx';
 
-export function ElectricityDashboard() {
+export function ElectricityDashboard({ onOpenCalcSettings }) {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [activeView, setActiveView] = useState('active');
@@ -517,9 +518,14 @@ export function ElectricityDashboard() {
       )}
 
       <header className="page__header" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-        <div>
-          <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
-          <h1 className="page__title">{t('electricity')}</h1>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
+            <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
+          </div>
+          <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
+            <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
+          </button>
         </div>
         {refreshProgress && (
           <div className="refresh-progress">
@@ -744,6 +750,8 @@ export function ElectricityDashboard() {
         onClose={() => setConfirmState(prev => ({ ...prev, open: false }))}
         onConfirm={confirmState.onConfirm}
       />
+
+      <HelpFooter t={t} />
     </div>
   );
 }

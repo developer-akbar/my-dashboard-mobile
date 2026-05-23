@@ -1,26 +1,60 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { FiX, FiZap, FiPlus, FiMinus } from 'react-icons/fi';
+import { FiX, FiZap, FiPlus, FiMinus, FiChevronDown } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
-import { calculateEstimatedBill } from '../utils/billing.js';
+import { calculateEstimatedBill, DEFAULT_DOMESTIC_CONFIG, DEFAULT_COMMERCIAL_CONFIG } from '../utils/billing.js';
 import { formatInr } from '../../../shared/utils/index.js';
+import { db } from '../../../shared/db/storage.js';
 
 export function BillCalculator({ open, service, onClose }) {
   const { t } = useTranslation();
   const [currentRdg, setCurrentRdg] = useState('');
   const [error, setError] = useState('');
+  const [serviceType, setServiceType] = useState('domestic');
+  const [configs, setConfigs] = useState({ domestic: DEFAULT_DOMESTIC_CONFIG, commercial: DEFAULT_COMMERCIAL_CONFIG });
   const inputRef = useRef(null);
 
   const lastRdg = service?.closingRdg || 0;
   const load = service?.ctrLoad || 0;
 
   useEffect(() => {
+    async function loadConfigs() {
+      const d = await db.getSetting('calc_config_domestic', DEFAULT_DOMESTIC_CONFIG);
+      const c = await db.getSetting('calc_config_commercial', DEFAULT_COMMERCIAL_CONFIG);
+      setConfigs({ domestic: d, commercial: c });
+    }
     if (open) {
+      loadConfigs();
       setCurrentRdg('');
       setError('');
+      // Try to guess service type from category
+      const cat = (service?.category || '').toUpperCase();
+      if (cat.includes('COM') || cat.includes('LT-II') || cat.includes('LT2')) {
+        setServiceType('commercial');
+      } else {
+        setServiceType('domestic');
+      }
+      
       setTimeout(() => inputRef.current?.focus(), 300);
     }
-  }, [open]);
+  }, [open, service]);
+
+  // Handle Esc and Back button
+  useEffect(() => {
+    const handleKeyDown = (e) => { if (e.key === 'Escape' && open) onClose(); };
+    const handleBack = (e) => {
+      if (open && !e.detail?.handled) {
+        onClose();
+        if (e.detail) e.detail.handled = true;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('app-back-button', handleBack);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('app-back-button', handleBack);
+    };
+  }, [open, onClose]);
 
   const estimation = useMemo(() => {
     const curr = parseFloat(currentRdg);
@@ -30,8 +64,9 @@ export function BillCalculator({ open, service, onClose }) {
       return null;
     }
     setError('');
-    return calculateEstimatedBill(curr - lastRdg, load);
-  }, [currentRdg, lastRdg, load, t]);
+    const config = serviceType === 'domestic' ? configs.domestic : configs.commercial;
+    return calculateEstimatedBill(curr - lastRdg, load, config);
+  }, [currentRdg, lastRdg, load, serviceType, configs, t]);
 
   if (!open) return null;
 
@@ -49,26 +84,48 @@ export function BillCalculator({ open, service, onClose }) {
 
         <div className="sheet__form" style={{ padding: '20px 0' }}>
           <div className="field">
-            <span className="field__label">{t('last_reading')}</span>
-            <div className="field__input field__input--mono" style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-3)', border: 'none' }}>
-              {lastRdg.toLocaleString('en-IN')}
-            </div>
+             <span className="field__label">{t('service_type', 'Service Type')}</span>
+             <div className="seg" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                <button 
+                  type="button"
+                  className={`seg__btn ${serviceType === 'domestic' ? 'seg__btn--active' : ''}`}
+                  onClick={() => setServiceType('domestic')}
+                >
+                  {t('domestic', 'Domestic')}
+                </button>
+                <button 
+                  type="button"
+                  className={`seg__btn ${serviceType === 'commercial' ? 'seg__btn--active' : ''}`}
+                  onClick={() => setServiceType('commercial')}
+                >
+                  {t('commercial', 'Commercial')}
+                </button>
+             </div>
           </div>
 
-          <div className="field">
-            <label className="field__label" htmlFor="currentRdg">{t('current_reading')}</label>
-            <input
-              ref={inputRef}
-              id="currentRdg"
-              type="number"
-              className={`field__input field__input--mono ${error ? 'field__input--error' : ''}`}
-              placeholder={t('enter_current_reading')}
-              value={currentRdg}
-              onChange={e => setCurrentRdg(e.target.value)}
-              inputMode="decimal"
-            />
-            {error && <span className="field__hint field__hint--error">{error}</span>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="field">
+              <span className="field__label">{t('last_reading')}</span>
+              <div className="field__input field__input--mono" style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-3)', border: 'none' }}>
+                {lastRdg.toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field__label" htmlFor="currentRdg">{t('current_reading')}</label>
+              <input
+                ref={inputRef}
+                id="currentRdg"
+                type="number"
+                className={`field__input field__input--mono ${error ? 'field__input--error' : ''}`}
+                placeholder={t('enter_current_reading')}
+                value={currentRdg}
+                onChange={e => setCurrentRdg(e.target.value)}
+                inputMode="decimal"
+              />
+            </div>
           </div>
+          {error && <span className="field__hint field__hint--error" style={{ marginTop: '-12px', display: 'block', marginBottom: '12px' }}>{error}</span>}
 
           {estimation && (
             <div className="estimation-results" style={{ marginTop: '8px', padding: '16px', background: 'var(--primary-dim)', borderRadius: 'var(--radius)', border: '1px solid var(--primary-glow)' }}>
@@ -94,6 +151,12 @@ export function BillCalculator({ open, service, onClose }) {
                   <span style={{ color: 'var(--text-2)' }}>Customer Charges (CC)</span>
                   <span style={{ fontWeight: 500 }}>{formatInr(estimation.cc)}</span>
                 </div>
+                {estimation.fac > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: 'var(--text-2)' }}>Fuel Adjustment (FAC)</span>
+                    <span style={{ fontWeight: 500 }}>{formatInr(estimation.fac)}</span>
+                  </div>
+                )}
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--primary-glow)', fontSize: '15px' }}>
                   <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{t('est_total')}</span>

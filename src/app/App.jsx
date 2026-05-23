@@ -7,6 +7,7 @@ import { Analytics } from '@vercel/analytics/react';
 import posthog from 'posthog-js';
 import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
+import { CalculationSettings } from '../features/electricity/components/CalculationSettings.jsx';
 
 // ── PostHog Initialization ──────────────────────────────────────────────────
 if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
@@ -119,7 +120,8 @@ function AppContent() {
 
       {/* Main */}
       <main className="main">
-        {activePage === 'electricity' && <ElectricityDashboard />}
+        {activePage === 'electricity' && <ElectricityDashboard onOpenCalcSettings={() => setActivePage('calculation-settings')} />}
+        {activePage === 'calculation-settings' && <CalculationSettings onBack={() => setActivePage('electricity')} />}
         {activePage === 'home' && (
           <div className="page coming-soon">
             <h2>{t('home')}</h2><p>Coming soon</p>

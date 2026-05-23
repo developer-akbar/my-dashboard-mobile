@@ -206,11 +206,10 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                       {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
                     </button>
                     <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
-                    {(service.category === 'LT1' || !service.category) && (
-                      <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
-                        <LuCalculator size={13} /> {t('calculate_next_bill')}
-                      </button>
-                    )}
+                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
+                      <LuCalculator size={13} /> {t('calculate_next_bill')}
+                    </button>
+                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onAbout(); }}><FiInfo size={13} /> {t('about_service')}</button>
                     <button className="danger" onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
                   </div>
                 )}

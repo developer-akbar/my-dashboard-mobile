@@ -7,8 +7,9 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'my-dashboard';
-const DB_VERSION = 3;  // bumped: adds lastReportedBillDate
+const DB_VERSION = 4;  // bumped: adds settings table
 const STORE = 'electricity_services';
+const SETTINGS_STORE = 'settings';
 
 let _idb = null;
 let _sqlite = null;
@@ -36,8 +37,11 @@ async function getIdb() {
         store.createIndex('isDeleted', 'isDeleted', { unique: false });
         store.createIndex('pinned', 'pinned', { unique: false });
       }
-      // v2: new fields are plain JS properties — IndexedDB stores them automatically.
-      // No schema change needed; existing records just won't have them until next refresh.
+      if (oldVersion < 4) {
+        if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
+          db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
+        }
+      }
     },
   });
   return _idb;
@@ -139,6 +143,13 @@ async function getSqlite() {
         deletedAt TEXT,
         createdAt TEXT,
         updatedAt TEXT
+      )
+    `);
+    
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
       )
     `);
     
@@ -422,6 +433,34 @@ async function deleteService(id, permanent = false) {
   }
 }
 
+async function getSetting(key, defaultValue = null) {
+  const platform = await getPlatform();
+  if (platform === 'android') {
+    const db = await getSqlite();
+    const result = await db.query(`SELECT value FROM settings WHERE key = ?`, [key]);
+    if (!result.values?.length) return defaultValue;
+    try { return JSON.parse(result.values[0].value); }
+    catch { return result.values[0].value; }
+  } else {
+    const db = await getIdb();
+    const result = await db.get(SETTINGS_STORE, key);
+    return result ? result.value : defaultValue;
+  }
+}
+
+async function setSetting(key, value) {
+  const platform = await getPlatform();
+  if (platform === 'android') {
+    const db = await getSqlite();
+    const valStr = JSON.stringify(value);
+    await db.run(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, valStr]);
+    await sqliteSave();
+  } else {
+    const db = await getIdb();
+    await db.put(SETTINGS_STORE, { key, value });
+  }
+}
+
 export const db = {
   init: async () => {
     const platform = await getPlatform();
@@ -439,4 +478,6 @@ export const db = {
   update: updateService,
   delete: deleteService,
   getPlatform,
+  getSetting,
+  setSetting,
 };
