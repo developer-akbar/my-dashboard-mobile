@@ -336,7 +336,7 @@ export function HelpFooter({ t }) {
   return (
     <div style={{ marginTop: '40px', marginBottom: '20px', padding: '20px', background: 'var(--red-dim)', borderRadius: '12px', border: '1px solid var(--red-glow)', textAlign: 'center' }}>
       <h4 style={{ color: 'var(--red)', fontSize: '14px', marginBottom: '8px' }}>{t('bribe_asking')}</h4>
-      <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>{t('bribe_contact')} <br/> <a href="mailto:complaints.acb@ap.gov.in" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>complaints.acb@ap.gov.in</a></p>
+      <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>{t('bribe_contact')} <br/> <a href="mailto:acb@ap.gov.in" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>acb@ap.gov.in</a></p>
     </div>
   );
 }
