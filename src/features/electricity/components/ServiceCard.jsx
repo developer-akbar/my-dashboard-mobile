@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
-  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo
+  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock
 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill } from 'react-icons/bs';
@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { formatInr, formatDate, formatDateTime, fromNow, getDueTone, getDueCopy } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
+import { BsQrCode } from 'react-icons/bs';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill }) {
+export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onShowQR, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const { t } = useTranslation();
@@ -206,6 +207,9 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                       {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
                     </button>
                     <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
+                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onShowQR?.(service); }}>
+                      <BsQrCode size={13} /> Show QR Code
+                    </button>
                     <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
                       <LuCalculator size={13} /> {t('calculate_next_bill')}
                     </button>

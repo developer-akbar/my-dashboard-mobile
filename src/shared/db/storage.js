@@ -7,7 +7,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'my-dashboard';
-const DB_VERSION = 4;  // bumped: adds settings table
+const DB_VERSION = 5;  // bumped: adds billTime
 const STORE = 'electricity_services';
 const SETTINGS_STORE = 'settings';
 
@@ -17,6 +17,9 @@ let _platform = null; // 'android' | 'browser'
 
 // ── Platform detection ──────────────────────────────────────────────────────
 
+/**
+ * Detects if the app is running as a native Android app via Capacitor.
+ */
 function isAndroid() {
   return (
     typeof window !== 'undefined' &&
@@ -25,8 +28,19 @@ function isAndroid() {
   );
 }
 
+async function getPlatform() {
+  if (_platform) return _platform;
+  const { Device } = await import('@capacitor/device');
+  const info = await Device.getInfo();
+  _platform = info.platform === 'android' ? 'android' : 'browser';
+  return _platform;
+}
+
 // ── IndexedDB (browser/desktop) ─────────────────────────────────────────────
 
+/**
+ * Initializes and upgrades the IndexedDB database.
+ */
 async function getIdb() {
   if (_idb) return _idb;
   _idb = await openDB(DB_NAME, DB_VERSION, {
@@ -51,9 +65,13 @@ async function getIdb() {
 
 let _sqliteConnection = null;
 
+/**
+ * Initializes the SQLite connection for native Android.
+ * Handles schema creation and surgical column migrations.
+ */
 async function getSqlite() {
   if (_sqlite) return _sqlite;
-  
+
   const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite');
   if (!_sqliteConnection) {
     _sqliteConnection = new SQLiteConnection(CapacitorSQLite);
@@ -68,40 +86,21 @@ async function getSqlite() {
     } else {
       db = await conn.createConnection('mydashboard', false, 'no-encryption', 1, false);
     }
-    
+
     await db.open();
 
-    // Migrate: add missing columns
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN historyFetchedAt TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN lastReportedBillDate TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN category TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN closingRdg REAL;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN ctrLoad REAL;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN divisionCode TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN divisionName TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN circleName TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN sectionName TEXT;");
-    } catch (e) {}
-    try {
-      await db.execute("ALTER TABLE electricity_services ADD COLUMN uniqueServiceNumber TEXT;");
-    } catch (e) {}
+    // Migrate: add missing columns (surgical updates for existing installs)
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN historyFetchedAt TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN lastReportedBillDate TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN billTime TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN category TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN closingRdg REAL;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN ctrLoad REAL;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN divisionCode TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN divisionName TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN circleName TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN sectionName TEXT;"); } catch (e) {}
+    try { await db.execute("ALTER TABLE electricity_services ADD COLUMN uniqueServiceNumber TEXT;"); } catch (e) {}
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS electricity_services (
@@ -118,6 +117,7 @@ async function getSqlite() {
         lastFetchedAt TEXT,
         historyFetchedAt TEXT,
         lastReportedBillDate TEXT,
+        billTime TEXT,
         lastRefreshedDate TEXT,
         lastError TEXT,
         isPaid INTEGER DEFAULT 0,
@@ -161,10 +161,14 @@ async function getSqlite() {
   }
 }
 
+/**
+ * Persists the SQLite state to the device's permanent storage.
+ */
 async function sqliteSave() {
   if (_sqlite && (await getPlatform()) === 'android') {
+    const { CapacitorSQLite } = await import('@capacitor-community/sqlite');
     try {
-      await _sqlite.saveToStore('mydashboard');
+      await CapacitorSQLite.saveToStore({ database: 'mydashboard' });
     } catch (e) {
       console.warn("SQLite saveToStore failed:", e);
     }
@@ -181,22 +185,28 @@ function generateId() {
 
 // ── Serializers ──────────────────────────────────────────────────────────────
 
+/**
+ * Prepares a record for SQLite storage by converting objects/arrays to JSON strings.
+ */
 function serializeRecord(record) {
   return {
     ...record,
-    lastThreeAmounts: record.lastThreeAmounts ? JSON.stringify(record.lastThreeAmounts) : '[]',
+    lastThreeAmounts: JSON.stringify(record.lastThreeAmounts || []),
     billBreakup:      record.billBreakup      ? JSON.stringify(record.billBreakup)      : null,
     billHistory:      record.billHistory      ? JSON.stringify(record.billHistory)      : null,
     paymentHistory:   record.paymentHistory   ? JSON.stringify(record.paymentHistory)   : null,
     trendData:        record.trendData        ? JSON.stringify(record.trendData)        : null,
     insights:         record.insights         ? JSON.stringify(record.insights)         : null,
-    isPaid:     record.isPaid     ? 1 : 0,
-    pinned:     record.pinned     ? 1 : 0,
-    isDeleted:  record.isDeleted  ? 1 : 0,
+    isPaid:           record.isPaid ? 1 : 0,
+    pinned:           record.pinned ? 1 : 0,
+    isDeleted:        record.isDeleted ? 1 : 0,
   };
 }
 
-function deserializeRecord(row) {
+/**
+ * Converts a SQLite row back to a JS object by parsing JSON strings.
+ */
+function deserializeRow(row) {
   if (!row) return null;
   return {
     ...row,
@@ -206,92 +216,83 @@ function deserializeRecord(row) {
     paymentHistory:   typeof row.paymentHistory   === 'string' ? JSON.parse(row.paymentHistory)   : row.paymentHistory || null,
     trendData:        typeof row.trendData        === 'string' ? JSON.parse(row.trendData)        : row.trendData      || null,
     insights:         typeof row.insights         === 'string' ? JSON.parse(row.insights)         : row.insights       || null,
-    isPaid:     Boolean(row.isPaid),
-    pinned:     Boolean(row.pinned),
-    isDeleted:  Boolean(row.isDeleted),
+    isPaid:           !!row.isPaid,
+    pinned:           !!row.pinned,
+    isDeleted:        !!row.isDeleted,
   };
 }
 
 // ── DB Operations ─────────────────────────────────────────────────────────────
 
-async function getPlatform() {
-  if (_platform) return _platform;
-  _platform = isAndroid() ? 'android' : 'browser';
-  return _platform;
-}
-
+/**
+ * Returns all active (non-deleted) services.
+ */
 async function getAllServices() {
   const platform = await getPlatform();
   if (platform === 'android') {
     const db = await getSqlite();
-    const result = await db.query(
-      `SELECT * FROM electricity_services WHERE isDeleted = 0
-       ORDER BY pinned DESC, pinnedAt ASC, createdAt DESC`
-    );
-    return (result.values || []).map(deserializeRecord);
+    const result = await db.query(`SELECT * FROM electricity_services WHERE isDeleted = 0 ORDER BY pinned DESC, pinnedAt DESC, createdAt DESC`);
+    return (result.values || []).map(deserializeRow);
   } else {
     const db = await getIdb();
     const all = await db.getAll(STORE);
-    return all
-      .filter((r) => !r.isDeleted)
-      .sort((a, b) => {
-        if (b.pinned !== a.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
-        if (a.pinned && b.pinned) return new Date(a.pinnedAt) - new Date(b.pinnedAt);
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
+    return all.filter(s => !s.isDeleted).sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
   }
 }
 
+/**
+ * Returns all soft-deleted services.
+ */
 async function getTrashServices() {
   const platform = await getPlatform();
   if (platform === 'android') {
     const db = await getSqlite();
-    const result = await db.query(
-      `SELECT * FROM electricity_services WHERE isDeleted = 1
-       ORDER BY deletedAt DESC`
-    );
-    return (result.values || []).map(deserializeRecord);
+    const result = await db.query(`SELECT * FROM electricity_services WHERE isDeleted = 1 ORDER BY deletedAt DESC`);
+    return (result.values || []).map(deserializeRow);
   } else {
     const db = await getIdb();
     const all = await db.getAll(STORE);
-    return all
-      .filter((r) => r.isDeleted)
-      .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+    return all.filter(s => s.isDeleted).sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
   }
 }
 
+/**
+ * Retrieves a single service by its unique internal ID.
+ */
 async function getServiceById(id) {
   const platform = await getPlatform();
   if (platform === 'android') {
     const db = await getSqlite();
-    const result = await db.query(
-      `SELECT * FROM electricity_services WHERE id = ?`,
-      [id]
-    );
-    return deserializeRecord(result.values?.[0] || null);
+    const result = await db.query(`SELECT * FROM electricity_services WHERE id = ?`, [id]);
+    return result.values?.length ? deserializeRow(result.values[0]) : null;
   } else {
     const db = await getIdb();
-    const record = await db.get(STORE, id);
-    return deserializeRecord(record || null);
+    return await db.get(STORE, id);
   }
 }
 
-async function getServiceByNumber(serviceNumber) {
+/**
+ * Retrieves a single service by its APSPDCL service number.
+ */
+async function getServiceByNumber(number) {
   const platform = await getPlatform();
   if (platform === 'android') {
     const db = await getSqlite();
-    const result = await db.query(
-      `SELECT * FROM electricity_services WHERE serviceNumber = ? AND isDeleted = 0`,
-      [serviceNumber]
-    );
-    return deserializeRecord(result.values?.[0] || null);
+    const result = await db.query(`SELECT * FROM electricity_services WHERE serviceNumber = ? AND isDeleted = 0`, [number]);
+    return result.values?.length ? deserializeRow(result.values[0]) : null;
   } else {
     const db = await getIdb();
-    const all = await db.getAllFromIndex(STORE, 'serviceNumber', serviceNumber);
-    return deserializeRecord(all.find((r) => !r.isDeleted) || null);
+    return await db.getFromIndex(STORE, 'serviceNumber', number);
   }
 }
 
+/**
+ * Persists a new service record to the appropriate database.
+ */
 async function createService(data) {
   const platform = await getPlatform();
   const now = new Date().toISOString();
@@ -309,6 +310,7 @@ async function createService(data) {
     lastFetchedAt: null,
     historyFetchedAt: null,
     lastReportedBillDate: null,
+    billTime: null,
     lastRefreshedDate: null,
     lastError: null,
     isPaid: false,
@@ -316,9 +318,9 @@ async function createService(data) {
     receiptNumber: null,
     paidAmount: null,
     billBreakup: null,
-    billHistory: null,
-    paymentHistory: null,
-    trendData: null,
+    billHistory: [],
+    paymentHistory: [],
+    trendData: [],
     insights: null,
     category: null,
     closingRdg: null,
@@ -327,7 +329,7 @@ async function createService(data) {
     divisionName: null,
     circleName: null,
     sectionName: null,
-    uniqueServiceNumber: null,
+    uniqueServiceNumber: data.serviceNumber,
     pinned: false,
     pinnedAt: null,
     isDeleted: false,
@@ -343,16 +345,16 @@ async function createService(data) {
       `INSERT INTO electricity_services
         (id, serviceNumber, label, customerName, lastBillDate, lastDueDate,
          lastAmountDue, lastBilledUnits, lastThreeAmounts, lastStatus, lastFetchedAt,
-         historyFetchedAt, lastReportedBillDate, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
+         historyFetchedAt, lastReportedBillDate, billTime, lastRefreshedDate, lastError, isPaid, paidDate, receiptNumber, paidAmount,
          billBreakup, billHistory, paymentHistory, trendData, insights,
          category, closingRdg, ctrLoad,
          divisionCode, divisionName, circleName, sectionName, uniqueServiceNumber,
          pinned, pinnedAt, isDeleted, deletedAt, createdAt, updatedAt)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         ser.id, ser.serviceNumber, ser.label, ser.customerName,
         ser.lastBillDate, ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits,
-        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastReportedBillDate, ser.lastRefreshedDate,
+        ser.lastThreeAmounts, ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastReportedBillDate, ser.billTime, ser.lastRefreshedDate,
         ser.lastError, ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.category, ser.closingRdg, ser.ctrLoad,
@@ -363,11 +365,14 @@ async function createService(data) {
     await sqliteSave();
   } else {
     const db = await getIdb();
-    await db.put(STORE, record);
+    await db.add(STORE, record);
   }
   return record;
 }
 
+/**
+ * Updates an existing service record with a partial patch.
+ */
 async function updateService(id, patch) {
   const platform = await getPlatform();
   const now = new Date().toISOString();
@@ -381,7 +386,7 @@ async function updateService(id, patch) {
       `UPDATE electricity_services SET
         serviceNumber=?, label=?, customerName=?, lastBillDate=?, lastDueDate=?,
         lastAmountDue=?, lastBilledUnits=?, lastThreeAmounts=?, lastStatus=?,
-        lastFetchedAt=?, historyFetchedAt=?, lastReportedBillDate=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
+        lastFetchedAt=?, historyFetchedAt=?, lastReportedBillDate=?, billTime=?, lastRefreshedDate=?, lastError=?, isPaid=?, paidDate=?,
         receiptNumber=?, paidAmount=?, billBreakup=?, billHistory=?,
         paymentHistory=?, trendData=?, insights=?,
         category=?, closingRdg=?, ctrLoad=?,
@@ -391,7 +396,7 @@ async function updateService(id, patch) {
       [
         ser.serviceNumber, ser.label, ser.customerName, ser.lastBillDate,
         ser.lastDueDate, ser.lastAmountDue, ser.lastBilledUnits, ser.lastThreeAmounts,
-        ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastReportedBillDate, ser.lastRefreshedDate, ser.lastError,
+        ser.lastStatus, ser.lastFetchedAt, ser.historyFetchedAt, ser.lastReportedBillDate, ser.billTime, ser.lastRefreshedDate, ser.lastError,
         ser.isPaid, ser.paidDate, ser.receiptNumber, ser.paidAmount,
         ser.billBreakup, ser.billHistory, ser.paymentHistory, ser.trendData, ser.insights,
         ser.category, ser.closingRdg, ser.ctrLoad,
@@ -411,21 +416,23 @@ async function updateService(id, patch) {
   }
 }
 
+/**
+ * Deletes a service (soft-delete by default, hard-delete if requested).
+ */
 async function deleteService(id, permanent = false) {
   const platform = await getPlatform();
   if (permanent) {
     if (platform === 'android') {
-      await (await getSqlite()).run(
-        `DELETE FROM electricity_services WHERE id=?`, [id]
-      );
+      const db = await getSqlite();
+      await db.run(`DELETE FROM electricity_services WHERE id = ?`, [id]);
       await sqliteSave();
     } else {
       const db = await getIdb();
       await db.delete(STORE, id);
     }
   } else {
-    await updateService(id, {
-      isDeleted: true,
+    await updateService(id, { 
+      isDeleted: true, 
       deletedAt: new Date().toISOString(),
       pinned: false,
       pinnedAt: null,
@@ -433,6 +440,9 @@ async function deleteService(id, permanent = false) {
   }
 }
 
+/**
+ * Persists and retrieves application-wide settings.
+ */
 async function getSetting(key, defaultValue = null) {
   const platform = await getPlatform();
   if (platform === 'android') {
@@ -461,6 +471,9 @@ async function setSetting(key, value) {
   }
 }
 
+/**
+ * Exposed DB API
+ */
 export const db = {
   init: async () => {
     const platform = await getPlatform();

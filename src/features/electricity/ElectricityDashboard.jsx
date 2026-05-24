@@ -5,6 +5,7 @@ import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
 import { BillCalculator } from './components/BillCalculator.jsx';
+import { QRCodeDialog } from './components/QRCodeDialog.jsx';
 import { SummaryBar } from './components/SummaryBar.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
@@ -22,6 +23,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   const [dialog, setDialog] = useState({ open: false, service: null });
   const [aboutDialog, setAboutDialog] = useState({ open: false, service: null });
   const [calculator, setCalculator] = useState({ open: false, service: null });
+  const [qrDialog, setQrDialog] = useState({ open: false, service: null });
   const [confirmState, setConfirmState] = useState({ open: false, title: '', description: '', isDanger: false, onConfirm: () => {} });
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(null);
@@ -129,10 +131,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       if (e.detail?.handled) return;
 
       // 1. Priority: Close any open Modal or Dialog
-      if (dialog.open || aboutDialog.open || calculator.open || confirmState.open || bulkResult) {
+      if (dialog.open || aboutDialog.open || calculator.open || qrDialog.open || confirmState.open || bulkResult) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         setCalculator({ open: false, service: null });
+        setQrDialog({ open: false, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
         setBulkResult(null);
         if (e.detail) e.detail.handled = true;
@@ -155,7 +158,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     };
     window.addEventListener('app-back-button', handleBack);
     return () => window.removeEventListener('app-back-button', handleBack);
-  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, confirmState.open, bulkResult]);
+  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, qrDialog.open, confirmState.open, bulkResult]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -626,6 +629,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
                     handleCalculateBill(svc);
                     if (ph) ph.capture('calculator_opened', { id: svc.id });
                   }}
+                  onShowQR={(svc) => setQrDialog({ open: true, service: svc })}
                   onPay={() => {
                     handlePay(s);
                     if (ph) ph.capture('pay_clicked', { id: s.id });
@@ -701,6 +705,17 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         open={calculator.open}
         service={calculator.service}
         onClose={() => setCalculator({ open: false, service: null })}
+      />
+
+      <QRCodeDialog
+        open={qrDialog.open}
+        service={qrDialog.service}
+        onClose={() => setQrDialog({ open: false, service: null })}
+        onUpdateTime={(id, time) => {
+          actions.update(id, { billTime: time });
+          // Update the dialog's local service state to refresh QR
+          setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } }));
+        }}
       />
 
       {bulkResult && (
