@@ -49,6 +49,9 @@ import { scrapeBillDeskSession } from './utils/billdesk/session.js';
 const APSPDCL_BASE = 'https://apspdcl.in/ConsumerDashboard/public';
 const BILLDESK_URL = 'https://payments.billdesk.com/MercOnline/SPDCLController';
 
+/**
+ * Standard POST helper for APSPDCL Consumer Dashboard endpoints.
+ */
 async function apspdclPost(endpoint, serviceNumber) {
   const res = await fetch(`${APSPDCL_BASE}/${endpoint}`, {
     method: 'POST',
@@ -73,13 +76,16 @@ async function apspdclPost(endpoint, serviceNumber) {
   }
 }
 
+/**
+ * High-level BillDesk fetcher with auto-solve fallback.
+ */
 async function fetchBillDeskBill(serviceNumber, billdeskSession) {
   if (billdeskSession) {
     const { reqtoken, captcha, cookie } = billdeskSession;
     return await executeBillDeskRequest(serviceNumber, reqtoken, captcha, cookie);
   }
 
-  // Auto-solve with retries if no session provided
+  // Auto-solve with retries if no session provided (e.g. background refresh)
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
@@ -102,6 +108,9 @@ async function fetchBillDeskBill(serviceNumber, billdeskSession) {
   return null;
 }
 
+/**
+ * Raw POST request to BillDesk SPDCL controller.
+ */
 async function executeBillDeskRequestRaw(serviceNumber, reqtoken, jcaptchaVal, cookie) {
   const headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
@@ -123,11 +132,17 @@ async function executeBillDeskRequestRaw(serviceNumber, reqtoken, jcaptchaVal, c
   return await res.text();
 }
 
+/**
+ * Execute BillDesk request and parse the result.
+ */
 async function executeBillDeskRequest(serviceNumber, reqtoken, jcaptchaVal, cookie) {
   const html = await executeBillDeskRequestRaw(serviceNumber, reqtoken, jcaptchaVal, cookie);
   return parseBillDeskHtml(html);
 }
 
+/**
+ * Regex-based parser for BillDesk consumer detail HTML.
+ */
 function parseBillDeskHtml(html) {
   const parseField = (label) => {
     const patterns = [
@@ -165,7 +180,19 @@ function parseBillDeskHtml(html) {
   const billAmount = parseNumber(parseField('Bill Amount'));
   const currentDemand = parseNumber(parseField('Current Demand'));
   const rawBillDate = parseField('Bill Date');
+  const rawBillTime = parseField('Bill Time') || parseField('Generation Time') || parseField('Reading Time') || parseField('Reading Date');
   const rawDueDate = parseField('Due Date');
+
+  // Try to extract time (HHMM) from strings like "02-MAY-2026 10:15:00" for UPI accuracy
+  let extractedTime = null;
+  const timeRegex = /(\d{1,2})[:](\d{2})/;
+  if (rawBillTime && timeRegex.test(rawBillTime)) {
+    const match = rawBillTime.match(timeRegex);
+    extractedTime = match[0].replace(':', '');
+  } else if (rawBillDate && timeRegex.test(rawBillDate)) {
+    const match = rawBillDate.match(timeRegex);
+    extractedTime = match[0].replace(':', '');
+  }
 
   console.log('[api] BillDesk parse candidates', {
     customerName,
@@ -175,7 +202,8 @@ function parseBillDeskHtml(html) {
     billAmount,
     currentDemand,
     rawBillDate,
-    rawDueDate,
+    rawBillTime,
+    extractedTime,
   });
 
   const billDeskAmount = currentDemand === 0 ? 0 : (currentDemand ?? billAmount ?? null);
@@ -190,6 +218,7 @@ function parseBillDeskHtml(html) {
     billDeskCurrentDemand: currentDemand,
     billDeskIsPaid: currentDemand === 0,
     billDeskBillDate: rawBillDate,
+    billDeskBillTime: extractedTime,
     billDeskDueDate: rawDueDate,
   };
 }
@@ -201,16 +230,26 @@ const MONTH_MAP = {
   JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11,
 };
 
-function parseDate(v) {
+/**
+ * Intelligent date parser with time support for HHMM extraction.
+ */
+function parseDate(v, timeStr) {
   if (!v) return null;
+  
+  // Combine date and time if available
+  let fullStr = String(v).trim();
+  if (timeStr && !fullStr.includes(':')) fullStr += ' ' + String(timeStr).trim();
+
+  // Try standard JS parsing first (handles DD-MMM-YYYY HH:MM:SS)
+  const ts = Date.parse(fullStr.replace(/-/g, ' '));
+  if (!isNaN(ts)) return new Date(ts);
+
+  // Fallback to manual parsing for DD-MM-YYYY
   const p = String(v).trim().split(/[-/]/);
   if (p.length === 3) {
     let d, m, y;
-    if (p[0].length === 4) {
-      [y, m, d] = p;
-    } else {
-      [d, m, y] = p;
-    }
+    if (p[0].length === 4) [y, m, d] = p;
+    else [d, m, y] = p;
 
     let month;
     if (!isNaN(m)) month = parseInt(m, 10) - 1;
@@ -219,11 +258,18 @@ function parseDate(v) {
     const year = String(y).length === 2 ? 2000 + +y : +y;
     const day = +d;
 
-    if (month != null && isFinite(year) && isFinite(day))
-      return new Date(Date.UTC(year, month, day));
+    if (month != null && isFinite(year) && isFinite(day)) {
+       const date = new Date(Date.UTC(year, month, day));
+       if (timeStr) {
+         const tMatch = timeStr.match(/(\d{1,2})[:](\d{2})/);
+         if (tMatch) {
+            date.setUTCHours(parseInt(tMatch[1], 10), parseInt(tMatch[2], 10));
+         }
+       }
+       return date;
+    }
   }
-  const ts = Date.parse(String(v).replace(/-/g, ' '));
-  return isNaN(ts) ? null : new Date(ts);
+  return null;
 }
 
 function toNum(v) {
@@ -231,12 +277,21 @@ function toNum(v) {
   return isFinite(n) ? n : 0;
 }
 
+/**
+ * Maps raw APSPDCL bill row to unified DTO.
+ */
 function normaliseBill(row) {
+  // Deep search for time in APSPDCL raw fields
+  const rawDateWithTime = row.reading_date || row.readingdate || row.bill_gen_time || row.closingDate || '';
+  const timeMatch = rawDateWithTime.match(/(\d{1,2})[:](\d{2})/);
+  const extractedTime = timeMatch ? timeMatch[0].replace(':', '') : null;
+
   return {
-    closingDate:  parseDate(row.closingDate),
-    dueDate:      parseDate(row.duedate),
-    billedUnits:  toNum(row.billedUnits),
-    billAmount:   toNum(row.billAmount),
+    closingDate:  parseDate(row.closingDate || row.reading_date),
+    closingTime:  extractedTime,
+    dueDate:      parseDate(row.duedate || row.due_date),
+    billedUnits:  toNum(row.billedUnits || row.units),
+    billAmount:   toNum(row.billAmount || row.amount),
     ec:    toNum(row.ec),
     fixchg:toNum(row.fixchg),
     cc:    toNum(row.cc),
@@ -252,6 +307,9 @@ function normaliseBill(row) {
   };
 }
 
+/**
+ * Matches payment records against bills to determine real-time status.
+ */
 function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
   const empty = { isPaid:false, paidDate:null, receiptNumber:null, paidAmount:null, currentPaymentTotal:0, arrears:[], arrearsTotal:0, divname: null, secname: null };
   if (!Array.isArray(rawPayments) || !rawPayments.length || !bills?.length) {
@@ -346,6 +404,9 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
   };
 }
 
+/**
+ * Detailed bill breakup calculator.
+ */
 function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 0, finalBillAmount = null, isdAmount = 0) {
   // Calculate Gross Total as sum of components
   const grossTotal = toNum(bill.ec) + toNum(bill.fixchg) + toNum(bill.cc) + toNum(bill.ed) + toNum(bill.fsa);
@@ -373,6 +434,9 @@ function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 
   };
 }
 
+/**
+ * Migration helper for old 23233... series.
+ */
 function getMigratedNumber(sn) {
   if (!sn || sn.length !== 13) return null;
   // The user specifically requested: 23233... -> 55513...
@@ -717,6 +781,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     migratedServiceNumber,
     customerName: finalCustomerName,
     billDate: (billDeskBillDate && parseDate(billDeskBillDate)) ? parseDate(billDeskBillDate).toISOString() : (latest ? latest.closingDate.toISOString() : new Date().toISOString()),
+    billTime: billDeskData?.billDeskBillTime || latest?.closingTime || null,
     dueDate: (billDeskDueDate && parseDate(billDeskDueDate)) ? parseDate(billDeskDueDate).toISOString() : (latest?.dueDate?.toISOString() || null),
     billedUnits: latest?.billedUnits ?? null,
     billAmount: finalDueAmount,

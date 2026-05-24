@@ -60,6 +60,7 @@ function snapshotToPatch(snapshot, existing = {}) {
   const patch = {
     customerName:      snapshot.customerName,
     lastBillDate:      snapshot.billDate,
+    billTime:          snapshot.billTime,
     lastDueDate:       snapshot.dueDate,
     lastAmountDue:     snapshot.amountDue,
     lastBilledUnits:   snapshot.billedUnits,
