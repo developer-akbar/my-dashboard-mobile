@@ -189,6 +189,28 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   overflow-x: hidden;
   background: var(--bg);
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  padding-right: 4px; /* Tiny buffer for the gutter */
+}
+
+/* Custom scrollbar for better visual integration with the gutter */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hi);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hi) transparent;
 }
 
 /* ── Page ───────────────────────────────────────────────────────────────────── */
@@ -1098,7 +1120,7 @@ input[type="checkbox"] {
   border: 1px solid var(--border-hi);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  padding: 24px;
+  padding: 16px;
   animation: scaleUp 0.2s cubic-bezier(0.16,1,0.3,1);
 }
 
@@ -1109,6 +1131,7 @@ input[type="checkbox"] {
 
 .dialog__title { font-size: 17px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
 .dialog__desc { font-size: 13.5px; color: var(--text-2); margin-bottom: 24px; white-space: pre-wrap; }
+.dialog__body { overflow-y: auto; scrollbar-gutter: stable; padding-right: 4px; }
 .dialog__footer { display: flex; gap: 8px; justify-content: flex-end; }
 
 .sheet {
@@ -1137,7 +1160,8 @@ input[type="checkbox"] {
 
 .sheet__header {
   display: flex;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
   padding: 12px 20px 16px;
   border-bottom: 1px solid var(--border);
@@ -1169,6 +1193,8 @@ input[type="checkbox"] {
   flex-direction: column;
   gap: 16px;
   padding: 20px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .sheet__footer {

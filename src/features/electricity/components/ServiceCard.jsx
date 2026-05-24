@@ -14,6 +14,8 @@ import {
 import { formatInr, formatDate, formatDateTime, fromNow, getDueTone, getDueCopy } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
 import { BsQrCode } from 'react-icons/bs';
+import { QRCodeSVG } from 'qrcode.react';
+import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -226,15 +228,27 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
       <div className={`scard__body ${isExpanded ? 'scard__body--expanded' : ''}`}>
         <div className="scard__body-inner">
       {/* ── Hero amount ──────────────────────────────────── */}
-      <div className="scard__hero">
-        <div className="scard__hero-left">
+      <div className="scard__hero" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+        <div className="scard__hero-left" style={{ flex: 1 }}>
           <p className="scard__hero-label">{t('amount_due')}</p>
           <p className="scard__hero-amount">{status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}</p>
           {status === 'DUE' && insights?.vsLastMonth && (
             <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
           )}
         </div>
-        <div className="scard__hero-right">
+
+        <div className="scard__hero-mid" onClick={(e) => { e.stopPropagation(); onShowQR(service); }} style={{ cursor: 'pointer', flexShrink: 0, border: '2px solid var(--border)', borderRadius: '6px', background: '#fff' }} title={t('show_qr')}>
+          <div style={{ background: '#fff', padding: '4px', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', display: 'flex' }}>
+            <QRCodeSVG 
+              value={generateAPSPDCLUpiString(service) || ''} 
+              size={44}
+              level="L"
+              includeMargin={false}
+            />
+          </div>
+        </div>
+
+        <div className="scard__hero-right" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           {dueCopy && !service.isPaid && <span className={`due-tag due-tag--${dueTone}`}>{dueCopy}</span>}
           {service.isPaid && (
             <span className="paid-tag"><FiCheckCircle size={12} /> {t('paid')}</span>
