@@ -711,6 +711,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         open={qrDialog.open}
         service={qrDialog.service}
         onClose={() => setQrDialog({ open: false, service: null })}
+        onUpdateTime={(id, time) => {
+          actions.update(id, { billTime: time });
+          // Update the dialog's local service state to refresh QR
+          setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } }));
+        }}
       />
 
       {bulkResult && (

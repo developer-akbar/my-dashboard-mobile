@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
-  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo
+  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock
 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill } from 'react-icons/bs';

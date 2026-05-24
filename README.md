@@ -7,9 +7,10 @@ A modern, privacy-first personal tracking dashboard built with **React 18 + Vite
 ## ⚡ Key Features
 
 - **Multi-Service Tracking:** Monitor multiple APSPDCL electricity connections from a single, unified view.        
-- **Pinning Services:** Pin important services to the top of the dashboard with a visual indicator for quick access. (New)
+- **Pinning Services:** Pin important services to the top of the dashboard with a visual indicator for quick access.
 - **Bulk Actions:** Select multiple services via long-press or checkboxes to trash, restore, or purge them in one shot.
 - **Trash & Recovery:** Accidental deletions are a thing of the past. Move services to Trash and restore them anytime with full history preserved.
+- **Dynamic UPI QR Payments (In Progress):** Generate custom UPI QR codes for instant bill payments directly to APSPDCL. (Experimental)
 - **Visual Feedback:** Smooth auto-scroll and highlight animations when adding or restoring services.
 - **Multi-Language Support:** Full i18n support with dynamically toggleable English and Telugu options.
 - **Rich Visualizations:**
@@ -22,6 +23,19 @@ A modern, privacy-first personal tracking dashboard built with **React 18 + Vite
 - **About Info:** Quick access to service metadata like Circle, Division, and Section.
 - **Light / Dark Mode:** Native support for both themes with a clean, modern SaaS aesthetic.
 - **Privacy-First Storage:** All data is stored locally on your device (IndexedDB for Web, SQLite for Android).
+
+---
+
+## 🧪 Experimental Feature: Dynamic QR Payments
+
+We have reverse-engineered the APSPDCL UPI logic to generate dynamic payment links. 
+
+**Note on "The Hard Part":**
+A valid APSPDCL VPA requires the exact **Bill Generation Time (HHMM)**. Since this is not always available in public history APIs, we have implemented:
+- **Deep Time Extraction:** Automatically scanning raw API responses for hidden timestamps.
+- **Manual Override:** Allowing users to enter the generation time directly from their physical receipt to ensure 100% accurate QR codes.
+
+*Current Status: Experimental. Do not use for high-value payments without validation. Official "Pay Now" redirection remains the primary safe method.*
 
 ---
 
