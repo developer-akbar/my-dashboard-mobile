@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -32,6 +32,78 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   const ph = usePostHog();
 
   const [bulkResult, setBulkResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  /**
+   * Exports the current list of services to a JSON file.
+   * Only includes essential data for ACTIVE (non-deleted) services.
+   */
+  const handleExport = () => {
+    // Collect minimal data only for ACTIVE services
+    const activeServices = services.filter(s => !s.isDeleted);
+    const data = activeServices.map(s => ({
+      label: s.label,
+      serviceNumber: s.serviceNumber,
+      pinned: s.pinned
+    }));
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Construct filename: mydashboard_apspdcl_bills_backup_timestamp.json
+    const timestamp = new Date().getTime();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mydashboard_apspdcl_bills_backup_${timestamp}.json`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    if (ph) ph.capture('data_exported', { count: data.length });
+    toast.success(`${data.length} services exported successfully`);
+  };
+
+  /**
+   * Imports services from a backup JSON file.
+   * Validates each service number via the /validate API and restores pinned status.
+   */
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (!Array.isArray(data)) throw new Error('Invalid backup format');
+        
+        // Map to standard entries format for bulk addition, preserving pinned state
+        const entries = data.map(item => ({
+          label: item.label || '',
+          number: item.serviceNumber,
+          pinned: !!item.pinned
+        })).filter(e => e.number && e.number.length === 13);
+
+        if (entries.length === 0) {
+          toast.error(t('no_valid_services_in_backup', 'No valid service numbers found in backup'));
+          return;
+        }
+
+        toast.success(`Found ${entries.length} services. Starting import...`);
+
+        // Trigger our standard bulk add logic (validates each number via API)
+        await submitService({ isBulk: true, entries });
+        if (ph) ph.capture('data_imported', { count: entries.length });
+      } catch (err) {
+        toast.error(t('import_failed', 'Failed to read backup file'));
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    e.target.value = '';
+  };
 
   const trackBill = async (service, snapshot) => {
     if (!ph || !snapshot || !snapshot.billDate) return;
@@ -276,7 +348,13 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         }
 
         try {
-          await actions.add({ isBulk: false, serviceNumber: sn, label: entry.label });
+          // Fix: Ensure pinned status is passed during restoration/import
+          await actions.add({ 
+            isBulk: false, 
+            serviceNumber: sn, 
+            label: entry.label, 
+            pinned: !!entry.pinned 
+          });
           results.succeeded.push(sn);
           toast.loading(`Added ${results.succeeded.length}/${entries.length}...`, { id: tst });
         } catch (e) {
@@ -524,11 +602,36 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
-            <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
+              <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
+                <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
+              </button>
+            </div>
           </div>
-          <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
-            <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
-          </button>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}>
+                <FiDownload size={20} style={{ color: 'var(--text-3)' }} />
+              </button>
+              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title={t('restore', 'Restore')} style={{ width: '40px', height: '40px' }}>
+                <FiUpload size={20} style={{ color: 'var(--text-3)' }} />
+              </button>
+              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>
+            </div>
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              accept=".json" 
+              onChange={handleImport} 
+            />
+          </div>
         </div>
         {refreshProgress && (
           <div className="refresh-progress">
