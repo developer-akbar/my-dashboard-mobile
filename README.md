@@ -12,6 +12,8 @@ A modern, privacy-first personal tracking dashboard built with **React 18 + Vite
 - **Trash & Recovery:** Accidental deletions are a thing of the past. Move services to Trash and restore them anytime with full history preserved.
 - **Dynamic UPI QR Payments (In Progress):** Generate custom UPI QR codes for instant bill payments directly to APSPDCL. (Experimental)
 - **Visual Feedback:** Smooth auto-scroll and highlight animations when adding or restoring services.
+- **Customizable Card Appearance:** Switch between a minimal **Classic** view (header-focused) and a data-rich **Quick Glance** view (includes metrics and history chips) with a single tap. Preferences are automatically persisted.
+- **Smart Expansion:** Regardless of the active view mode, expanding a card provides an instant high-density summary, including billed units, 3-month history chips, and granular insights.
 - **Multi-Language Support:** Full i18n support with dynamically toggleable English and Telugu options.
 - **Rich Visualizations:**
   - 18-month historical trend charts.
