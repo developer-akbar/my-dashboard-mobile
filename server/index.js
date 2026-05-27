@@ -21,18 +21,13 @@
  *   1. Calls raw APSPDCL endpoints
  *   2. Processes + normalises the response
  *   3. Returns a clean, minimal DTO
- *
- * This way:
- *   - The frontend makes 1 clean named API call per action
- *   - APSPDCL raw endpoints are never visible in browser DevTools
- *   - The DTO is small and purpose-built (no raw APSPDCL noise)
  */
 
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { solveCaptchaImage } from './utils/billdesk/ocr.js';
-
+import { scrapeBillDeskSession } from './utils/billdesk/session.js';
 
 dotenv.config();
 
@@ -41,8 +36,6 @@ const PORT = process.env.API_PORT || 4100;
 
 app.use(cors());
 app.use(express.json());
-
-import { scrapeBillDeskSession } from './utils/billdesk/session.js';
 
 // ── APSPDCL raw client (server-side only) ─────────────────────────────────────
 
@@ -183,7 +176,7 @@ function parseBillDeskHtml(html) {
   const rawBillTime = parseField('Bill Time') || parseField('Generation Time') || parseField('Reading Time') || parseField('Reading Date');
   const rawDueDate = parseField('Due Date');
 
-  // Try to extract time (HHMM) from strings like "02-MAY-2026 10:15:00" for UPI accuracy
+  // Deep extract time (HHMM) from available fields for UPI QR accuracy
   let extractedTime = null;
   const timeRegex = /(\d{1,2})[:](\d{2})/;
   if (rawBillTime && timeRegex.test(rawBillTime)) {
@@ -231,45 +224,50 @@ const MONTH_MAP = {
 };
 
 /**
- * Intelligent date parser with time support for HHMM extraction.
+ * Intelligent date parser for APSPDCL (DD-MMM-YY) and BillDesk (DD/MM/YY) formats.
+ * Prevents locale-dependent day/month swapping.
  */
 function parseDate(v, timeStr) {
   if (!v) return null;
-  
-  // Combine date and time if available
-  let fullStr = String(v).trim();
-  if (timeStr && !fullStr.includes(':')) fullStr += ' ' + String(timeStr).trim();
+  const original = String(v).trim();
+  const fullStr = original.toUpperCase();
 
-  // Try standard JS parsing first (handles DD-MMM-YYYY HH:MM:SS)
-  const ts = Date.parse(fullStr.replace(/-/g, ' '));
-  if (!isNaN(ts)) return new Date(ts);
+  let d, m, y;
 
-  // Fallback to manual parsing for DD-MM-YYYY
-  const p = String(v).trim().split(/[-/]/);
-  if (p.length === 3) {
-    let d, m, y;
-    if (p[0].length === 4) [y, m, d] = p;
-    else [d, m, y] = p;
-
-    let month;
-    if (!isNaN(m)) month = parseInt(m, 10) - 1;
-    else month = MONTH_MAP[m.toUpperCase()];
-
-    const year = String(y).length === 2 ? 2000 + +y : +y;
-    const day = +d;
-
-    if (month != null && isFinite(year) && isFinite(day)) {
-       const date = new Date(Date.UTC(year, month, day));
-       if (timeStr) {
-         const tMatch = timeStr.match(/(\d{1,2})[:](\d{2})/);
-         if (tMatch) {
-            date.setUTCHours(parseInt(tMatch[1], 10), parseInt(tMatch[2], 10));
-         }
-       }
-       return date;
+  // 1. Match DD-MMM-YY (e.g. 02-MAY-26) or DD-MMM-YYYY
+  const mmmMatch = fullStr.match(/^(\d{1,2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{2,4})/);
+  if (mmmMatch) {
+    d = parseInt(mmmMatch[1], 10);
+    m = MONTH_MAP[mmmMatch[2]];
+    y = parseInt(mmmMatch[3], 10);
+    if (y < 100) y += 2000;
+  } 
+  // 2. Match DD/MM/YY (e.g. 02/05/26) or DD/MM/YYYY
+  else {
+    const slashMatch = fullStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (slashMatch) {
+      d = parseInt(slashMatch[1], 10);
+      m = parseInt(slashMatch[2], 10) - 1;
+      y = parseInt(slashMatch[3], 10);
+      if (y < 100) y += 2000;
     }
   }
-  return null;
+
+  // If manual parsing succeeded, create Date object in UTC
+  if (d !== undefined && m !== undefined && m >= 0 && m <= 11 && y !== undefined) {
+    const date = new Date(Date.UTC(y, m, d));
+    if (timeStr) {
+      const tMatch = String(timeStr).match(/(\d{1,2})[:](\d{2})/);
+      if (tMatch) date.setUTCHours(parseInt(tMatch[1], 10), parseInt(tMatch[2], 10));
+    }
+    return date;
+  }
+
+  // 3. Fallback to standard JS parsing for anything else (e.g. YYYY-MM-DD)
+  let fallbackStr = original;
+  if (timeStr && !fallbackStr.includes(':')) fallbackStr += ' ' + String(timeStr).trim();
+  const ts = Date.parse(fallbackStr.replace(/-/g, ' '));
+  return isNaN(ts) ? null : new Date(ts);
 }
 
 function toNum(v) {
@@ -893,30 +891,34 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
 
 /**
  * POST /api/services/refresh-all
- * Body: { serviceNumbers: ["1234567890123", ...], billdeskSession?: { reqtoken, captcha, cookie } }
+ * Body: { services: [{ id, serviceNumber }, ...], serviceNumbers: ["123..."], billdeskSession?: { reqtoken, captcha, cookie } }
  *
  * Refreshes a list of service numbers.
  * Processed sequentially to avoid hammering APSPDCL.
  *
  * APSPDCL calls: 2 per service number
- *
- * Response: { ok: true, results: [{ serviceNumber, snapshot?, error? }] }
  */
 app.post('/api/services/refresh-all', async (req, res) => {
-  const { serviceNumbers, billdeskSession } = req.body || {};
-  if (!Array.isArray(serviceNumbers) || !serviceNumbers.length) {
-    return res.status(400).json({ ok: false, error: 'serviceNumbers array is required' });
+  const { services: inputServices, serviceNumbers, billdeskSession } = req.body || {};
+  
+  let servicesToProcess = [];
+  if (Array.isArray(inputServices)) {
+    servicesToProcess = inputServices;
+  } else if (Array.isArray(serviceNumbers)) {
+    servicesToProcess = serviceNumbers.map(sn => ({ serviceNumber: sn }));
+  } else {
+    return res.status(400).json({ ok: false, error: 'CRITICAL_ERROR: services or serviceNumbers array is required' });
   }
 
   const results = [];
-  for (const sn of serviceNumbers) {
+  for (const s of servicesToProcess) {
     try {
-      const snapshot = await buildSnapshot(sn, billdeskSession);
+      const snapshot = await buildSnapshot(s.serviceNumber, billdeskSession);
       results.push(snapshot
-        ? { serviceNumber: sn, ok: true, snapshot }
-        : { serviceNumber: sn, ok: false, error: 'No data returned' });
+        ? { id: s.id, serviceNumber: s.serviceNumber, ok: true, snapshot }
+        : { id: s.id, serviceNumber: s.serviceNumber, ok: false, error: 'No data returned' });
     } catch (err) {
-      results.push({ serviceNumber: sn, ok: false, error: err.message || 'Fetch failed' });
+      results.push({ id: s.id, serviceNumber: s.serviceNumber, ok: false, error: err.message || 'Fetch failed' });
     }
   }
 

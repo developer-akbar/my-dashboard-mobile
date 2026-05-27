@@ -232,7 +232,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         <div className="scard__hero-left" style={{ flex: 1 }}>
           <p className="scard__hero-label">{t('amount_due')}</p>
           <p className="scard__hero-amount">{status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}</p>
-          {status === 'DUE' && insights?.vsLastMonth && (
+          {insights?.vsLastMonth && (
             <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
           )}
         </div>

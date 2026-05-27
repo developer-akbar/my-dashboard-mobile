@@ -137,13 +137,6 @@ function snapshotToPatch(snapshot, existing = {}) {
  * Strategy: refresh on first load of the day (date-level staleness).
  * This means: open the app in the morning → all services auto-refresh once.
  * Any subsequent opens on the same calendar day → no auto-refresh (use cached data).
- *
- * Why "first load of the day" over "every N hours":
- *   - Bill data changes once a month, payment status changes when user pays.
- *   - Time-based (e.g. 6h) would still miss the case where user pays at 2am
- *     and opens the app at 3am — they'd still see "DUE" for 3 hours.
- *   - Date-based is simpler, predictable, and matches how users think:
- *     "I open the app today, I see today's data."
  */
 export function shouldAutoRefresh(service) {
   if (!service.lastRefreshedDate) return true;
@@ -256,27 +249,25 @@ export async function refreshService(id, billdeskSession) {
 /**
  * POST /services/refresh-all
  *
- * Sends all service numbers to POST /api/services/refresh-all in one request.
+ * Sends all services to POST /api/services/refresh-all in one request.
  * Server processes them sequentially. Client updates local DB from results.
  *
  * @param {(done:number, total:number)=>void} onProgress
  * @param {object} billdeskSession
- * @returns {{ succeeded:number, failed:number, errors:string[] }}
+ * @returns {{ succeeded:number, failed:number, errors:string[], results:any[] }}
  */
 export async function refreshAllServices(onProgress, billdeskSession) {
   const services = await db.getAll();
   if (!services.length) return { succeeded: 0, failed: 0, errors: [] };
 
-  const serviceNumbers = services.map(s => s.serviceNumber);
-
-  // One API call to the server — server fans out to APSPDCL sequentially
-  const json = await apiPost('/services/refresh-all', { serviceNumbers, billdeskSession });
+  // One API call to the server — send the full service list so the server can map snapshots back to local IDs
+  const json = await apiPost('/services/refresh-all', { services, billdeskSession });
   const { results } = json;
 
   // Apply each result to local DB
   let done = 0;
   const tasks = results.map(result => async () => {
-    const service = services.find(s => s.serviceNumber === result.serviceNumber);
+    const service = services.find(s => s.id === result.id);
     if (!service) return;
 
     if (result.ok && result.snapshot) {
@@ -295,7 +286,7 @@ export async function refreshAllServices(onProgress, billdeskSession) {
   await runWithConcurrency(tasks, 4);
 
   const errors = results.filter(r => !r.ok).map(r => r.error || 'Unknown error');
-  return { succeeded: json.succeeded, failed: json.failed, errors };
+  return { succeeded: json.succeeded, failed: json.failed, errors, results };
 }
 
 /**
