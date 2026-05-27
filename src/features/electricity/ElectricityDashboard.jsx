@@ -868,8 +868,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         onClose={() => setConfirmState(prev => ({ ...prev, open: false }))}
         onConfirm={confirmState.onConfirm}
       />
-
-      <HelpFooter t={t} />
     </div>
   );
 }
