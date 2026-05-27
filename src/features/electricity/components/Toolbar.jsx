@@ -1,9 +1,10 @@
-import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { SessionIndicator } from './SessionIndicator.jsx';
 import toast from 'react-hot-toast';
+import { useState } from 'react';
 
-export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services }) {
+export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services, cardStyle, onToggleCardStyle }) {
   const { t, i18n } = useTranslation();
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
@@ -37,23 +38,23 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
           />
         </div>
         
-        <div className="toolbar__group">          
-          <button className="btn btn--primary btn--sm" onClick={onAdd}>
-            <FiPlus size={15} />
-            <span style={{ marginLeft: '4px' }}>{t('add')}</span>
-          </button>
-
+        <div className="toolbar__group">
           <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
             <FiGlobe size={15} />
             <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{isTelugu ? 'English' : 'తెలుగు'}</span>
             <span className="show-mobile-sm" style={{ marginLeft: '4px', fontSize: '11px', fontWeight: '800' }}>{isTelugu ? 'En' : 'తె'}</span>
+          </button>
+
+          <button className="btn btn--primary btn--sm" onClick={onAdd}>
+            <FiPlus size={15} />
+            <span style={{ marginLeft: '4px' }}>{t('add')}</span>
           </button>
         </div>
       </div>
 
       {/* ── Bottom Row: Filters, Navigation, Refresh ── */}
       <div className="toolbar__row toolbar__row--bottom">
-        <div className="toolbar__group" style={{ flex: 1, justifyContent: 'space-between' }}>
+        <div className="toolbar__group" style={{ flex: 1, justifyContent: 'flex-start', gap: '8px' }}>
           <div className="seg">
             <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -67,7 +68,16 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             </button>
           </div>
 
-          <div className="toolbar__filters">
+          <button 
+            className="btn btn--ghost btn--sm" 
+            onClick={onToggleCardStyle} 
+            title={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
+            style={{ padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)' }}
+          >
+            {cardStyle === 'classic' ? <FiLayout size={18} style={{ color: 'var(--text-3)' }} /> : <FiEye size={18} style={{ color: 'var(--primary)' }} />}
+          </button>
+
+          <div className="toolbar__filters" style={{ marginLeft: 'auto' }}>
             <div className="select-wrap">
               <select className="select" value={filters.status} onChange={e => onFiltersChange({ ...filters, status: e.target.value })}>
                 <option value="">{t('filter_all')}</option>

@@ -5,7 +5,7 @@ import {
   FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock
 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
-import { BsPin, BsPinFill } from 'react-icons/bs';
+import { BsPin, BsPinFill, BsQrCode } from 'react-icons/bs';
 import toast from 'react-hot-toast';
 import {
   ComposedChart, Area, BarChart, Bar, Line,
@@ -13,7 +13,6 @@ import {
 } from 'recharts';
 import { formatInr, formatDate, formatDateTime, fromNow, getDueTone, getDueCopy } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
-import { BsQrCode } from 'react-icons/bs';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
 
@@ -70,15 +69,28 @@ function Section({ title, badge, defaultOpen = false, children }) {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onShowQR, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill }) {
+export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onShowQR, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill, cardStyle = 'rich' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
+  const [showUpdateInfo, setShowUpdateInfo] = useState(false);
   const { t } = useTranslation();
   const longPressTimer = useRef(null);
 
   useEffect(() => {
     setIsExpanded(!useAccordion);
-  }, [useAccordion]);
+  }, [useAccordion, cardStyle]);
+
+  useEffect(() => {
+    if (!showUpdateInfo) return;
+    const handleEsc = (e) => { if (e.key === 'Escape') setShowUpdateInfo(false); };
+    window.addEventListener('keydown', handleEsc);
+    const handlePop = () => setShowUpdateInfo(false);
+    window.addEventListener('popstate', handlePop);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('popstate', handlePop);
+    };
+  }, [showUpdateInfo]);
 
   const status = service.lastStatus || 'UNKNOWN';
   const dueTone = getDueTone(service.lastDueDate, service.isPaid);
@@ -97,7 +109,6 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
   const touchPos = useRef({ x: 0, y: 0 });
 
   const handlePressStart = (e) => {
-    // Track start position to allow small movement (jitter)
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     touchPos.current = { x: clientX, y: clientY };
@@ -107,7 +118,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         onToggleSelect(service.id);
         if (window.navigator.vibrate) window.navigator.vibrate(50);
       }
-    }, 700); // Slightly longer for reliability
+    }, 700);
   };
 
   const handlePressEnd = () => {
@@ -119,32 +130,35 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
 
   const handlePressMove = (e) => {
     if (!longPressTimer.current) return;
-
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
     const dx = Math.abs(clientX - touchPos.current.x);
     const dy = Math.abs(clientY - touchPos.current.y);
-
-    // If moved more than 10px, cancel the long press (it's a scroll or swipe)
     if (dx > 10 || dy > 10) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   };
 
+  const isHistoryError = service.lastError?.includes('APSPDCL history unavailable');
+
   return (
     <article 
       id={id}
-      className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''} ${isFlashing ? 'flash' : ''}`}
+      className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''} ${isFlashing ? 'flash' : ''} ${isExpanded ? 'scard--expanded' : ''}`}
       onContextMenu={e => { if (longPressTimer.current || selecting) e.preventDefault(); }}
+      style={{ overflow: 'visible' }}
     >
+      {selecting && (
+        <div 
+          className="scard__select-overlay" 
+          onClick={e => { e.stopPropagation(); onToggleSelect(service.id); }}
+          style={{ position: 'absolute', inset: 0, zIndex: 5, cursor: 'pointer' }}
+        />
+      )}
 
-      {/* ── Top bar ──────────────────────────────────────── */}
-      <div 
-        className="scard__topbar" 
-        onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} 
-        style={{ cursor: useAccordion ? 'pointer' : 'default', userSelect: 'none', WebkitUserSelect: 'none' }}
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <header className="scard__header" 
         onMouseDown={handlePressStart}
         onMouseUp={handlePressEnd}
         onMouseLeave={handlePressEnd}
@@ -153,198 +167,257 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         onTouchEnd={handlePressEnd}
         onTouchMove={handlePressMove}
       >
-        {selecting && (
-          <div className="scard__select" onClick={e => e.stopPropagation()}>
-            <input 
-              type="checkbox" 
-              checked={!!selected} 
-              onChange={() => onToggleSelect(service.id)}
-              style={{ width: '18px', height: '18px', margin: 0, padding: 0 }}
-            />
-          </div>
-        )}
-        <div className="scard__status-col">
-          {service.pinned && <BsPinFill size={15} className="scard__pin" style={{ color: 'var(--primary-hi)', marginBottom: '2px' }} />}
+        <div className="scard__identity">
+          {selecting && (
+            <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', marginRight: '8px' }}>
+              <input 
+                type="checkbox" 
+                checked={!!selected} 
+                onChange={() => onToggleSelect(service.id)}
+                onClick={e => e.stopPropagation()}
+                style={{ width: '18px', height: '18px', margin: 0, padding: 0 }}
+              />
+            </div>
+          )}
           <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
-        </div>
-        <div className="scard__topbar-info">
-          <h3 className="scard__name">
-            {service.label || t('untitled')}
-          </h3>
-          <p className="scard__customer">
-            {(service.customerName && service.customerName !== service.label) ? service.customerName : (service.customerName || t('untitled'))}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <button className="scard__num" onClick={(e) => { e.stopPropagation(); copyNum(); }}>
-              <FiCopy size={10} />{service.serviceNumber}
-            </button>
-            <button className="icon-btn" onClick={(e) => { e.stopPropagation(); onAbout(); }} title={t('about')} style={{ width: '20px', height: '20px', padding: 0 }}>
-              <FiInfo size={14} />
-            </button>
+          <div className="scard__identity-text">
+            <h3 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h3>
+            <div className="scard__num-row">
+              <span className="scard__num">{service.serviceNumber}</span>
+              <button 
+                className="icon-btn-micro" 
+                onClick={(e) => { e.stopPropagation(); copyNum(); }} 
+                title={t('copy')}
+                style={{ position: 'relative', zIndex: 10 }}
+              >
+                <FiCopy size={12} />
+              </button>
+            </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-          {useAccordion && !isExpanded && (
-            <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-1)', lineHeight: 1 }}>
-              {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
+        <div className="scard__header-right" style={{ position: 'relative', zIndex: 30 }}>
+          {service.pinned && <BsPinFill size={14} className="scard__pin" style={{ color: 'var(--primary-hi)' }} />}
+          
+          {cardStyle === 'classic' && (
+            <div 
+              className="scard__updated-at" 
+              title={formatDateTime(service.lastFetchedAt)}
+              onClick={(e) => { e.stopPropagation(); setShowUpdateInfo(!showUpdateInfo); }}
+              style={{ fontSize: '10px', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <FiClock size={11} /> {fromNow(service.lastFetchedAt)}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {service.lastError && (
-              <FiAlertTriangle size={14} color="var(--amber)" title={service.lastError} />
-            )}
-            <span className={`pill pill--${status.toLowerCase()}`}>{t(`filter_${status.toLowerCase()}`, status.replace('_', ' '))}</span>
-            <div className="scard__actions" onClick={e => e.stopPropagation()}>
-              <button className={`icon-btn ${refreshing ? 'icon-btn--spin' : ''}`} onClick={onRefresh} disabled={refreshing} title={t('refresh')}>
-                <FiRefreshCw size={15} />
-              </button>
-              <div className="scard__menu-wrap">
-                <button className="icon-btn" onClick={() => setMenuOpen(v => !v)} onBlur={() => setTimeout(() => setMenuOpen(false), 150)}>
-                  <FiMoreVertical size={15} />
-                </button>
-                {menuOpen && (
-                  <div className="popover" onMouseDown={e => e.stopPropagation()}>
-                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onTogglePin(); }}>
-                      {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
-                    </button>
-                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
-                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onShowQR?.(service); }}>
-                      <BsQrCode size={13} /> Show QR Code
-                    </button>
-                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
-                      <LuCalculator size={13} /> {t('calculate_next_bill')}
-                    </button>
-                    <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onAbout(); }}><FiInfo size={13} /> {t('about_service')}</button>
-                    <button className="danger" onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
-                  </div>
-                )}
-              </div>
+          {showUpdateInfo && cardStyle === 'classic' && (
+            <div className="popover" style={{ position: 'absolute', top: '30px', right: '40px', width: 'auto', whiteSpace: 'nowrap', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600' }}>
+               Updated: {formatDateTime(service.lastFetchedAt)}
             </div>
+          )}
+
+          <span className={`soft-badge soft-badge--${status.toLowerCase()}`}>{t(`filter_${status.toLowerCase()}`, status.replace('_', ' '))}</span>
+          <div className="scard__menu-wrap">
+            <button className="icon-btn-ghost" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} onBlur={() => setTimeout(() => setMenuOpen(false), 200)}>
+              <FiMoreVertical size={16} />
+            </button>
+            {menuOpen && (
+              <div className="popover" onMouseDown={e => e.stopPropagation()} style={{ zIndex: 100 }}>
+                <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onTogglePin(); }}>
+                  {service.pinned ? <BsPinFill size={13} /> : <BsPin size={13} />} {service.pinned ? 'Unpin' : 'Pin'}
+                </button>
+                <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(); }}><FiEdit2 size={13} /> Edit</button>
+                <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onShowQR?.(service); }}>
+                  <BsQrCode size={13} /> Show QR Code
+                </button>
+                <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
+                  <LuCalculator size={13} /> {t('calculate_next_bill')}
+                </button>
+                <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onAbout(); }}><FiInfo size={13} /> {t('about_service')}</button>
+                <button className="danger" onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
+              </div>
+            )}
           </div>
+        </div>
+      </header>
+
+      {/* ── Hero / Amount ───────────────────────────────────────────── */}
+      <div className="scard__hero-main" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined}>
+        <div className="scard__hero-content">
+          <p className="scard__hero-label">{t('amount_due')}</p>
+          <div className="scard__hero-val">
+            <h2 className="scard__hero-amount">
+              {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
+            </h2>
+          </div>
+          <div className="scard__hero-meta">
+            {insights?.vsLastMonth && (
+              <div style={{marginBottom: '4px'}}>
+                 <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
+              </div>
+            )}
+            {dueCopy && !service.isPaid && <span className={`text-${dueTone}`}>{dueCopy} (Due {formatDate(service.lastDueDate)})</span>}
+            {service.isPaid && (
+              <span className="text-green" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <FiCheckCircle size={12} /> {t('paid')} {formatInr(service.paidAmount)} on {formatDate(service.paidDate)}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
+          <div className="scard__hero-qr" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }} title={t('show_qr')} style={{ position: 'relative', zIndex: 10 }}>
+            <QRCodeSVG value={generateAPSPDCLUpiString(service) || ''} size={44} level="L" includeMargin={false} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Quick Metrics (Visible when collapsed in rich mode, or always when expanded) ────────────────── */}
+      {(cardStyle === 'rich' || isExpanded) && (
+        <div className="scard__quick-metrics" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} style={{ cursor: useAccordion ? 'pointer' : 'default', paddingBottom: (service.lastThreeAmounts?.length > 0) ? '8px' : '14px' }}>
+          <div className="qm-item">
+            <span className="qm-label">{t('units')}</span>
+            <span className="qm-val">
+              {service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} 
+              <span style={{fontSize: '9px', fontWeight: '500', marginLeft:'2px', color: 'var(--text-3)'}}>u</span>
+            </span>
+          </div>
+          <div className="qm-item">
+            <span className="qm-label">{t('bill_date')}</span>
+            <span className="qm-val">{formatDate(service.lastBillDate)}</span>
+          </div>
+          <div className="qm-item" onClick={(e) => { e.stopPropagation(); setShowUpdateInfo(!showUpdateInfo); }} style={{ cursor: 'pointer', position: 'relative' }}>
+            <span className="qm-label">{t('last_updated')}</span>
+            <span className="qm-val" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <FiClock size={11} /> {fromNow(service.lastFetchedAt)}
+            </span>
+            {showUpdateInfo && (
+              <div className="popover" style={{ position: 'absolute', bottom: '100%', right: '0', marginBottom: '8px', width: 'auto', whiteSpace: 'nowrap', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600' }}>
+                 Updated: {formatDateTime(service.lastFetchedAt)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick History Chips (Visible when collapsed in rich mode, or always when expanded) ────────────────── */}
+      {(cardStyle === 'rich' || isExpanded) && Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
+        <div className="scard__chips" style={{ borderTop: 'none' }}>
+          {service.lastThreeAmounts.map((b, i) => {
+            const date = new Date(b.paidDate || b.billDate);
+            const label = `${MO[date.getUTCMonth()]} ${String(date.getUTCFullYear()).slice(2)}`;
+            return (
+              <div key={i} className="chip" style={{ minWidth: 'auto', flex: '1', padding: '4px 8px' }}>
+                <span style={{ fontSize: '9px' }}>{label}</span>
+                <b style={{ fontSize: '11px' }}>{formatInr(b.billAmount)}</b>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Action Bar ──────────────────────────────────────────────── */}
+      <div className="scard__action-bar" onClick={e => e.stopPropagation()} style={{ position: 'relative', zIndex: 20 }}>
+        <div className="scard__action-left">
+          <button className="btn-ghost-sm" onClick={onRefresh} disabled={refreshing}>
+            <FiRefreshCw size={14} className={refreshing ? 'spin' : ''} /> {t('refresh')}
+          </button>
+        </div>
+        <div className="scard__action-right">
+          {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 ? (
+            <>
+              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }} title="Calculator">
+                <LuCalculator size={14} />
+              </button>
+              <button className="btn btn--pay btn--sm" onClick={onPay}>
+                {t('pay_now')}
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }}>
+                <BsQrCode size={14} /> <span className="hide-mobile-sm" style={{marginLeft:'4px'}}>QR</span>
+              </button>
+              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }}>
+                <LuCalculator size={14} /> <span className="hide-mobile-sm" style={{marginLeft:'4px'}}>{t('calculate_next_bill')}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
+      {/* ── Expanded Body ──────────────────────────────────────────── */}
       <div className={`scard__body ${isExpanded ? 'scard__body--expanded' : ''}`}>
         <div className="scard__body-inner">
-      {/* ── Hero amount ──────────────────────────────────── */}
-      <div className="scard__hero" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-        <div className="scard__hero-left" style={{ flex: 1 }}>
-          <p className="scard__hero-label">{t('amount_due')}</p>
-          <p className="scard__hero-amount">{status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}</p>
-          {insights?.vsLastMonth && (
-            <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
-          )}
-        </div>
-
-        <div className="scard__hero-mid" onClick={(e) => { e.stopPropagation(); onShowQR(service); }} style={{ cursor: 'pointer', flexShrink: 0, border: '2px solid var(--border)', borderRadius: '6px', background: '#fff' }} title={t('show_qr')}>
-          <div style={{ background: '#fff', padding: '4px', borderRadius: '6px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', display: 'flex' }}>
-            <QRCodeSVG 
-              value={generateAPSPDCLUpiString(service) || ''} 
-              size={44}
-              level="L"
-              includeMargin={false}
-            />
-          </div>
-        </div>
-
-        <div className="scard__hero-right" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-          {dueCopy && !service.isPaid && <span className={`due-tag due-tag--${dueTone}`}>{dueCopy}</span>}
-          {service.isPaid && (
-            <span className="paid-tag"><FiCheckCircle size={12} /> {t('paid')}</span>
-          )}
-          {/* <div className="scard__foot"> */}
-            {service.isPaid
-              ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                  <span className="receipt-line">{formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
-                  <button className="btn btn--ghost" onClick={onPay} style={{ height: '26px', padding: '0 8px', fontSize: '11.5px', marginTop: '2px', color: 'var(--primary)' }}><FiExternalLink size={11} /> {t('pay_more')}</button>
-                </div>
-              )
-              : <span />}
-            {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-              <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13} /> {t('pay_now')}</button>
-            )}
-          {/* </div> */}
-        </div>
-      </div>
-
-      {/* ── Key metrics row ──────────────────────────────── */}
-      <div className="scard__kv">
-        <div className="kv"><span>{t('bill_date')}</span><b><FiCalendar size={13} />{formatDate(service.lastBillDate)}</b></div>
-        <div className="kv"><span>{t('due_date')}</span><b><FiCalendar size={13} />{formatDate(service.lastDueDate)}</b></div>
-        <div className="kv">
-          <span>{t('units')}</span>
-          <b>{service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} <TrendBadge value={insights?.vsLastMonth?.units} unit="u" percent={insights?.vsLastMonth?.unitsPct} /></b>
-        </div>
-        <div className="kv"><span>{t('updated')}</span><b title={formatDateTime(service.lastFetchedAt)}>{fromNow(service.lastFetchedAt)}</b></div>
-      </div>
-
-      {/* ── Quick stats ──────────────────────────────────── */}
-      {insights && (
-        <div className="scard__chips">
-          <div className="chip"><span>{t('avg_mo')}</span><b>{formatInr(insights.avgAmount)}</b></div>
-          {insights.avgUnits6m != null && <div className="chip"><span>{t('avg_units')}</span><b>{insights.avgUnits6m.toLocaleString('en-IN')} u - 6m</b><b>{insights.avgUnits12m.toLocaleString('en-IN')} u - 12m</b></div>}
-          {insights?.vsSameMonthLastYear && (
-            <div className="chip"><span>{t('vs_last_year')}</span><TrendBadge value={insights?.vsSameMonthLastYear.amount} unit="₹" percent={insights?.vsSameMonthLastYear.amountPct} /></div>
-          )}
-        </div>
-      )}
-
-      {/* ── Error ────────────────────────────────────────── */}
-      {service.lastError && (
-        <div className="scard__error"><FiAlertTriangle size={12} />{service?.lastError}</div>
-      )}
-
-      {/* ── Accordions ───────────────────────────────────── */}
-      {breakup && (
-        <Section title={t('bill_breakup')} badge={formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}>
-          <BreakupPanel breakup={breakup} isPaid={service.isPaid} paidAmount={service.paidAmount} t={t} />
-        </Section>
-      )}
-
-      {Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
-        <Section title={t('recent_bills')} badge={service.historyFetchedAt ? `Fetched ${formatDate(service.historyFetchedAt)}` : null}>
-          <div className="hist-list">
-            {service.lastThreeAmounts.map((b, i) => (
-              <div key={i} className="hist-row">
-                <span className="hist-date">{formatDate(b.paidDate || b.billDate)}</span>
-                <span className="hist-units">{b.billedUnits != null ? `${Number(b.billedUnits).toLocaleString('en-IN')} u` : ''}</span>
-                <b className="hist-amt">{formatInr(b.billAmount)}</b>
+          {insights && (
+            <Section title="Consumption Insights" defaultOpen={false}>
+              <div style={{ padding: '0 10px' }}>
+                 <div className="receipt-row">
+                    <span className="receipt-row__label">Units Vs Last Month</span>
+                    <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />
+                 </div>
+                 {insights.vsSameMonthLastYear && (
+                   <>
+                     <div className="receipt-row">
+                        <span className="receipt-row__label">Units Vs Last Year</span>
+                        <TrendBadge value={insights.vsSameMonthLastYear.units} unit="u" percent={insights.vsSameMonthLastYear.unitsPct} />
+                     </div>
+                     <div className="receipt-row">
+                        <span className="receipt-row__label">Amount Vs Last Year</span>
+                        <TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} />
+                     </div>
+                   </>
+                 )}
+                 <div className="receipt-row">
+                    <span className="receipt-row__label">{t('avg_mo')}</span>
+                    <b className="receipt-row__val">{formatInr(insights.avgAmount)}</b>
+                 </div>
+                 <div className="receipt-row">
+                    <span className="receipt-row__label">Avg Units (Last 6m)</span>
+                    <b className="receipt-row__val">{insights.avgUnits6m?.toLocaleString('en-IN') || '—'} u</b>
+                 </div>
+                 <div className="receipt-row">
+                    <span className="receipt-row__label">Avg Units (Last 12m)</span>
+                    <b className="receipt-row__val">{insights.avgUnits12m?.toLocaleString('en-IN') || '—'} u</b>
+                 </div>
               </div>
-            ))}
-          </div>
-        </Section>
-      )}
+            </Section>
+          )}
 
-      {service.trendData?.length > 0 && (
-        <Section title={t('trends')}>
-          <TrendPanel data={service.trendData} insights={insights} t={t} />
-        </Section>
-      )}
+          {breakup && (
+            <Section title={t('bill_breakup')} badge={formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}>
+              <BreakupPanel breakup={breakup} isPaid={service.isPaid} paidAmount={service.paidAmount} t={t} />
+            </Section>
+          )}
 
-      {service.paymentHistory?.length > 0 && (
-        <Section title={t('payment_history')} badge={`${service.paymentHistory.length}`}>
-          <PaymentsPanel payments={service.paymentHistory} t={t} />
-        </Section>
-      )}
+          {service.trendData?.length > 0 && (
+            <Section title={t('trends')}>
+              <TrendPanel data={service.trendData} insights={insights} t={t} />
+            </Section>
+          )}
 
-      {/* ── Footer ───────────────────────────────────────── */}
-      {/* <div className="scard__foot">
-        {service.isPaid
-          ? <span className="receipt-line"><FiCheckCircle size={12}/>{service.receiptNumber || '—'} · {formatInr(service.paidAmount)} · {formatDate(service.paidDate)}</span>
-          : <span/>}
-        {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-          <button className="btn btn--pay" onClick={onPay}><FiExternalLink size={13}/> Pay now</button>
-        )}
-      </div> */}
+          <Section 
+            title={t('payment_history')} 
+            badge={isHistoryError ? <span style={{display:'flex', alignItems:'center', gap: '4px'}}><FiAlertTriangle size={12}/> Sync Error</span> : `${service.paymentHistory?.length || 0}`}
+          >
+            {isHistoryError && (
+              <div className="scard__error" style={{ margin: '8px 10px' }}>
+                <FiAlertTriangle size={12} />
+                APSPDCL payment history is unavailable for this service number
+              </div>
+            )}
+            {service.paymentHistory?.length > 0 ? (
+              <PaymentsPanel payments={service.paymentHistory} t={t} />
+            ) : !isHistoryError && (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)', fontSize: '13px' }}>
+                No payment records found
+              </div>
+            )}
+          </Section>
         </div>
       </div>
     </article>
   );
 }
-
-// ── Breakup panel ─────────────────────────────────────────────────────────────
 
 function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
   const rows = [
@@ -357,57 +430,71 @@ function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
   const total = breakup.grossTotal || 1;
   return (
     <div className="bp">
-      {/* Proportional bar */}
       <div className="bp__bar">
         {rows.map(r => (
           <div key={r.key} className="bp__seg" style={{ flex: breakup[r.key] / total, background: r.color }} title={r.label} />
         ))}
       </div>
-      {/* Rows */}
+      
       {rows.map(r => (
-        <div key={r.key} className="bp__row">
-          <span className="bp__dot" style={{ background: r.color }} />
-          <span className="bp__label">{r.label}</span>
-          <span className="bp__pct">{((breakup[r.key] || 0) / total * 100).toFixed(1)}%</span>
-          <b className="bp__val">{formatInr(breakup[r.key] || 0)}</b>
+        <div key={r.key} className="receipt-row">
+          <span className="receipt-row__label">
+            <span className="bp__dot" style={{ background: r.color }} />
+            {r.label}
+          </span>
+          <b className="receipt-row__val">{formatInr(breakup[r.key] || 0)}</b>
         </div>
       ))}
-      <div className="bp__row bp__row--sub"><span className="bp__label">{t('gross_total')}</span><b>{formatInr(breakup.grossTotal || 0)}</b></div>
+      
+      <div style={{ borderTop: '1px dashed var(--border-md)', margin: '8px 0' }} />
+      <div className="receipt-row">
+        <span className="receipt-row__label">{t('gross_total')}</span>
+        <b className="receipt-row__val">{formatInr(breakup.grossTotal || 0)}</b>
+      </div>
+      
       {breakup.isd !== 0 && breakup.isd != null && (
-        <div className={`bp__row bp__row--deduction ${breakup.isd < 0 ? 'credit' : ''}`}>
-          <span className="bp__label">{t('isd')}</span>
-          <b>{formatInr(breakup.isd)}</b>
+        <div className="receipt-row">
+          <span className="receipt-row__label">{t('isd')}</span>
+          <b className="receipt-row__val" style={{ color: breakup.isd < 0 ? 'var(--green)' : 'inherit' }}>{formatInr(breakup.isd)}</b>
         </div>
       )}
+      
       {breakup.arrearsTotal > 0 && (
         <>
-          <div className="bp__divider">{t('arrears')}</div>
+          <div style={{ borderTop: '1px dashed var(--border-md)', margin: '8px 0' }} />
           {Array.isArray(breakup.arrears) && breakup.arrears.map((a, i) => (
-            <div key={i} className="bp__row bp__row--arrear">
-              <FiCheckCircle size={11} color="#10b981" />
-              <span className="bp__label mono-sm">{a.receiptNo || `Payment ${i + 1}`} <small>({formatDate(a.date)})</small></span>
-              <b className="credit">−{formatInr(a.amount)}</b>
+            <div key={i} className="receipt-row">
+              <span className="receipt-row__label">
+                <FiCheckCircle size={12} color="var(--green)" /> 
+                {a.receiptNo || `Payment ${i + 1}`} 
+                <small style={{fontWeight:'normal', marginLeft: '4px'}}>({formatDate(a.date)})</small>
+              </span>
+              <b className="receipt-row__val credit">−{formatInr(a.amount)}</b>
             </div>
           ))}
-          <div className="bp__row bp__row--arrear"><span className="bp__label">{t('total_arrears')}</span><b className="credit">−{formatInr(breakup.arrearsTotal)}</b></div>
+          <div className="receipt-row">
+            <span className="receipt-row__label">{t('total_arrears')}</span>
+            <b className="receipt-row__val credit">−{formatInr(breakup.arrearsTotal)}</b>
+          </div>
         </>
       )}
+      
       {isPaid && paidAmount != null && (
-        <div className="bp__row bp__row--arrear">
-          <FiCheckCircle size={11} color="#10b981" />
-          <span className="bp__label">{t('paid_amount')}</span>
-          <b className="credit">−{formatInr(paidAmount)}</b>
+        <div className="receipt-row">
+          <span className="receipt-row__label">
+            <FiCheckCircle size={12} color="var(--green)" /> {t('paid_amount')}
+          </span>
+          <b className="receipt-row__val credit">−{formatInr(paidAmount)}</b>
         </div>
       )}
-      <div className="bp__row bp__row--net">
-        <span className="bp__label">{t('net_due')}</span>
-        <b style={isPaid ? { color: 'var(--green)' } : {}}>{formatInr(isPaid ? 0 : (breakup.netDue ?? breakup.grossTotal ?? 0))}</b>
+      
+      <div className="receipt-row receipt-row--net">
+        <span className="receipt-row__label">{t('net_due')}</span>
+        <b className="receipt-row__val">{formatInr(isPaid ? 0 : (breakup.netDue ?? breakup.grossTotal ?? 0))}</b>
       </div>
     </div>
   );
 }
-
-// ── Trend panel ───────────────────────────────────────────────────────────────
 
 function TrendPanel({ data, insights, t }) {
   const [view, setView] = useState('amount');
@@ -448,7 +535,7 @@ function TrendPanel({ data, insights, t }) {
             <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
             <Tooltip content={<ChartTip />} />
             <Area type="monotone" dataKey="billedUnits" name="Units" stroke="var(--cyan)" fill="var(--cyan-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--cyan)' }} />
-            {insights?.avgUnits && <ReferenceLine y={insights.avgUnits} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />}
+            <ReferenceLine y={insights?.avgUnits} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />
           </ComposedChart>
         </ResponsiveContainer>
       )}
@@ -490,8 +577,6 @@ function TrendPanel({ data, insights, t }) {
     </div>
   );
 }
-
-// ── Payments panel ────────────────────────────────────────────────────────────
 
 function PaymentsPanel({ payments, t }) {
   return (
