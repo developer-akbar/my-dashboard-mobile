@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -19,8 +19,16 @@ import { HelpFooter } from './components/CalculationSettings.jsx';
 export function ElectricityDashboard({ onOpenCalcSettings }) {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
+  const [cardStyle, setCardStyle] = useState(localStorage.getItem('appearance_card_style') || 'classic'); 
   const [activeView, setActiveView] = useState('active');
   const [dialog, setDialog] = useState({ open: false, service: null });
+
+  const toggleCardStyle = () => {
+    const nextStyle = cardStyle === 'classic' ? 'rich' : 'classic';
+    setCardStyle(nextStyle);
+    localStorage.setItem('appearance_card_style', nextStyle);
+  };
+
   const [aboutDialog, setAboutDialog] = useState({ open: false, service: null });
   const [calculator, setCalculator] = useState({ open: false, service: null });
   const [qrDialog, setQrDialog] = useState({ open: false, service: null });
@@ -654,6 +662,8 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         trashCount={trash.length}
         hasServices={services.length > 0 && !loading}
         services={services}
+        cardStyle={cardStyle}
+        onToggleCardStyle={toggleCardStyle}
       />
 
       {activeView === 'active' && (
@@ -682,6 +692,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
                   id={`service-${s.id}`}
                   service={s}
                   useAccordion={useAccordion}
+                  cardStyle={cardStyle}
                   refreshing={refreshingIds.has(s.id)}
                   isFlashing={flashingId === s.id}
                   selected={selectedIds.has(s.id)}
@@ -841,7 +852,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
               {bulkResult.alreadyExists.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
                   <p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Skipped - Already Active ({bulkResult.alreadyExists.length})</p>
-                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.alreadyExists.join(', ')}</p>
+                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.alreadyExists.length}</p>
                 </div>
               )}
               {bulkResult.failed.length > 0 && (
