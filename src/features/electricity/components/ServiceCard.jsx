@@ -258,7 +258,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
             {dueCopy && !service.isPaid && <span className={`text-${dueTone}`}>{dueCopy} (Due {formatDate(service.lastDueDate)})</span>}
             {service.isPaid && (
               <span className="text-green" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <FiCheckCircle size={12} /> {t('paid')} on {formatDate(service.paidDate)}
+                <FiCheckCircle size={12} /> {t('paid')} {formatInr(service.paidAmount)} on {formatDate(service.paidDate)}
               </span>
             )}
           </div>
