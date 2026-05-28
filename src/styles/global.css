@@ -494,6 +494,7 @@ input[type="checkbox"] {
   position: sticky;
   top: 70px; /* Below the sticky header */
   z-index: 40;
+  background: var(--bg-2);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
   transition: top 0.3s ease;
