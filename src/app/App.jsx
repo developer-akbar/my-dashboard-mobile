@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { App as CapApp } from '@capacitor/app';
@@ -31,6 +31,65 @@ function AppContent() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const { t, i18n } = useTranslation();
   const ph = usePostHog();
+
+  // ── PWA Install Banner State ──────────────────────────────────────────────
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    // 1. Listen for the install prompt event
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // 2. Timer to show banner after 1 minute
+    const timer = setTimeout(() => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isCapacitor = window.Capacitor?.getPlatform() !== 'web';
+      
+      const dismissalTime = localStorage.getItem('pwa_banner_dismissed_at');
+      const isInstalled = localStorage.getItem('pwa_installed') === 'true';
+      
+      let isDismissed = false;
+      if (dismissalTime) {
+        const hoursPassed = (Date.now() - parseInt(dismissalTime, 10)) / (1000 * 60 * 60);
+        if (hoursPassed < 24) isDismissed = true;
+      }
+
+      if (!isStandalone && !isCapacitor && !isDismissed && !isInstalled) {
+        setShowInstallBanner(true);
+      }
+    }, 60000); // 60 seconds
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('pwa_installed', 'true'); // Assume intent is enough to hide for a long time
+
+    if (!deferredPrompt) {
+      toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      if (ph) ph.capture('pwa_installed');
+    }
+    setDeferredPrompt(null);
+  };
+
+  const handleDismissBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('pwa_banner_dismissed_at', Date.now().toString());
+    if (ph) ph.capture('pwa_banner_dismissed');
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -98,6 +157,15 @@ function AppContent() {
 
   return (
     <div className="shell">
+      {showInstallBanner && (
+        <div className="install-banner">
+          <span className="install-banner__text">Add MyDashboard to your home screen for quick access?</span>
+          <div className="install-banner__actions">
+            <button className="btn btn--white" onClick={handleInstallClick}>Yes</button>
+            <button className="btn btn--outline-white" onClick={handleDismissBanner}>Not now</button>
+          </div>
+        </div>
+      )}
       {/* Desktop sidebar */}
       <aside className="sidebar">
         <div className="sidebar__brand">
