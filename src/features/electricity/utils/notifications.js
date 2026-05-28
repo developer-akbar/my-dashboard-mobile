@@ -11,6 +11,8 @@ const getApiBase = () => {
   return '/api';
 };
 
+let listenersRegistered = false;
+
 export async function setupPushNotifications() {
   if (Capacitor.getPlatform() === 'web') return;
 
@@ -26,8 +28,8 @@ export async function setupPushNotifications() {
       return;
     }
 
-    // IMPORTANT: Add listeners BEFORE registering
-    await PushNotifications.removeAllListeners();
+    if (listenersRegistered) return;
+    listenersRegistered = true;
 
     await PushNotifications.addListener('registration', async (token) => {
       console.log('[notifications] Token received:', token.value);
@@ -41,8 +43,8 @@ export async function setupPushNotifications() {
     await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
       console.log('[notifications] Received:', notification);
       await saveNotificationToHistory({
-        title: notification.title,
-        body: notification.body,
+        title: notification.title || 'Notification',
+        body: notification.body || '',
         serviceNumber: notification.data?.serviceNumber,
         type: notification.data?.type
       });
@@ -57,11 +59,11 @@ export async function setupPushNotifications() {
       const notification = action.notification;
       
       await saveNotificationToHistory({
-        title: notification.title,
-        body: notification.body,
+        title: notification.title || 'Notification',
+        body: notification.body || '',
         serviceNumber: notification.data?.serviceNumber,
         type: notification.data?.type,
-        read: false // Keep as unread so the badge shows up when app opens
+        read: false
       });
 
       // Crucial: Fire the event so the bell icon updates instantly upon app foregrounding
@@ -70,10 +72,12 @@ export async function setupPushNotifications() {
 
       if (notification.data?.serviceNumber) {
         // Trigger deep link event
-        const deepLinkEvent = new CustomEvent('notification-deep-link', { 
-          detail: { serviceNumber: notification.data.serviceNumber } 
-        });
-        window.dispatchEvent(deepLinkEvent);
+        setTimeout(() => {
+          const deepLinkEvent = new CustomEvent('notification-deep-link', { 
+            detail: { serviceNumber: notification.data.serviceNumber } 
+          });
+          window.dispatchEvent(deepLinkEvent);
+        }, 500); // Small delay to ensure UI is ready after cold start
       }
     });
 
