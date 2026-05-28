@@ -53,8 +53,8 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
       </div>
 
       {/* ── Bottom Row: Filters, Navigation, Refresh ── */}
-      <div className="toolbar__row toolbar__row--bottom">
-        <div className="toolbar__group" style={{ flex: 1, justifyContent: 'flex-start', gap: '8px' }}>
+      <div className="toolbar__row toolbar__row--bottom" style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-start' }}>
+        <div className="toolbar__group" style={{ flex: '0 1 auto', justifyContent: 'flex-start', gap: '6px', flexWrap: 'wrap' }}>
           <div className="seg">
             <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -72,12 +72,14 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             className="btn btn--ghost btn--sm" 
             onClick={onToggleCardStyle} 
             title={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
-            style={{ padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)' }}
+            style={{ padding: '0 6px', height: '32px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            {cardStyle === 'classic' ? <FiLayout size={18} style={{ color: 'var(--text-3)' }} /> : <FiEye size={18} style={{ color: 'var(--primary)' }} />}
+            <span style={{ fontSize: '11px', fontWeight: '700' }} className="hide-xs">View Style</span>
+            <span style={{ fontSize: '11px', fontWeight: '700' }} className="show-xs hide-xxs">Style</span>
+            {cardStyle === 'classic' ? <FiLayout size={17} style={{ color: 'var(--text-3)' }} /> : <FiEye size={17} style={{ color: 'var(--primary)' }} />}
           </button>
 
-          <div className="toolbar__filters" style={{ marginLeft: 'auto' }}>
+          <div className="toolbar__filters" style={{ display: 'flex', gap: '4px' }}>
             <div className="select-wrap">
               <select className="select" value={filters.status} onChange={e => onFiltersChange({ ...filters, status: e.target.value })}>
                 <option value="">{t('filter_all')}</option>
@@ -103,7 +105,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         <div className="toolbar__group toolbar__group--refresh" style={{ background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
           <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll || !hasServices} style={{ border: 'none', background: 'transparent', padding: '0 6px' }}>
             <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
-            <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
+            <span className="hide-xs" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
           </button>
           <SessionIndicator />
         </div>
