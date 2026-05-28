@@ -28,8 +28,31 @@ import express from 'express';
 import cors from 'cors';
 import { solveCaptchaImage } from './utils/billdesk/ocr.js';
 import { scrapeBillDeskSession } from './utils/billdesk/session.js';
+import { Redis } from '@upstash/redis';
+import admin from 'firebase-admin';
 
 dotenv.config();
+
+// ── Notification Infrastructure ──────────────────────────────────────────────
+
+const redis = process.env.UPSTASH_REDIS_REST_URL 
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log('[api] Firebase Admin initialized');
+  } catch (err) {
+    console.error('[api] Failed to initialize Firebase Admin:', err);
+  }
+}
 
 const app = express();
 const PORT = process.env.API_PORT || 4100;
@@ -1093,6 +1116,113 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
   }
 
   return res.json({ ok: false, error: lastError });
+});
+
+// ── Notification Routes ───────────────────────────────────────────────────
+
+/**
+ * POST /api/notifications/register
+ * Body: { token: string, serviceNumbers: string[] }
+ */
+app.post('/api/notifications/register', async (req, res) => {
+  const { token, serviceNumbers } = req.body || {};
+  if (!token || !Array.isArray(serviceNumbers)) {
+    return res.status(400).json({ ok: false, error: 'Missing token or serviceNumbers' });
+  }
+
+  if (!redis) {
+    return res.status(503).json({ ok: false, error: 'Redis not configured' });
+  }
+
+  try {
+    // Store token and its associated service numbers
+    await redis.set(`push_token:${token}`, JSON.stringify(serviceNumbers), { ex: 60 * 60 * 24 * 30 }); // 30 days
+    
+    // Add token to a set of all tokens for the scheduler
+    await redis.sadd('all_push_tokens', token);
+    
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[api] Failed to register notifications:', err);
+    res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/notifications/check
+ * Query: ?secret=INTERNAL_SECRET
+ *
+ * This endpoint is called by GitHub Actions/Vercel Cron.
+ * It iterates through all registered tokens, checks their bills, and sends pushes.
+ */
+app.get('/api/notifications/check', async (req, res) => {
+  const { secret } = req.query;
+  if (secret !== process.env.INTERNAL_SECRET) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+
+  if (!redis || !admin.apps.length) {
+    return res.status(503).json({ ok: false, error: 'Redis or Firebase not configured' });
+  }
+
+  try {
+    const tokens = await redis.smembers('all_push_tokens');
+    let processed = 0;
+    let notificationsSent = 0;
+
+    for (const token of tokens) {
+      const serviceNumbersStr = await redis.get(`push_token:${token}`);
+      if (!serviceNumbersStr) continue;
+      
+      const serviceNumbers = typeof serviceNumbersStr === 'string' ? JSON.parse(serviceNumbersStr) : serviceNumbersStr;
+      
+      for (const sn of serviceNumbers) {
+        try {
+          // Fetch snapshot without a user session (uses auto-solve)
+          const snapshot = await buildSnapshot(sn);
+          if (!snapshot || snapshot.isPaid || snapshot.amountDue <= 0) continue;
+
+          const dueDate = snapshot.dueDate ? new Date(snapshot.dueDate) : null;
+          if (!dueDate) continue;
+
+          const now = new Date();
+          const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+          let shouldNotify = false;
+          let title = '';
+          let body = '';
+
+          if (diffDays === 4) {
+            shouldNotify = true;
+            title = 'Bill Due Soon';
+            body = `Your bill of ₹${snapshot.amountDue} for ${sn} is due in 4 days.`;
+          } else if (diffDays < 0) {
+            // Overdue
+            shouldNotify = true;
+            title = 'Bill Overdue';
+            body = `Your bill of ₹${snapshot.amountDue} for ${sn} is overdue! Please pay immediately.`;
+          }
+
+          if (shouldNotify) {
+            await admin.messaging().send({
+              token,
+              notification: { title, body },
+              data: { serviceNumber: sn, type: 'BILL_REMINDER' }
+            });
+            notificationsSent++;
+          }
+        } catch (err) {
+          console.error(`[scheduler] Failed to check ${sn}:`, err.message);
+        }
+      }
+      processed++;
+    }
+
+    res.json({ ok: true, processed, notificationsSent });
+  } catch (err) {
+    console.error('[api] Scheduler error:', err);
+    res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
 });
 
 // ── Health check ──────────────────────────────────────────────────────────────

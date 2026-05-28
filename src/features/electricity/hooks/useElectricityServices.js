@@ -23,6 +23,7 @@ import {
   updateService,
 } from '../api/servicesApi.js';
 import { getValidSession } from '../utils/billdeskSession.jsx';
+import { syncPushTokenWithServer } from '../utils/notifications.js';
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,10 @@ export function useElectricityServices() {
     try {
       const [services, trash] = await Promise.all([listServices(), listTrash()]);
       dispatch({ type: 'LOAD', services, trash });
+      
+      // Sync push notifications state with server
+      syncPushTokenWithServer().catch(err => console.error("Push sync failed", err));
+      
       return services; // return so auto-refresh can inspect them
     } catch (e) {
       console.error("[useElectricityServices] Failed to load services:", e);
