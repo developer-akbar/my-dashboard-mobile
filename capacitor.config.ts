@@ -18,7 +18,13 @@ const config: CapacitorConfig = {
       electronMacLocation: '/Users/Shared/CapacitorDatabases',
       electronLinuxLocation: 'Databases'
     },
-    "CapacitorHttp": {"enabled": true}
+    "CapacitorHttp": {"enabled": true},
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  },
+  "android": {
+    "allowMixedContent": true
   }
 };
 

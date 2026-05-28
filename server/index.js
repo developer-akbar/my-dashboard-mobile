@@ -1206,8 +1206,22 @@ app.get('/api/notifications/check', async (req, res) => {
           if (shouldNotify) {
             await admin.messaging().send({
               token,
-              notification: { title, body },
-              data: { serviceNumber: sn, type: 'BILL_REMINDER' }
+              notification: { 
+                title, 
+                body 
+              },
+              android: {
+                notification: {
+                  icon: 'ic_stat_ic_notification',
+                  color: '#4f46e5',
+                  tag: `bill_${sn}`, // Prevents duplicate notifications for same bill
+                  clickAction: 'TOP_STORY_ACTIVITY', // Standard action
+                }
+              },
+              data: { 
+                serviceNumber: sn, 
+                type: title === 'Bill Overdue' ? 'BILL_OVERDUE' : 'BILL_REMINDER' 
+              }
             });
             notificationsSent++;
           }

@@ -1,10 +1,10 @@
-import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye, FiBell } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { SessionIndicator } from './SessionIndicator.jsx';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
 
-export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services, cardStyle, onToggleCardStyle }) {
+export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services, cardStyle, onToggleCardStyle, unreadCount, onOpenInbox }) {
   const { t, i18n } = useTranslation();
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
@@ -52,9 +52,8 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         </div>
       </div>
 
-      {/* ── Bottom Row: Filters, Navigation, Refresh ── */}
-      <div className="toolbar__row toolbar__row--bottom" style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-start' }}>
-        <div className="toolbar__group" style={{ flex: '0 1 auto', justifyContent: 'flex-start', gap: '6px', flexWrap: 'wrap' }}>
+      <div className="toolbar__row toolbar__row--bottom" style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="toolbar__group" style={{ flex: '1 1 auto', justifyContent: 'flex-start', gap: '6px', flexWrap: 'wrap' }}>
           <div className="seg">
             <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -67,6 +66,26 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
               {trashCount > 0 && <span className="badge">{trashCount}</span>}
             </button>
           </div>
+
+          <button 
+            className="btn btn--ghost btn--sm" 
+            onClick={onOpenInbox} 
+            title="Notifications"
+            style={{ position: 'relative', padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)' }}
+          >
+            <FiBell size={16} />
+            {unreadCount > 0 && (
+              <span style={{ 
+                position: 'absolute', top: '2px', right: '4px', 
+                background: 'var(--red)', color: 'white', 
+                fontSize: '9px', fontWeight: '800', 
+                borderRadius: '10px', padding: '1px 4px',
+                minWidth: '14px', border: '1.5px solid var(--surface-1)'
+              }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
 
           <button 
             className="btn btn--ghost btn--sm" 

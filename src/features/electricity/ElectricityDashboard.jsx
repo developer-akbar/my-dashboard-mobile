@@ -16,12 +16,89 @@ import { useTranslation } from 'react-i18next';
 import { usePostHog } from '@posthog/react';
 import { HelpFooter } from './components/CalculationSettings.jsx';
 
+import { NotificationInbox } from './components/NotificationInbox.jsx';
+import { db } from '../../shared/db/storage.js';
+
 export function ElectricityDashboard({ onOpenCalcSettings }) {
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [cardStyle, setCardStyle] = useState(localStorage.getItem('appearance_card_style') || 'classic'); 
   const [activeView, setActiveView] = useState('active');
   const [dialog, setDialog] = useState({ open: false, service: null });
+
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const pendingDeepLink = useRef(null);
+
+  useEffect(() => {
+    const updateUnread = async () => {
+      const history = await db.getSetting('notification_history') || [];
+      setUnreadCount(history.filter(n => !n.read).length);
+    };
+    updateUnread();
+    
+    const handleNotif = () => {
+      updateUnread();
+      // Auto-refresh when a notification arrives
+      handleRefreshAll();
+    };
+
+    const handleDeepLink = (e) => {
+      const sn = e.detail?.serviceNumber;
+      if (!sn) return;
+
+      if (loading || services.length === 0) {
+        console.log('[dashboard] Services loading, deferring deep link for:', sn);
+        pendingDeepLink.current = sn;
+        return;
+      }
+
+      const svc = services.find(s => s.serviceNumber === sn);
+      if (svc) {
+        flashCard(svc.id);
+        setDialog({ open: false, service: null });
+        setAboutDialog({ open: false, service: null });
+        
+        // Show QR dialog so they can pay immediately
+        setTimeout(() => {
+          setQrDialog({ open: true, service: svc });
+        }, 100);
+        
+        pendingDeepLink.current = null;
+      } else {
+        console.warn('[dashboard] Deep linked service not found in active list:', sn);
+      }
+    };
+
+    window.addEventListener('notification-received', handleNotif);
+    window.addEventListener('notification-deep-link', handleDeepLink);
+    
+    // Check if we have a deferred deep link after loading
+    if (!loading && services.length > 0 && pendingDeepLink.current) {
+      handleDeepLink({ detail: { serviceNumber: pendingDeepLink.current } });
+    }
+
+    return () => {
+      window.removeEventListener('notification-received', handleNotif);
+      window.removeEventListener('notification-deep-link', handleDeepLink);
+    };
+  }, [services, actions, loading]);
+
+  const handleNotificationAction = (notification) => {
+    setInboxOpen(false);
+    if (notification.serviceNumber) {
+      const svc = services.find(s => s.serviceNumber === notification.serviceNumber);
+      if (svc) {
+        flashCard(svc.id);
+        // Show QR dialog or About dialog depending on type
+        if (notification.type === 'BILL_OVERDUE' || notification.type === 'BILL_REMINDER') {
+          setQrDialog({ open: true, service: svc });
+        } else {
+          setAboutDialog({ open: true, service: svc });
+        }
+      }
+    }
+  };
 
   const toggleCardStyle = () => {
     const nextStyle = cardStyle === 'classic' ? 'rich' : 'classic';
@@ -664,6 +741,14 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         services={services}
         cardStyle={cardStyle}
         onToggleCardStyle={toggleCardStyle}
+        unreadCount={unreadCount}
+        onOpenInbox={() => setInboxOpen(true)}
+      />
+
+      <NotificationInbox 
+        open={inboxOpen} 
+        onClose={() => setInboxOpen(false)} 
+        onAction={handleNotificationAction}
       />
 
       {activeView === 'active' && (
