@@ -204,7 +204,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
           )}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
-            {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)' }} />}
+            {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)', transform: 'rotate(45deg)' }} />}
           </div>
           <div className="scard__identity-text">
             <h3 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h3>
