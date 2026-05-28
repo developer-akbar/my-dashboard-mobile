@@ -1215,7 +1215,6 @@ app.get('/api/notifications/check', async (req, res) => {
                   icon: 'ic_stat_ic_notification',
                   color: '#4f46e5',
                   tag: `bill_${sn}`, // Prevents duplicate notifications for same bill
-                  clickAction: 'TOP_STORY_ACTIVITY', // Standard action
                 }
               },
               data: { 
