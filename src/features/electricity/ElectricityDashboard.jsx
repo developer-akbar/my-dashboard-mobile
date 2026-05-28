@@ -36,67 +36,84 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       setUnreadCount(history.filter(n => !n.read).length);
     };
     updateUnread();
-    
-    const handleNotif = (e) => {
-      updateUnread();
+
+    const processDeepLink = async (sn) => {
+      if (!sn || loading || services.length === 0) return false;
       
+      const svc = services.find(s => s.serviceNumber === sn);
+      if (svc) {
+        console.log('[dashboard] Successfully matched service for deep link:', sn);
+        setInboxOpen(false);
+        setDialog({ open: false, service: null });
+        setAboutDialog({ open: false, service: null });
+        flashCard(svc.id);
+        setTimeout(() => {
+          setQrDialog({ open: true, service: svc });
+        }, 300); // 300ms to allow UI transitions
+        return true;
+      }
+      return false;
+    };
+
+    const handleNotif = (e) => {
+      console.log('[dashboard] Live notification signal received');
+      updateUnread();
       const sn = e.detail?.serviceNumber;
       if (sn) {
         const svc = services.find(s => s.serviceNumber === sn);
-        if (svc) {
-          // targeted refresh for the specific service mentioned in notification
-          actions.refresh(svc.id).catch(err => console.error('[dashboard] Silent refresh failed', err));
-          return;
-        }
+        if (svc) actions.refresh(svc.id).catch(() => {});
       }
-      
-      // Fallback: Quiet refresh all if no specific SN found or provided
-      handleRefreshAll({ quiet: true });
     };
 
-    const handleDeepLink = (e) => {
+    const handleDeepLinkSignal = (e) => {
       const sn = e.detail?.serviceNumber;
-      if (!sn) return;
-
-      if (loading || services.length === 0) {
-        console.log('[dashboard] Services loading, deferring deep link for:', sn);
-        pendingDeepLink.current = sn;
-        return;
+      console.log('[dashboard] Live deep-link signal received for:', sn);
+      if (sn) {
+        processDeepLink(sn).then(success => {
+          if (!success) {
+            console.log('[dashboard] Data not ready, deferring deep link for:', sn);
+            pendingDeepLink.current = sn;
+          }
+        });
       }
+    };
 
-      const svc = services.find(s => s.serviceNumber === sn);
-      if (svc) {
-        // Ensure inbox is closed so it doesn't block the QR dialog
-        setInboxOpen(false);
-        
-        flashCard(svc.id);
-        setDialog({ open: false, service: null });
-        setAboutDialog({ open: false, service: null });
-        
-        // Show QR dialog so they can pay immediately
-        setTimeout(() => {
-          setQrDialog({ open: true, service: svc });
-        }, 100);
-        
-        pendingDeepLink.current = null;
-      } else {
-        console.warn('[dashboard] Deep linked service not found in active list:', sn);
+    const checkBootAction = async () => {
+      const pending = await db.getSetting('pending_notification_action');
+      if (pending && pending.serviceNumber) {
+        // Only act on actions less than 5 minutes old
+        if (Date.now() - pending.timestamp < 300000) {
+          console.log('[dashboard] Boot check: Processing pending action for:', pending.serviceNumber);
+          const success = await processDeepLink(pending.serviceNumber);
+          if (success) {
+            await db.setSetting('pending_notification_action', null);
+            pendingDeepLink.current = null;
+          } else {
+            pendingDeepLink.current = pending.serviceNumber;
+          }
+        } else {
+          console.log('[dashboard] Boot check: Expiring old action');
+          await db.setSetting('pending_notification_action', null);
+        }
       }
     };
 
     window.addEventListener('notification-received', handleNotif);
-    window.addEventListener('notification-deep-link', handleDeepLink);
+    window.addEventListener('notification-deep-link', handleDeepLinkSignal);
     
-    // Check if we have a deferred deep link after loading
-    if (!loading && services.length > 0 && pendingDeepLink.current) {
-      handleDeepLink({ detail: { serviceNumber: pendingDeepLink.current } });
+    if (!loading && services.length > 0) {
+      if (pendingDeepLink.current) {
+        processDeepLink(pendingDeepLink.current);
+        pendingDeepLink.current = null;
+      }
+      checkBootAction();
     }
 
     return () => {
       window.removeEventListener('notification-received', handleNotif);
-      window.removeEventListener('notification-deep-link', handleDeepLink);
+      window.removeEventListener('notification-deep-link', handleDeepLinkSignal);
     };
-  }, [services, actions, loading]);
+  }, [loading, services, actions]);
 
   const handleNotificationAction = (notification) => {
     setInboxOpen(false);
@@ -104,7 +121,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       const svc = services.find(s => s.serviceNumber === notification.serviceNumber);
       if (svc) {
         flashCard(svc.id);
-        // Show QR dialog or About dialog depending on type
         if (notification.type === 'BILL_OVERDUE' || notification.type === 'BILL_REMINDER') {
           setQrDialog({ open: true, service: svc });
         } else {

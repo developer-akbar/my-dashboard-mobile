@@ -17,76 +17,76 @@ export async function setupPushNotifications() {
   if (Capacitor.getPlatform() === 'web') return;
 
   try {
-    let permStatus = await PushNotifications.checkPermissions();
-
-    if (permStatus.receive === 'prompt') {
-      permStatus = await PushNotifications.requestPermissions();
-    }
-
+    const permStatus = await PushNotifications.checkPermissions();
     if (permStatus.receive !== 'granted') {
-      console.warn('[notifications] Permission denied');
-      return;
+      const requestStatus = await PushNotifications.requestPermissions();
+      if (requestStatus.receive !== 'granted') return;
     }
 
     if (listenersRegistered) return;
     listenersRegistered = true;
 
+    // 1. Token Registration
     await PushNotifications.addListener('registration', async (token) => {
-      console.log('[notifications] Token received:', token.value);
+      console.log('[push] registration success:', token.value);
       await syncPushTokenWithServer(token.value);
     });
 
-    await PushNotifications.addListener('registrationError', (error) => {
-      console.error('[notifications] Registration error:', error);
-    });
-
+    // 2. Incoming while App is OPEN
     await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-      console.log('[notifications] Received:', notification);
-      await saveNotificationToHistory({
-        title: notification.title || 'Notification',
+      console.log('[push] received (foreground):', notification);
+
+      const payload = {
+        title: notification.title || 'Bill Update',
         body: notification.body || '',
         serviceNumber: notification.data?.serviceNumber,
-        type: notification.data?.type
-      });
+        type: notification.data?.type || 'BILL_REMINDER',
+        read: false
+      };
 
-      // Refresh the dashboard - pass serviceNumber for targeted refresh
-      const refreshEvent = new CustomEvent('notification-received', {
-        detail: { serviceNumber: notification.data?.serviceNumber }
-      });
-      window.dispatchEvent(refreshEvent);
+      await saveNotificationToHistory(payload);
+
+      // Dispatch for UI refresh
+      window.dispatchEvent(new CustomEvent('notification-received', { detail: payload }));
     });
 
+    // 3. User TAPS notification (Background or Cold Start)
     await PushNotifications.addListener('pushNotificationActionPerformed', async (action) => {
-      console.log('[notifications] Action:', action);
+      console.log('[push] action performed:', action);
       const notification = action.notification;
-      
-      await saveNotificationToHistory({
-        title: notification.title || 'Notification',
+
+      const payload = {
+        title: notification.title || 'Bill Update',
         body: notification.body || '',
         serviceNumber: notification.data?.serviceNumber,
-        type: notification.data?.type,
+        type: notification.data?.type || 'BILL_REMINDER',
         read: false
-      });
+      };
 
-      // Crucial: Fire the event so the bell icon updates instantly upon app foregrounding
-      const refreshEvent = new CustomEvent('notification-received');
-      window.dispatchEvent(refreshEvent);
+      await saveNotificationToHistory(payload);
 
-      if (notification.data?.serviceNumber) {
-        // Trigger deep link event
-        setTimeout(() => {
-          const deepLinkEvent = new CustomEvent('notification-deep-link', { 
-            detail: { serviceNumber: notification.data.serviceNumber } 
-          });
-          window.dispatchEvent(deepLinkEvent);
-        }, 500); // Small delay to ensure UI is ready after cold start
+      // Persist the intent to open this bill so the UI can check it on boot
+      if (payload.serviceNumber) {
+        await db.setSetting('pending_notification_action', {
+          serviceNumber: payload.serviceNumber,
+          timestamp: Date.now()
+        });
+      }
+
+      // Fire events as immediate fallback
+      window.dispatchEvent(new CustomEvent('notification-received', { detail: payload }));
+      if (payload.serviceNumber) {
+        window.dispatchEvent(new CustomEvent('notification-deep-link', { 
+          detail: { serviceNumber: payload.serviceNumber } 
+        }));
       }
     });
 
-    // Now register
+    // Register with FCM
     await PushNotifications.register();
+
   } catch (err) {
-    console.error('[notifications] Setup failed:', err);
+    console.error('[push] setup error:', err);
   }
 }
 
