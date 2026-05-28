@@ -38,65 +38,68 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     updateUnread();
     
     const handleNotif = (e) => {
+      console.log('[dashboard] Notification signal received', e.detail);
       updateUnread();
       
       const sn = e.detail?.serviceNumber;
       if (sn) {
         const svc = services.find(s => s.serviceNumber === sn);
         if (svc) {
-          // targeted refresh for the specific service mentioned in notification
           actions.refresh(svc.id).catch(err => console.error('[dashboard] Silent refresh failed', err));
           return;
         }
       }
-      
-      // Fallback: Quiet refresh all if no specific SN found or provided
       handleRefreshAll({ quiet: true });
     };
 
     const handleDeepLink = (e) => {
       const sn = e.detail?.serviceNumber;
+      console.log('[dashboard] Deep link signal received for:', sn);
       if (!sn) return;
 
+      // If still loading data, save it for later
       if (loading || services.length === 0) {
-        console.log('[dashboard] Services loading, deferring deep link for:', sn);
         pendingDeepLink.current = sn;
         return;
       }
 
       const svc = services.find(s => s.serviceNumber === sn);
       if (svc) {
-        // Ensure inbox is closed so it doesn't block the QR dialog
+        // CLOSE INBOX ALWAYS before opening popup
         setInboxOpen(false);
-        
-        flashCard(svc.id);
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         
-        // Show QR dialog so they can pay immediately
+        flashCard(svc.id);
+        
+        // Use a clean timeout to break out of current render cycle
         setTimeout(() => {
           setQrDialog({ open: true, service: svc });
-        }, 100);
-        
-        pendingDeepLink.current = null;
-      } else {
-        console.warn('[dashboard] Deep linked service not found in active list:', sn);
+          pendingDeepLink.current = null;
+        }, 150);
       }
     };
 
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLink);
     
-    // Check if we have a deferred deep link after loading
+    // Recovery: Check if we have a deferred deep link after loading finishes
     if (!loading && services.length > 0 && pendingDeepLink.current) {
-      handleDeepLink({ detail: { serviceNumber: pendingDeepLink.current } });
+      const sn = pendingDeepLink.current;
+      const svc = services.find(s => s.serviceNumber === sn);
+      if (svc) {
+        setInboxOpen(false);
+        flashCard(svc.id);
+        setTimeout(() => setQrDialog({ open: true, service: svc }), 200);
+      }
+      pendingDeepLink.current = null;
     }
 
     return () => {
       window.removeEventListener('notification-received', handleNotif);
       window.removeEventListener('notification-deep-link', handleDeepLink);
     };
-  }, [services, actions, loading]);
+  }, [loading, services, actions]);
 
   const handleNotificationAction = (notification) => {
     setInboxOpen(false);
