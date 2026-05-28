@@ -2,7 +2,13 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../../../shared/db/storage';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const getApiBase = () => {
+  const env = import.meta.env?.VITE_API_URL;
+  if (env && !env.includes('127.0.0.1:5173') && !env.includes('localhost:5173')) {
+    return env.replace(/\/$/, '');
+  }
+  return '/api';
+};
 
 export async function setupPushNotifications() {
   if (Capacitor.getPlatform() === 'web') return;
@@ -53,7 +59,9 @@ export async function syncPushTokenWithServer(token) {
     if (serviceNumbers.length === 0 && !token) return;
 
     // Store token locally too
-    await db.setSetting('push_token', token);
+    if (token) {
+      await db.setSetting('push_token', token);
+    }
 
     const storedToken = token || await db.getSetting('push_token');
     if (!storedToken) return;
@@ -63,7 +71,11 @@ export async function syncPushTokenWithServer(token) {
     const currentState = JSON.stringify({ token: storedToken, serviceNumbers });
     if (lastSynced === currentState) return;
 
-    await fetch(`${API_BASE}/api/notifications/register`, {
+    const baseUrl = getApiBase();
+    const url = `${baseUrl}/notifications/register`;
+    console.log('Syncing push token to:', url);
+
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -73,8 +85,17 @@ export async function syncPushTokenWithServer(token) {
       }),
     });
     
-    await db.setSetting('last_synced_push_state', currentState);
-    console.log('Push token synced with server');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok) {
+        await db.setSetting('last_synced_push_state', currentState);
+        console.log('Push token synced with server');
+      } else {
+        console.error('Server error syncing push token:', json.error);
+      }
+    } else {
+      console.error('Failed to sync push token, server returned:', res.status);
+    }
   } catch (err) {
     console.error('Failed to sync push token:', err);
   }
