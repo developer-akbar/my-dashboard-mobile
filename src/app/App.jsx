@@ -32,6 +32,58 @@ function AppContent() {
   const { t, i18n } = useTranslation();
   const ph = usePostHog();
 
+  // ── PWA Install Banner State ──────────────────────────────────────────────
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    // 1. Listen for the install prompt event
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // 2. Timer to show banner after 1 minute
+    const timer = setTimeout(() => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isCapacitor = window.Capacitor?.getPlatform() !== 'web';
+      const isDismissed = localStorage.getItem('pwa_banner_dismissed') === 'true';
+
+      if (!isStandalone && !isCapacitor && !isDismissed) {
+        setShowInstallBanner(true);
+      }
+    }, 60000); // 60 seconds
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    setShowInstallBanner(false);
+    if (!deferredPrompt) {
+      // If prompt event isn't supported (e.g. iOS), just show info or dismiss
+      toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
+      localStorage.setItem('pwa_banner_dismissed', 'true');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      if (ph) ph.capture('pwa_installed');
+    }
+    setDeferredPrompt(null);
+    localStorage.setItem('pwa_banner_dismissed', 'true');
+  };
+
+  const handleDismissBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('pwa_banner_dismissed', 'true');
+    if (ph) ph.capture('pwa_banner_dismissed');
+  };
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
@@ -98,6 +150,15 @@ function AppContent() {
 
   return (
     <div className="shell">
+      {showInstallBanner && (
+        <div className="install-banner">
+          <span className="install-banner__text">Add MyDashboard to your home screen for quick access?</span>
+          <div className="install-banner__actions">
+            <button className="btn btn--white" onClick={handleInstallClick}>Yes</button>
+            <button className="btn btn--outline-white" onClick={handleDismissBanner}>Not now</button>
+          </div>
+        </div>
+      )}
       {/* Desktop sidebar */}
       <aside className="sidebar">
         <div className="sidebar__brand">
