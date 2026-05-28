@@ -352,12 +352,10 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
           {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 ? (
             <>
               <button 
-                className={`btn btn--secondary btn--sm ${isUpiInvalid ? 'btn--danger-outline' : ''}`} 
+                className="btn btn--secondary btn--sm" 
                 onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }} 
                 title="Calculator"
-                style={isUpiInvalid ? { borderColor: 'var(--red)', color: 'var(--red)' } : {}}
               >
-                {isUpiInvalid && <FiAlertCircle size={14} style={{ marginRight: '4px' }} />}
                 <LuCalculator size={14} />
               </button>
               <button className="btn btn--pay btn--sm" onClick={onPay}>

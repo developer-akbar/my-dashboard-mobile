@@ -53,11 +53,12 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
       </div>
 
       {/* ── Bottom Row: Filters, Navigation, Refresh ── */}
-      <div className="toolbar__row toolbar__row--bottom">
-        <div className="toolbar__group" style={{ flex: 1, justifyContent: 'flex-start', gap: '8px' }}>
+      <div className="toolbar__row toolbar__row--bottom" style={{ flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' }}>
+        <style>{`.toolbar__row--bottom::-webkit-scrollbar { display: none; }`}</style>
+        <div className="toolbar__group" style={{ flex: '0 0 auto', justifyContent: 'flex-start', gap: '6px', flexWrap: 'nowrap' }}>
           <div className="seg">
             <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
-               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                  <FiZap size={14} className="show-mobile-sm" />
                  {t('active')}
                </span>
@@ -72,14 +73,14 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             className="btn btn--ghost btn--sm" 
             onClick={onToggleCardStyle} 
             title={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
-            style={{ padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: '0 6px', height: '32px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
           >
-            <span className="hide-mobile-sm" style={{ fontSize: '12px', fontWeight: '600' }}>View Style</span>
-            <span className="show-mobile-sm" style={{ fontSize: '12px', fontWeight: '600' }}>Style</span>
-            {cardStyle === 'classic' ? <FiLayout size={18} style={{ color: 'var(--text-3)' }} /> : <FiEye size={18} style={{ color: 'var(--primary)' }} />}
+            <span className="hide-mobile-sm" style={{ fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>View Style</span>
+            <span className="show-mobile-sm" style={{ fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>Style</span>
+            {cardStyle === 'classic' ? <FiLayout size={17} style={{ color: 'var(--text-3)' }} /> : <FiEye size={17} style={{ color: 'var(--primary)' }} />}
           </button>
 
-          <div className="toolbar__filters" style={{ marginLeft: 'auto' }}>
+          <div className="toolbar__filters" style={{ marginLeft: '4px', display: 'flex', gap: '4px', flexShrink: 0 }}>
             <div className="select-wrap">
               <select className="select" value={filters.status} onChange={e => onFiltersChange({ ...filters, status: e.target.value })}>
                 <option value="">{t('filter_all')}</option>

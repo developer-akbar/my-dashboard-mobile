@@ -220,9 +220,18 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
 
           <a
             href={upiString}
-            className="btn btn--primary"
-            style={{ width: '100%', justifyContent: 'center', height: '44px', fontSize: '15px', padding: '6px 12px', textDecoration: 'none' }}
+            className={`btn btn--primary ${isTimeMissing ? 'btn--danger-outline' : ''}`}
+            style={{ 
+              width: '100%', 
+              justifyContent: 'center', 
+              height: '44px', 
+              fontSize: '15px', 
+              padding: '6px 12px', 
+              textDecoration: 'none',
+              ...(isTimeMissing ? { borderColor: 'var(--red)', color: 'var(--red)', background: 'transparent', borderWidth: '2px' } : {})
+            }}
           >
+            {isTimeMissing && <FiAlertCircle size={18} style={{ marginRight: '8px' }} />}
             Pay via UPI
           </a>
 
