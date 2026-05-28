@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FiX, FiExternalLink, FiClock, FiCheck, FiInfo, FiCopy } from 'react-icons/fi';
+import { FiX, FiExternalLink, FiClock, FiCheck, FiInfo, FiCopy, FiAlertCircle } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
