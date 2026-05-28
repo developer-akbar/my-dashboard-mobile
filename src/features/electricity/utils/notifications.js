@@ -1,6 +1,7 @@
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { db } from '../../../shared/db/storage';
+import { saveNotificationToHistory } from '../components/NotificationInbox.jsx';
 
 const getApiBase = () => {
   const env = import.meta.env?.VITE_API_URL;
@@ -37,12 +38,38 @@ export async function setupPushNotifications() {
       console.error('[notifications] Registration error:', error);
     });
 
-    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
       console.log('[notifications] Received:', notification);
+      await saveNotificationToHistory({
+        title: notification.title,
+        body: notification.body,
+        serviceNumber: notification.data?.serviceNumber,
+        type: notification.data?.type
+      });
+      
+      // Refresh the dashboard if active
+      const refreshEvent = new CustomEvent('notification-received');
+      window.dispatchEvent(refreshEvent);
     });
 
-    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    await PushNotifications.addListener('pushNotificationActionPerformed', async (action) => {
       console.log('[notifications] Action:', action);
+      const notification = action.notification;
+      
+      await saveNotificationToHistory({
+        title: notification.title,
+        body: notification.body,
+        serviceNumber: notification.data?.serviceNumber,
+        type: notification.data?.type,
+        read: false // Keep as unread so the badge shows up when app opens
+      });
+      if (notification.data?.serviceNumber) {
+        // Trigger deep link event
+        const deepLinkEvent = new CustomEvent('notification-deep-link', { 
+          detail: { serviceNumber: notification.data.serviceNumber } 
+        });
+        window.dispatchEvent(deepLinkEvent);
+      }
     });
 
     // Now register
