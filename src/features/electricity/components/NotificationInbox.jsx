@@ -120,7 +120,7 @@ export function NotificationInbox({ open, onClose, onAction }) {
 export async function saveNotificationToHistory(notification) {
   const history = await db.getSetting('notification_history') || [];
   const newNotif = {
-    id: Date.now().toString(),
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     timestamp: new Date().toISOString(),
     read: false,
     ...notification
