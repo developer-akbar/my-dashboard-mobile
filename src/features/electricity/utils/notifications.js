@@ -63,6 +63,11 @@ export async function setupPushNotifications() {
         type: notification.data?.type,
         read: false // Keep as unread so the badge shows up when app opens
       });
+
+      // Crucial: Fire the event so the bell icon updates instantly upon app foregrounding
+      const refreshEvent = new CustomEvent('notification-received');
+      window.dispatchEvent(refreshEvent);
+
       if (notification.data?.serviceNumber) {
         // Trigger deep link event
         const deepLinkEvent = new CustomEvent('notification-deep-link', { 
