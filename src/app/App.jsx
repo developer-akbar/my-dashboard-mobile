@@ -48,9 +48,17 @@ function AppContent() {
     const timer = setTimeout(() => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isCapacitor = window.Capacitor?.getPlatform() !== 'web';
-      const isDismissed = localStorage.getItem('pwa_banner_dismissed') === 'true';
+      
+      const dismissalTime = localStorage.getItem('pwa_banner_dismissed_at');
+      const isInstalled = localStorage.getItem('pwa_installed') === 'true';
+      
+      let isDismissed = false;
+      if (dismissalTime) {
+        const hoursPassed = (Date.now() - parseInt(dismissalTime, 10)) / (1000 * 60 * 60);
+        if (hoursPassed < 24) isDismissed = true;
+      }
 
-      if (!isStandalone && !isCapacitor && !isDismissed) {
+      if (!isStandalone && !isCapacitor && !isDismissed && !isInstalled) {
         setShowInstallBanner(true);
       }
     }, 60000); // 60 seconds
@@ -63,10 +71,10 @@ function AppContent() {
 
   const handleInstallClick = async () => {
     setShowInstallBanner(false);
+    localStorage.setItem('pwa_installed', 'true'); // Assume intent is enough to hide for a long time
+
     if (!deferredPrompt) {
-      // If prompt event isn't supported (e.g. iOS), just show info or dismiss
       toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
-      localStorage.setItem('pwa_banner_dismissed', 'true');
       return;
     }
     deferredPrompt.prompt();
@@ -75,12 +83,11 @@ function AppContent() {
       if (ph) ph.capture('pwa_installed');
     }
     setDeferredPrompt(null);
-    localStorage.setItem('pwa_banner_dismissed', 'true');
   };
 
   const handleDismissBanner = () => {
     setShowInstallBanner(false);
-    localStorage.setItem('pwa_banner_dismissed', 'true');
+    localStorage.setItem('pwa_banner_dismissed_at', Date.now().toString());
     if (ph) ph.capture('pwa_banner_dismissed');
   };
 
