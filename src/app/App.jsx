@@ -9,7 +9,7 @@ import posthog from 'posthog-js';
 import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 import { CalculationSettings } from '../features/electricity/components/CalculationSettings.jsx';
-import { setupPushNotifications } from '../features/electricity/utils/notifications.js';
+import { setupPushNotifications, syncPushTokenWithServer } from '../features/electricity/utils/notifications.js';
 
 // ── PostHog Initialization ──────────────────────────────────────────────────
 if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
@@ -262,7 +262,27 @@ function AppContent() {
               </div>
 
               <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
-                <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>{t('feedback_support')}</h3>
+                <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>Notifications</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
+                  Keep your bill reminders up to date.
+                </p>
+                <button 
+                  className="btn btn--ghost"
+                  style={{ marginTop: '16px', width: '100%', justifyContent: 'center', color: 'var(--primary)' }}
+                  onClick={async () => {
+                    const success = await syncPushTokenWithServer(null, true);
+                    if (success) {
+                      toast.success('Notifications synced successfully!');
+                    } else {
+                      toast.error('Failed to sync notifications. Check logs.');
+                    }
+                  }}
+                >
+                  Sync Notifications
+                </button>
+              </div>
+
+              <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
                   {t('feedback_desc')}
                 </p>

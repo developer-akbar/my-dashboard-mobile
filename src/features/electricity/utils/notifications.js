@@ -13,67 +13,68 @@ const getApiBase = () => {
 export async function setupPushNotifications() {
   if (Capacitor.getPlatform() === 'web') return;
 
-  // Request permission to use push notifications
-  // iOS will prompt, Android 13+ will prompt
-  let permStatus = await PushNotifications.checkPermissions();
+  try {
+    let permStatus = await PushNotifications.checkPermissions();
 
-  if (permStatus.receive === 'prompt') {
-    permStatus = await PushNotifications.requestPermissions();
+    if (permStatus.receive === 'prompt') {
+      permStatus = await PushNotifications.requestPermissions();
+    }
+
+    if (permStatus.receive !== 'granted') {
+      console.warn('Push notification permission denied');
+      return;
+    }
+
+    await PushNotifications.register();
+
+    await PushNotifications.addListener('registration', async (token) => {
+      console.log('Push registration success, token:', token.value);
+      await syncPushTokenWithServer(token.value);
+    });
+
+    await PushNotifications.addListener('registrationError', (error) => {
+      console.error('Push registration error:', error);
+    });
+  } catch (err) {
+    console.error('Push setup failed:', err);
   }
-
-  if (permStatus.receive !== 'granted') {
-    console.warn('Push notification permission denied');
-    return;
-  }
-
-  // Register with Apple / Google to receive push via APNS/FCM
-  await PushNotifications.register();
-
-  // On success, we should be able to receive notifications
-  await PushNotifications.addListener('registration', async (token) => {
-    console.log('Push registration success, token:', token.value);
-    await syncPushTokenWithServer(token.value);
-  });
-
-  // Some errors with registration may occur
-  await PushNotifications.addListener('registrationError', (error) => {
-    console.error('Push registration error:', error);
-  });
-
-  // Show us the notification payload if the app is open
-  await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-    console.log('Push notification received:', notification);
-  });
-
-  // Method called when tapping on a notification
-  await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-    console.log('Push notification action performed:', notification);
-  });
 }
 
-export async function syncPushTokenWithServer(token) {
+/**
+ * Syncs the device token and service numbers with the backend.
+ * @param {string} [token] - Optional token if just received from registration
+ * @param {boolean} [force] - If true, ignores the local cache and forces a sync
+ */
+export async function syncPushTokenWithServer(token, force = false) {
   try {
     const services = await db.getAll();
     const serviceNumbers = services.map(s => s.serviceNumber);
     
-    if (serviceNumbers.length === 0 && !token) return;
-
-    // Store token locally too
+    // Get token from parameter or local storage
     if (token) {
       await db.setSetting('push_token', token);
     }
-
     const storedToken = token || await db.getSetting('push_token');
-    if (!storedToken) return;
+    
+    if (!storedToken) {
+      console.log('[notifications] No token available for sync');
+      return;
+    }
 
-    // Check if we already synced this exact state
-    const lastSynced = await db.getSetting('last_synced_push_state');
+    // Check if state changed to avoid redundant network calls
     const currentState = JSON.stringify({ token: storedToken, serviceNumbers });
-    if (lastSynced === currentState) return;
+    const lastSynced = await db.getSetting('last_synced_push_state');
+    
+    if (!force && lastSynced === currentState) {
+      console.log('[notifications] Push state already in sync');
+      return;
+    }
 
     const baseUrl = getApiBase();
-    const url = `${baseUrl}/notifications/register`;
-    console.log('Syncing push token to:', url);
+    // Critical: Ensure no double /api/
+    const url = `${baseUrl.replace(/\/api$/, '')}/api/notifications/register`;
+    
+    console.log('[notifications] Syncing to:', url);
 
     const res = await fetch(url, {
       method: 'POST',
@@ -89,14 +90,15 @@ export async function syncPushTokenWithServer(token) {
       const json = await res.json();
       if (json.ok) {
         await db.setSetting('last_synced_push_state', currentState);
-        console.log('Push token synced with server');
-      } else {
-        console.error('Server error syncing push token:', json.error);
+        console.log('[notifications] Sync successful');
+        return true;
       }
-    } else {
-      console.error('Failed to sync push token, server returned:', res.status);
     }
+    
+    console.error('[notifications] Sync failed with status:', res.status);
+    return false;
   } catch (err) {
-    console.error('Failed to sync push token:', err);
+    console.error('[notifications] Sync error:', err);
+    return false;
   }
 }
