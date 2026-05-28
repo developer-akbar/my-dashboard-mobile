@@ -69,26 +69,6 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
 
           <button 
             className="btn btn--ghost btn--sm" 
-            onClick={onOpenInbox} 
-            title="Notifications"
-            style={{ position: 'relative', padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)' }}
-          >
-            <FiBell size={16} />
-            {unreadCount > 0 && (
-              <span style={{ 
-                position: 'absolute', top: '2px', right: '4px', 
-                background: 'var(--red)', color: 'white', 
-                fontSize: '9px', fontWeight: '800', 
-                borderRadius: '10px', padding: '1px 4px',
-                minWidth: '14px', border: '1.5px solid var(--surface-1)'
-              }}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-
-          <button 
-            className="btn btn--ghost btn--sm" 
             onClick={onToggleCardStyle} 
             title={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
             style={{ padding: '0 6px', height: '32px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}

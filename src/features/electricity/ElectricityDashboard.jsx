@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -28,14 +28,86 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
   const [inboxOpen, setInboxOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
   const pendingDeepLink = useRef(null);
+
+  useEffect(() => {
+    const mainContainer = document.querySelector('.main');
+    if (!mainContainer) return;
+
+    const handleScroll = () => {
+      setIsScrolled(mainContainer.scrollTop > 50);
+    };
+
+    mainContainer.addEventListener('scroll', handleScroll);
+    return () => mainContainer.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const updateUnread = async () => {
       const history = await db.getSetting('notification_history') || [];
-      setUnreadCount(history.filter(n => !n.read).length);
+      const count = history.filter(n => !n.read).length;
+      setUnreadCount(count);
+      
+      // Update App Icon Badge
+      if (window.Capacitor?.isNativePlatform()) {
+        try {
+          const { Badge } = await import('@capawesome/capacitor-badge');
+          if (count > 0) {
+            await Badge.set({ count });
+          } else {
+            await Badge.clear();
+          }
+        } catch (e) {
+          console.warn('[badge] Failed to update badge', e);
+        }
+      }
     };
     updateUnread();
+
+    const selfHealNotifications = async () => {
+      if (loading || services.length === 0) return;
+      
+      const history = await db.getSetting('notification_history') || [];
+      let updated = false;
+
+      for (const svc of services) {
+        if (!svc.isPaid && svc.lastAmountDue > 0) {
+          const dueDate = svc.lastDueDate ? new Date(svc.lastDueDate) : null;
+          if (!dueDate) continue;
+
+          const now = new Date();
+          const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+          if (diffDays <= 4) {
+            // Check if we already have a notification for this specific bill amount
+            const exists = history.some(n => 
+              n.serviceNumber === svc.serviceNumber && 
+              n.body.includes(svc.lastAmountDue.toString())
+            );
+
+            if (!exists) {
+              const type = diffDays < 0 ? 'BILL_OVERDUE' : 'BILL_REMINDER';
+              const title = diffDays < 0 ? 'Bill Overdue' : 'Bill Due Soon';
+              const body = diffDays < 0 
+                ? `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is overdue!`
+                : `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is due in ${diffDays} days.`;
+
+              await saveNotificationToHistory({
+                title,
+                body,
+                serviceNumber: svc.serviceNumber,
+                type,
+                read: false
+              });
+              updated = true;
+            }
+          }
+        }
+      }
+
+      if (updated) updateUnread();
+    };
 
     const processDeepLink = async (sn) => {
       if (!sn || loading || services.length === 0) return false;
@@ -81,7 +153,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     const checkBootAction = async () => {
       const pending = await db.getSetting('pending_notification_action');
       if (pending && pending.serviceNumber) {
-        // Only act on actions less than 5 minutes old
         if (Date.now() - pending.timestamp < 300000) {
           console.log('[dashboard] Boot check: Processing pending action for:', pending.serviceNumber);
           const success = await processDeepLink(pending.serviceNumber);
@@ -107,6 +178,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         pendingDeepLink.current = null;
       }
       checkBootAction();
+      selfHealNotifications();
     }
 
     return () => {
@@ -674,7 +746,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   };
 
   return (
-    <div className="page">
+    <div className={`page ${isScrolled ? 'page--scrolled' : ''}`}>
       <div 
         className={`ptr ${pullDistance > 0 || isRefreshing ? 'ptr--visible' : ''} ${isRefreshing ? 'ptr--refreshing' : ''} ${pullDistance >= pullThreshold ? 'ptr--ready' : ''}`}
         style={{ transform: `translateY(${pullDistance - 70}px)` }}
@@ -725,30 +797,47 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         </div>
       )}
 
-      <header className="page__header" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+      <header className="page__header page__header--sticky">
         <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
-              <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
-                <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
-              </button>
-            </div>
+            {!isScrolled && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
+                <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
+                  <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
+                </button>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: isScrolled ? '12px' : '16px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <button 
+                className="icon-btn" 
+                onClick={() => setInboxOpen(true)} 
+                title="Notifications"
+                style={{ width: '40px', height: '40px', position: 'relative' }}
+              >
+                <FiBell size={20} style={{ color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-3)' }} />
+                {unreadCount > 0 && (
+                  <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+              </button>
+              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}>
                 <FiDownload size={20} style={{ color: 'var(--text-3)' }} />
               </button>
-              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>
+              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>}
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title={t('restore', 'Restore')} style={{ width: '40px', height: '40px' }}>
                 <FiUpload size={20} style={{ color: 'var(--text-3)' }} />
               </button>
-              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>
+              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>}
             </div>
             
             <input 
