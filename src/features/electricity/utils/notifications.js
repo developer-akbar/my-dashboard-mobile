@@ -21,22 +21,34 @@ export async function setupPushNotifications() {
     }
 
     if (permStatus.receive !== 'granted') {
-      console.warn('Push notification permission denied');
+      console.warn('[notifications] Permission denied');
       return;
     }
 
-    await PushNotifications.register();
+    // IMPORTANT: Add listeners BEFORE registering
+    await PushNotifications.removeAllListeners();
 
     await PushNotifications.addListener('registration', async (token) => {
-      console.log('Push registration success, token:', token.value);
+      console.log('[notifications] Token received:', token.value);
       await syncPushTokenWithServer(token.value);
     });
 
     await PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration error:', error);
+      console.error('[notifications] Registration error:', error);
     });
+
+    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('[notifications] Received:', notification);
+    });
+
+    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      console.log('[notifications] Action:', action);
+    });
+
+    // Now register
+    await PushNotifications.register();
   } catch (err) {
-    console.error('Push setup failed:', err);
+    console.error('[notifications] Setup failed:', err);
   }
 }
 
@@ -50,29 +62,32 @@ export async function syncPushTokenWithServer(token, force = false) {
     const services = await db.getAll();
     const serviceNumbers = services.map(s => s.serviceNumber);
     
-    // Get token from parameter or local storage
     if (token) {
       await db.setSetting('push_token', token);
     }
+    
     const storedToken = token || await db.getSetting('push_token');
     
     if (!storedToken) {
-      console.log('[notifications] No token available for sync');
-      return;
+      throw new Error('Device not yet registered for push notifications. Please wait a moment and try again.');
     }
 
-    // Check if state changed to avoid redundant network calls
     const currentState = JSON.stringify({ token: storedToken, serviceNumbers });
     const lastSynced = await db.getSetting('last_synced_push_state');
     
     if (!force && lastSynced === currentState) {
-      console.log('[notifications] Push state already in sync');
-      return;
+      console.log('[notifications] Already in sync');
+      return true;
     }
 
     const baseUrl = getApiBase();
-    // Critical: Ensure no double /api/
-    const url = `${baseUrl.replace(/\/api$/, '')}/api/notifications/register`;
+    // Use URL constructor for safety if it's a full URL, otherwise fallback to string concat
+    let url;
+    if (baseUrl.startsWith('http')) {
+      url = `${baseUrl.replace(/\/api$/, '')}/api/notifications/register`;
+    } else {
+      url = '/api/notifications/register';
+    }
     
     console.log('[notifications] Syncing to:', url);
 
@@ -86,19 +101,21 @@ export async function syncPushTokenWithServer(token, force = false) {
       }),
     });
     
-    if (res.ok) {
-      const json = await res.json();
-      if (json.ok) {
-        await db.setSetting('last_synced_push_state', currentState);
-        console.log('[notifications] Sync successful');
-        return true;
-      }
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Server returned ${res.status}: ${errorText || 'Unknown error'}`);
     }
-    
-    console.error('[notifications] Sync failed with status:', res.status);
-    return false;
+
+    const json = await res.json();
+    if (!json.ok) {
+      throw new Error(json.error || 'Server rejected registration');
+    }
+
+    await db.setSetting('last_synced_push_state', currentState);
+    console.log('[notifications] Sync successful');
+    return true;
   } catch (err) {
-    console.error('[notifications] Sync error:', err);
-    return false;
+    console.error('[notifications] Sync error:', err.message);
+    throw err; // Re-throw so the UI can show the specific error
   }
 }
