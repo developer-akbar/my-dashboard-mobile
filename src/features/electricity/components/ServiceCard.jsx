@@ -164,7 +164,6 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
   };
 
   const isHistoryError = service.lastError?.includes('APSPDCL history unavailable');
-  const isUpiInvalid = status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && !service.billTime;
 
   return (
     <article 
@@ -317,7 +316,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
               <FiClock size={11} /> {fromNow(service.lastFetchedAt)}
             </span>
             {showUpdateInfoMetrics && (
-              <div className="popover" style={{ position: 'absolute', bottom: '100%', right: '0', marginBottom: '8px', width: 'max-content', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+              <div className="popover" style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '8px', width: 'max-content', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                  Updated: {formatDateTime(service.lastFetchedAt)}
               </div>
             )}
