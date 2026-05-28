@@ -270,11 +270,13 @@ function AppContent() {
                   className="btn btn--ghost"
                   style={{ marginTop: '16px', width: '100%', justifyContent: 'center', color: 'var(--primary)' }}
                   onClick={async () => {
-                    const success = await syncPushTokenWithServer(null, true);
-                    if (success) {
-                      toast.success('Notifications synced successfully!');
-                    } else {
-                      toast.error('Failed to sync notifications. Check logs.');
+                    try {
+                      const success = await syncPushTokenWithServer(null, true);
+                      if (success) {
+                        toast.success('Notifications synced successfully!');
+                      }
+                    } catch (err) {
+                      toast.error(err.message || 'Failed to sync notifications');
                     }
                   }}
                 >
