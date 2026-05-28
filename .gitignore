@@ -10,3 +10,7 @@ Thumbs.db
 
 .vercel
 !.env.example
+
+# Android signing keys
+*.keystore
+*.jks
