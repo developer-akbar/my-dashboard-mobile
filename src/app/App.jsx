@@ -9,6 +9,7 @@ import posthog from 'posthog-js';
 import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 import { CalculationSettings } from '../features/electricity/components/CalculationSettings.jsx';
+import { setupPushNotifications } from '../features/electricity/utils/notifications.js';
 
 // ── PostHog Initialization ──────────────────────────────────────────────────
 if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
@@ -35,6 +36,10 @@ function AppContent() {
   // ── PWA Install Banner State ──────────────────────────────────────────────
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    setupPushNotifications();
+  }, []);
 
   useEffect(() => {
     // 1. Listen for the install prompt event
