@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { App as CapApp } from '@capacitor/app';
