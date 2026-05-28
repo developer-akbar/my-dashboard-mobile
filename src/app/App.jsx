@@ -4,6 +4,7 @@ import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { App as CapApp } from '@capacitor/app';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import posthog from 'posthog-js';
 import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
@@ -244,6 +245,7 @@ function AppContent() {
       />
       
       <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
