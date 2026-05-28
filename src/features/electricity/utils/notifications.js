@@ -48,9 +48,11 @@ export async function setupPushNotifications() {
         serviceNumber: notification.data?.serviceNumber,
         type: notification.data?.type
       });
-      
-      // Refresh the dashboard if active
-      const refreshEvent = new CustomEvent('notification-received');
+
+      // Refresh the dashboard - pass serviceNumber for targeted refresh
+      const refreshEvent = new CustomEvent('notification-received', {
+        detail: { serviceNumber: notification.data?.serviceNumber }
+      });
       window.dispatchEvent(refreshEvent);
     });
 

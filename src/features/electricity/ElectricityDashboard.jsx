@@ -37,10 +37,21 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     };
     updateUnread();
     
-    const handleNotif = () => {
+    const handleNotif = (e) => {
       updateUnread();
-      // Auto-refresh when a notification arrives
-      handleRefreshAll();
+      
+      const sn = e.detail?.serviceNumber;
+      if (sn) {
+        const svc = services.find(s => s.serviceNumber === sn);
+        if (svc) {
+          // targeted refresh for the specific service mentioned in notification
+          actions.refresh(svc.id).catch(err => console.error('[dashboard] Silent refresh failed', err));
+          return;
+        }
+      }
+      
+      // Fallback: Quiet refresh all if no specific SN found or provided
+      handleRefreshAll({ quiet: true });
     };
 
     const handleDeepLink = (e) => {
@@ -55,6 +66,9 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
       const svc = services.find(s => s.serviceNumber === sn);
       if (svc) {
+        // Ensure inbox is closed so it doesn't block the QR dialog
+        setInboxOpen(false);
+        
         flashCard(svc.id);
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
@@ -271,7 +285,9 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (selectedIds.size > 0) {
+        if (inboxOpen) {
+          setInboxOpen(false);
+        } else if (selectedIds.size > 0) {
           clearSelection();
         } else if (bulkResult) {
           setBulkResult(null);
@@ -280,7 +296,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIds, bulkResult]);
+  }, [selectedIds, bulkResult, inboxOpen]);
 
   // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
@@ -288,13 +304,14 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       if (e.detail?.handled) return;
 
       // 1. Priority: Close any open Modal or Dialog
-      if (dialog.open || aboutDialog.open || calculator.open || qrDialog.open || confirmState.open || bulkResult) {
+      if (dialog.open || aboutDialog.open || calculator.open || qrDialog.open || confirmState.open || bulkResult || inboxOpen) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         setCalculator({ open: false, service: null });
         setQrDialog({ open: false, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
         setBulkResult(null);
+        setInboxOpen(false);
         if (e.detail) e.detail.handled = true;
         return;
       }
@@ -315,7 +332,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     };
     window.addEventListener('app-back-button', handleBack);
     return () => window.removeEventListener('app-back-button', handleBack);
-  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, qrDialog.open, confirmState.open, bulkResult]);
+  }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, qrDialog.open, confirmState.open, bulkResult, inboxOpen]);
 
   // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
@@ -529,7 +546,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     }
   }
 
-  async function handleRefreshAll(options = { skipApi: false }) {
+  async function handleRefreshAll(options = { skipApi: false, quiet: false }) {
     // 1. Always reload from local DB first to update UI immediately
     const currentServices = await actions.reload();
 
@@ -537,11 +554,16 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       return;
     }
     
-    setRefreshingAll(true);
-    setRefreshProgress({ done: 0, total: currentServices.length });
+    if (!options.quiet) {
+      setRefreshingAll(true);
+      setRefreshProgress({ done: 0, total: currentServices.length });
+    }
+
     if (ph) ph.capture('refresh_all_started', { count: currentServices.length });
     try {
-      const summary = await actions.refreshAll((done, tot) => setRefreshProgress({ done, total: tot }));
+      const summary = await actions.refreshAll((done, tot) => {
+        if (!options.quiet) setRefreshProgress({ done, total: tot });
+      });
       if (summary) {
         if (ph) {
           ph.capture('refresh_all_completed', { succeeded: summary.succeeded, failed: summary.failed });
@@ -553,17 +575,21 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
             }
           }
         }
-        summary.failed === 0
-          ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
-          : toast.error(`Refresh failed for ${summary.failed} service(s)`);
+        if (!options.quiet) {
+          summary.failed === 0
+            ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
+            : toast.error(`Refresh failed for ${summary.failed} service(s)`);
+        }
       }
     } catch (err) {
-      if (err?.message !== 'CANCELLED') {
+      if (err?.message !== 'CANCELLED' && !options.quiet) {
         toast.error(`Refresh all failed: ${err?.message || 'Unknown error'}`);
       }
     } finally {
-      setRefreshingAll(false);
-      setRefreshProgress(null);
+      if (!options.quiet) {
+        setRefreshingAll(false);
+        setRefreshProgress(null);
+      }
     }
   }
 
