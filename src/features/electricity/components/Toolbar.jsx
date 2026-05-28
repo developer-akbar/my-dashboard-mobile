@@ -1,10 +1,10 @@
-import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye, FiBell } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { SessionIndicator } from './SessionIndicator.jsx';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
 
-export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services, cardStyle, onToggleCardStyle, unreadCount, onOpenInbox }) {
+export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refreshingAll, activeView, onViewChange, trashCount, hasServices, services, cardStyle, onToggleCardStyle }) {
   const { t, i18n } = useTranslation();
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';

@@ -18,8 +18,11 @@ import { HelpFooter } from './components/CalculationSettings.jsx';
 
 import { NotificationInbox } from './components/NotificationInbox.jsx';
 import { db } from '../../shared/db/storage.js';
+import { Capacitor } from '@capacitor/core';
 
 export function ElectricityDashboard({ onOpenCalcSettings }) {
+  const isWeb = Capacitor.getPlatform() === 'web';
+// ... (existing state)
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [cardStyle, setCardStyle] = useState(localStorage.getItem('appearance_card_style') || 'classic'); 
@@ -44,6 +47,8 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   }, []);
 
   useEffect(() => {
+    if (isWeb) return;
+
     const updateUnread = async () => {
       const history = await db.getSetting('notification_history') || [];
       const count = history.filter(n => !n.read).length;
@@ -811,20 +816,22 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
             )}
           </div>
           <div style={{ display: 'flex', gap: isScrolled ? '12px' : '16px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <button 
-                className="icon-btn" 
-                onClick={() => setInboxOpen(true)} 
-                title="Notifications"
-                style={{ width: '40px', height: '40px', position: 'relative' }}
-              >
-                <FiBell size={20} style={{ color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-3)' }} />
-                {unreadCount > 0 && (
-                  <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
-                )}
-              </button>
-              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
-            </div>
+            {!isWeb && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <button 
+                  className="icon-btn" 
+                  onClick={() => setInboxOpen(true)} 
+                  title="Notifications"
+                  style={{ width: '40px', height: '40px', position: 'relative' }}
+                >
+                  <FiBell size={20} style={{ color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-3)' }} />
+                  {unreadCount > 0 && (
+                    <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  )}
+                </button>
+                {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}>
@@ -872,8 +879,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         services={services}
         cardStyle={cardStyle}
         onToggleCardStyle={toggleCardStyle}
-        unreadCount={unreadCount}
-        onOpenInbox={() => setInboxOpen(true)}
       />
 
       <NotificationInbox 

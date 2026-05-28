@@ -32,7 +32,7 @@
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
-  background: #fff;
+  background: var(--bg-2);
 }
 
 .page--scrolled .page__header .icon-btn {
