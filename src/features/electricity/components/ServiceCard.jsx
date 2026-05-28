@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
-  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock
+  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock, FiAlertCircle
 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill, BsQrCode } from 'react-icons/bs';
@@ -72,25 +72,48 @@ function Section({ title, badge, defaultOpen = false, children }) {
 export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onShowQR, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill, cardStyle = 'rich' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
-  const [showUpdateInfo, setShowUpdateInfo] = useState(false);
+  const [showUpdateInfoHead, setShowUpdateInfoHead] = useState(false);
+  const [showUpdateInfoMetrics, setShowUpdateInfoMetrics] = useState(false);
   const { t } = useTranslation();
   const longPressTimer = useRef(null);
+  const headUpdateRef = useRef(null);
+  const metricsUpdateRef = useRef(null);
 
   useEffect(() => {
     setIsExpanded(!useAccordion);
   }, [useAccordion, cardStyle]);
 
   useEffect(() => {
-    if (!showUpdateInfo) return;
-    const handleEsc = (e) => { if (e.key === 'Escape') setShowUpdateInfo(false); };
+    if (!showUpdateInfoHead && !showUpdateInfoMetrics) return;
+    const handleEsc = (e) => { 
+      if (e.key === 'Escape') {
+        setShowUpdateInfoHead(false);
+        setShowUpdateInfoMetrics(false);
+      }
+    };
+    const handleClickOutside = (e) => {
+      if (headUpdateRef.current && !headUpdateRef.current.contains(e.target)) {
+        setShowUpdateInfoHead(false);
+      }
+      if (metricsUpdateRef.current && !metricsUpdateRef.current.contains(e.target)) {
+        setShowUpdateInfoMetrics(false);
+      }
+    };
     window.addEventListener('keydown', handleEsc);
-    const handlePop = () => setShowUpdateInfo(false);
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('touchstart', handleClickOutside);
+    const handlePop = () => {
+      setShowUpdateInfoHead(false);
+      setShowUpdateInfoMetrics(false);
+    };
     window.addEventListener('popstate', handlePop);
     return () => {
       window.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('touchstart', handleClickOutside);
       window.removeEventListener('popstate', handlePop);
     };
-  }, [showUpdateInfo]);
+  }, [showUpdateInfoHead, showUpdateInfoMetrics]);
 
   const status = service.lastStatus || 'UNKNOWN';
   const dueTone = getDueTone(service.lastDueDate, service.isPaid);
@@ -141,6 +164,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
   };
 
   const isHistoryError = service.lastError?.includes('APSPDCL history unavailable');
+  const isUpiInvalid = status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && !service.billTime;
 
   return (
     <article 
@@ -179,7 +203,10 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
               />
             </div>
           )}
-          <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+            <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
+            {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)' }} />}
+          </div>
           <div className="scard__identity-text">
             <h3 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h3>
             <div className="scard__num-row">
@@ -197,20 +224,19 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         </div>
 
         <div className="scard__header-right" style={{ position: 'relative', zIndex: 30 }}>
-          {service.pinned && <BsPinFill size={14} className="scard__pin" style={{ color: 'var(--primary-hi)' }} />}
-          
           {cardStyle === 'classic' && (
             <div 
+              ref={headUpdateRef}
               className="scard__updated-at" 
               title={formatDateTime(service.lastFetchedAt)}
-              onClick={(e) => { e.stopPropagation(); setShowUpdateInfo(!showUpdateInfo); }}
+              onClick={(e) => { e.stopPropagation(); setShowUpdateInfoHead(!showUpdateInfoHead); }}
               style={{ fontSize: '10px', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               <FiClock size={11} /> {fromNow(service.lastFetchedAt)}
             </div>
           )}
-          {showUpdateInfo && cardStyle === 'classic' && (
-            <div className="popover" style={{ position: 'absolute', top: '30px', right: '40px', width: 'auto', whiteSpace: 'nowrap', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600' }}>
+          {showUpdateInfoHead && cardStyle === 'classic' && (
+            <div className="popover" style={{ position: 'absolute', top: '30px', right: '40px', width: 'max-content', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                Updated: {formatDateTime(service.lastFetchedAt)}
             </div>
           )}
@@ -258,7 +284,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
             {dueCopy && !service.isPaid && <span className={`text-${dueTone}`}>{dueCopy} (Due {formatDate(service.lastDueDate)})</span>}
             {service.isPaid && (
               <span className="text-green" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <FiCheckCircle size={12} /> {t('paid')} {formatInr(service.paidAmount)} on {formatDate(service.paidDate)}
+                <FiCheckCircle size={12} /> {t('paid')} <b>{formatInr(service.paidAmount)}</b> on {formatDate(service.paidDate)}
               </span>
             )}
           </div>
@@ -285,13 +311,13 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
             <span className="qm-label">{t('bill_date')}</span>
             <span className="qm-val">{formatDate(service.lastBillDate)}</span>
           </div>
-          <div className="qm-item" onClick={(e) => { e.stopPropagation(); setShowUpdateInfo(!showUpdateInfo); }} style={{ cursor: 'pointer', position: 'relative' }}>
+          <div ref={metricsUpdateRef} className="qm-item" onClick={(e) => { e.stopPropagation(); setShowUpdateInfoMetrics(!showUpdateInfoMetrics); }} style={{ cursor: 'pointer', position: 'relative' }}>
             <span className="qm-label">{t('last_updated')}</span>
             <span className="qm-val" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <FiClock size={11} /> {fromNow(service.lastFetchedAt)}
             </span>
-            {showUpdateInfo && (
-              <div className="popover" style={{ position: 'absolute', bottom: '100%', right: '0', marginBottom: '8px', width: 'auto', whiteSpace: 'nowrap', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600' }}>
+            {showUpdateInfoMetrics && (
+              <div className="popover" style={{ position: 'absolute', bottom: '100%', right: '0', marginBottom: '8px', width: 'max-content', zIndex: 110, padding: '8px 12px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                  Updated: {formatDateTime(service.lastFetchedAt)}
               </div>
             )}
@@ -325,7 +351,13 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         <div className="scard__action-right">
           {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 ? (
             <>
-              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }} title="Calculator">
+              <button 
+                className={`btn btn--secondary btn--sm ${isUpiInvalid ? 'btn--danger-outline' : ''}`} 
+                onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }} 
+                title="Calculator"
+                style={isUpiInvalid ? { borderColor: 'var(--red)', color: 'var(--red)' } : {}}
+              >
+                {isUpiInvalid && <FiAlertCircle size={14} style={{ marginRight: '4px' }} />}
                 <LuCalculator size={14} />
               </button>
               <button className="btn btn--pay btn--sm" onClick={onPay}>
@@ -355,6 +387,12 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                     <span className="receipt-row__label">Units Vs Last Month</span>
                     <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />
                  </div>
+                 {insights.vsLastMonth?.amount != null && (
+                   <div className="receipt-row">
+                      <span className="receipt-row__label">Amount Vs Last Month</span>
+                      <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />
+                   </div>
+                 )}
                  {insights.vsSameMonthLastYear && (
                    <>
                      <div className="receipt-row">

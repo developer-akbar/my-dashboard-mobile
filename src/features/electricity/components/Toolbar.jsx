@@ -72,8 +72,10 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             className="btn btn--ghost btn--sm" 
             onClick={onToggleCardStyle} 
             title={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
-            style={{ padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)' }}
+            style={{ padding: '0 8px', height: '32px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
+            <span className="hide-mobile-sm" style={{ fontSize: '12px', fontWeight: '600' }}>View Style</span>
+            <span className="show-mobile-sm" style={{ fontSize: '12px', fontWeight: '600' }}>Style</span>
             {cardStyle === 'classic' ? <FiLayout size={18} style={{ color: 'var(--text-3)' }} /> : <FiEye size={18} style={{ color: 'var(--primary)' }} />}
           </button>
 

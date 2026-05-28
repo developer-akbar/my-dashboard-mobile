@@ -670,7 +670,7 @@ input[type="checkbox"] {
 }
 .scard:hover { border-color: var(--border-md); box-shadow: var(--shadow-lg); z-index: 1; }
 .scard--expanded { z-index: 2; }
-.scard--menu-open { z-index: 10; }
+.scard--menu-open { z-index: 200 !important; }
 
 .scard > :last-child {
   border-bottom-left-radius: calc(var(--radius-lg) - 1px);
