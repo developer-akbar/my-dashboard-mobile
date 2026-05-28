@@ -107,6 +107,7 @@ export async function syncPushTokenWithServer(token, force = false) {
     const storedToken = token || await db.getSetting('push_token');
     
     if (!storedToken) {
+      if (Capacitor.getPlatform() === 'web') return false;
       throw new Error('Device not yet registered for push notifications. Please wait a moment and try again.');
     }
 
