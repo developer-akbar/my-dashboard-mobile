@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -18,8 +18,11 @@ import { HelpFooter } from './components/CalculationSettings.jsx';
 
 import { NotificationInbox } from './components/NotificationInbox.jsx';
 import { db } from '../../shared/db/storage.js';
+import { Capacitor } from '@capacitor/core';
 
 export function ElectricityDashboard({ onOpenCalcSettings }) {
+  const isWeb = Capacitor.getPlatform() === 'web';
+// ... (existing state)
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [cardStyle, setCardStyle] = useState(localStorage.getItem('appearance_card_style') || 'classic'); 
@@ -28,75 +31,166 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
   const [inboxOpen, setInboxOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
   const pendingDeepLink = useRef(null);
 
   useEffect(() => {
+    const mainContainer = document.querySelector('.main');
+    if (!mainContainer) return;
+
+    const handleScroll = () => {
+      setIsScrolled(mainContainer.scrollTop > 50);
+    };
+
+    mainContainer.addEventListener('scroll', handleScroll);
+    return () => mainContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isWeb) return;
+
     const updateUnread = async () => {
       const history = await db.getSetting('notification_history') || [];
-      setUnreadCount(history.filter(n => !n.read).length);
+      const count = history.filter(n => !n.read).length;
+      setUnreadCount(count);
+      
+      // Update App Icon Badge
+      if (window.Capacitor?.isNativePlatform()) {
+        try {
+          const { Badge } = await import('@capawesome/capacitor-badge');
+          if (count > 0) {
+            await Badge.set({ count });
+          } else {
+            await Badge.clear();
+          }
+        } catch (e) {
+          console.warn('[badge] Failed to update badge', e);
+        }
+      }
     };
     updateUnread();
-    
-    const handleNotif = (e) => {
-      updateUnread();
+
+    const selfHealNotifications = async () => {
+      if (loading || services.length === 0) return;
       
+      const history = await db.getSetting('notification_history') || [];
+      let updated = false;
+
+      for (const svc of services) {
+        if (!svc.isPaid && svc.lastAmountDue > 0) {
+          const dueDate = svc.lastDueDate ? new Date(svc.lastDueDate) : null;
+          if (!dueDate) continue;
+
+          const now = new Date();
+          const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+          if (diffDays <= 4) {
+            // Check if we already have a notification for this specific bill amount
+            const exists = history.some(n => 
+              n.serviceNumber === svc.serviceNumber && 
+              n.body.includes(svc.lastAmountDue.toString())
+            );
+
+            if (!exists) {
+              const type = diffDays < 0 ? 'BILL_OVERDUE' : 'BILL_REMINDER';
+              const title = diffDays < 0 ? 'Bill Overdue' : 'Bill Due Soon';
+              const body = diffDays < 0 
+                ? `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is overdue!`
+                : `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is due in ${diffDays} days.`;
+
+              await saveNotificationToHistory({
+                title,
+                body,
+                serviceNumber: svc.serviceNumber,
+                type,
+                read: false
+              });
+              updated = true;
+            }
+          }
+        }
+      }
+
+      if (updated) updateUnread();
+    };
+
+    const processDeepLink = async (sn) => {
+      if (!sn || loading || services.length === 0) return false;
+      
+      const svc = services.find(s => s.serviceNumber === sn);
+      if (svc) {
+        console.log('[dashboard] Successfully matched service for deep link:', sn);
+        setInboxOpen(false);
+        setDialog({ open: false, service: null });
+        setAboutDialog({ open: false, service: null });
+        flashCard(svc.id);
+        setTimeout(() => {
+          setQrDialog({ open: true, service: svc });
+        }, 300); // 300ms to allow UI transitions
+        return true;
+      }
+      return false;
+    };
+
+    const handleNotif = (e) => {
+      console.log('[dashboard] Live notification signal received');
+      updateUnread();
       const sn = e.detail?.serviceNumber;
       if (sn) {
         const svc = services.find(s => s.serviceNumber === sn);
-        if (svc) {
-          // targeted refresh for the specific service mentioned in notification
-          actions.refresh(svc.id).catch(err => console.error('[dashboard] Silent refresh failed', err));
-          return;
-        }
+        if (svc) actions.refresh(svc.id).catch(() => {});
       }
-      
-      // Fallback: Quiet refresh all if no specific SN found or provided
-      handleRefreshAll({ quiet: true });
     };
 
-    const handleDeepLink = (e) => {
+    const handleDeepLinkSignal = (e) => {
       const sn = e.detail?.serviceNumber;
-      if (!sn) return;
-
-      if (loading || services.length === 0) {
-        console.log('[dashboard] Services loading, deferring deep link for:', sn);
-        pendingDeepLink.current = sn;
-        return;
+      console.log('[dashboard] Live deep-link signal received for:', sn);
+      if (sn) {
+        processDeepLink(sn).then(success => {
+          if (!success) {
+            console.log('[dashboard] Data not ready, deferring deep link for:', sn);
+            pendingDeepLink.current = sn;
+          }
+        });
       }
+    };
 
-      const svc = services.find(s => s.serviceNumber === sn);
-      if (svc) {
-        // Ensure inbox is closed so it doesn't block the QR dialog
-        setInboxOpen(false);
-        
-        flashCard(svc.id);
-        setDialog({ open: false, service: null });
-        setAboutDialog({ open: false, service: null });
-        
-        // Show QR dialog so they can pay immediately
-        setTimeout(() => {
-          setQrDialog({ open: true, service: svc });
-        }, 100);
-        
-        pendingDeepLink.current = null;
-      } else {
-        console.warn('[dashboard] Deep linked service not found in active list:', sn);
+    const checkBootAction = async () => {
+      const pending = await db.getSetting('pending_notification_action');
+      if (pending && pending.serviceNumber) {
+        if (Date.now() - pending.timestamp < 300000) {
+          console.log('[dashboard] Boot check: Processing pending action for:', pending.serviceNumber);
+          const success = await processDeepLink(pending.serviceNumber);
+          if (success) {
+            await db.setSetting('pending_notification_action', null);
+            pendingDeepLink.current = null;
+          } else {
+            pendingDeepLink.current = pending.serviceNumber;
+          }
+        } else {
+          console.log('[dashboard] Boot check: Expiring old action');
+          await db.setSetting('pending_notification_action', null);
+        }
       }
     };
 
     window.addEventListener('notification-received', handleNotif);
-    window.addEventListener('notification-deep-link', handleDeepLink);
+    window.addEventListener('notification-deep-link', handleDeepLinkSignal);
     
-    // Check if we have a deferred deep link after loading
-    if (!loading && services.length > 0 && pendingDeepLink.current) {
-      handleDeepLink({ detail: { serviceNumber: pendingDeepLink.current } });
+    if (!loading && services.length > 0) {
+      if (pendingDeepLink.current) {
+        processDeepLink(pendingDeepLink.current);
+        pendingDeepLink.current = null;
+      }
+      checkBootAction();
+      selfHealNotifications();
     }
 
     return () => {
       window.removeEventListener('notification-received', handleNotif);
-      window.removeEventListener('notification-deep-link', handleDeepLink);
+      window.removeEventListener('notification-deep-link', handleDeepLinkSignal);
     };
-  }, [services, actions, loading]);
+  }, [loading, services, actions]);
 
   const handleNotificationAction = (notification) => {
     setInboxOpen(false);
@@ -104,7 +198,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       const svc = services.find(s => s.serviceNumber === notification.serviceNumber);
       if (svc) {
         flashCard(svc.id);
-        // Show QR dialog or About dialog depending on type
         if (notification.type === 'BILL_OVERDUE' || notification.type === 'BILL_REMINDER') {
           setQrDialog({ open: true, service: svc });
         } else {
@@ -658,7 +751,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   };
 
   return (
-    <div className="page">
+    <div className={`page ${isScrolled ? 'page--scrolled' : ''}`}>
       <div 
         className={`ptr ${pullDistance > 0 || isRefreshing ? 'ptr--visible' : ''} ${isRefreshing ? 'ptr--refreshing' : ''} ${pullDistance >= pullThreshold ? 'ptr--ready' : ''}`}
         style={{ transform: `translateY(${pullDistance - 70}px)` }}
@@ -709,30 +802,49 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         </div>
       )}
 
-      <header className="page__header" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+      <header className="page__header page__header--sticky">
         <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
-              <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
-                <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
-              </button>
-            </div>
+            {!isScrolled && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
+                <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
+                  <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
+                </button>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: isScrolled ? '12px' : '16px', alignItems: 'center' }}>
+            {!isWeb && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <button 
+                  className="icon-btn" 
+                  onClick={() => setInboxOpen(true)} 
+                  title="Notifications"
+                  style={{ width: '40px', height: '40px', position: 'relative' }}
+                >
+                  <FiBell size={20} style={{ color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-3)' }} />
+                  {unreadCount > 0 && (
+                    <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  )}
+                </button>
+                {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}>
                 <FiDownload size={20} style={{ color: 'var(--text-3)' }} />
               </button>
-              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>
+              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>}
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title={t('restore', 'Restore')} style={{ width: '40px', height: '40px' }}>
                 <FiUpload size={20} style={{ color: 'var(--text-3)' }} />
               </button>
-              <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>
+              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>}
             </div>
             
             <input 
@@ -767,8 +879,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         services={services}
         cardStyle={cardStyle}
         onToggleCardStyle={toggleCardStyle}
-        unreadCount={unreadCount}
-        onOpenInbox={() => setInboxOpen(true)}
       />
 
       <NotificationInbox 
