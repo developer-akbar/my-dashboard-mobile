@@ -1157,7 +1157,13 @@ app.post('/api/notifications/register', async (req, res) => {
  */
 app.get('/api/notifications/check', async (req, res) => {
   const { secret } = req.query;
-  if (secret !== process.env.INTERNAL_SECRET) {
+  const authHeader = req.headers.authorization;
+  
+  const isAuthorized = 
+    secret === process.env.INTERNAL_SECRET || 
+    authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!isAuthorized) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
 

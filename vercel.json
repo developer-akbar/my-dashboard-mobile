@@ -25,5 +25,11 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/notifications/check",
+      "schedule": "0 4 * * *"
+    }
   ]
 }
