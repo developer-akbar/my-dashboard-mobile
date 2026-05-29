@@ -10,6 +10,7 @@ import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 import { CalculationSettings } from '../features/electricity/components/CalculationSettings.jsx';
 import { setupPushNotifications, syncPushTokenWithServer } from '../features/electricity/utils/notifications.js';
+import { PrivacyPolicy } from '../features/settings/PrivacyPolicy.jsx';
 
 // ── PostHog Initialization ──────────────────────────────────────────────────
 if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
@@ -28,7 +29,12 @@ const NAV = [
 ];
 
 function AppContent() {
-  const [activePage, setActivePage] = useState('electricity');
+  const [activePage, setActivePage] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/privacy') {
+      return 'privacy';
+    }
+    return 'electricity';
+  });
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const { t, i18n } = useTranslation();
   const ph = usePostHog();
@@ -36,6 +42,11 @@ function AppContent() {
   // ── PWA Install Banner State ──────────────────────────────────────────────
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  const handleNavClick = (id) => {
+    if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
+    setActivePage(id);
+  };
 
   useEffect(() => {
     setupPushNotifications();
@@ -182,7 +193,7 @@ function AppContent() {
             <button
               key={id}
               className={`sidebar__item ${activePage === id ? 'sidebar__item--active' : ''}`}
-              onClick={() => setActivePage(id)}
+              onClick={() => handleNavClick(id)}
             >
               <Icon size={17} />
               {t(id)}
@@ -194,12 +205,15 @@ function AppContent() {
 
       {/* Main */}
       <main className="main">
-        {activePage === 'electricity' && <ElectricityDashboard onOpenCalcSettings={() => setActivePage('calculation-settings')} />}
-        {activePage === 'calculation-settings' && <CalculationSettings onBack={() => setActivePage('electricity')} />}
+        {activePage === 'electricity' && <ElectricityDashboard onOpenCalcSettings={() => handleNavClick('calculation-settings')} />}
+        {activePage === 'calculation-settings' && <CalculationSettings onBack={() => handleNavClick('electricity')} />}
         {activePage === 'home' && (
           <div className="page coming-soon">
             <h2>{t('home')}</h2><p>Coming soon</p>
           </div>
+        )}
+        {activePage === 'privacy' && (
+          <PrivacyPolicy onBack={() => handleNavClick('settings')} />
         )}
         {activePage === 'settings' && (
           <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -295,6 +309,17 @@ function AppContent() {
                 >
                   {t('contact_developer')}
                 </a>
+                
+                <button 
+                  className="btn btn--ghost"
+                  style={{ marginTop: '8px', width: '100%', justifyContent: 'center', color: 'var(--text-2)' }}
+                  onClick={() => {
+                    window.history.pushState({}, '', '/privacy');
+                    setActivePage('privacy');
+                  }}
+                >
+                  View Privacy Policy
+                </button>
               </div>
             </div>
 
@@ -313,7 +338,7 @@ function AppContent() {
           <button
             key={id}
             className={`bottom-nav__item ${activePage === id ? 'bottom-nav__item--active' : ''}`}
-            onClick={() => setActivePage(id)}
+            onClick={() => handleNavClick(id)}
           >
             <Icon size={20} />
             <span>{t(id)}</span>

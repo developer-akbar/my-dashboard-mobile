@@ -487,15 +487,21 @@ input[type="checkbox"] {
   flex-direction: column;
   gap: 12px;
   padding: 12px;
-  background: var(--bg-2);
+  background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   margin-bottom: 20px;
   position: sticky;
-  top: 12px;
+  top: 70px; /* Below the sticky header */
   z-index: 40;
+  background: var(--bg-2);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
+  transition: top 0.3s ease;
+}
+
+.page--scrolled .toolbar {
+  top: 54px; /* Move up when header is condensed */
 }
 
 .toolbar__row { 

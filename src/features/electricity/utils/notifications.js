@@ -11,6 +11,8 @@ const getApiBase = () => {
   return '/api';
 };
 
+let listenersRegistered = false;
+
 export async function setupPushNotifications() {
   if (Capacitor.getPlatform() === 'web') return;
 
@@ -21,11 +23,8 @@ export async function setupPushNotifications() {
       if (requestStatus.receive !== 'granted') return;
     }
 
-    // Register with FCM
-    await PushNotifications.register();
-
-    // Remove existing to avoid duplicates if this runs again
-    await PushNotifications.removeAllListeners();
+    if (listenersRegistered) return;
+    listenersRegistered = true;
 
     // 1. Token Registration
     await PushNotifications.addListener('registration', async (token) => {
@@ -61,27 +60,36 @@ export async function setupPushNotifications() {
         body: notification.body || '',
         serviceNumber: notification.data?.serviceNumber,
         type: notification.data?.type || 'BILL_REMINDER',
-        read: false // Mark as unread so user sees it in inbox
+        read: false
       };
 
       await saveNotificationToHistory(payload);
 
-      // Small delay to ensure the DOM is ready if it's a cold start
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('notification-received', { detail: payload }));
+      // Persist the intent to open this bill so the UI can check it on boot
+      if (payload.serviceNumber) {
+        await db.setSetting('pending_notification_action', {
+          serviceNumber: payload.serviceNumber,
+          timestamp: Date.now()
+        });
+      }
 
-        if (payload.serviceNumber) {
-          window.dispatchEvent(new CustomEvent('notification-deep-link', { 
-            detail: { serviceNumber: payload.serviceNumber } 
-          }));
-        }
-      }, 300);
+      // Fire events as immediate fallback
+      window.dispatchEvent(new CustomEvent('notification-received', { detail: payload }));
+      if (payload.serviceNumber) {
+        window.dispatchEvent(new CustomEvent('notification-deep-link', { 
+          detail: { serviceNumber: payload.serviceNumber } 
+        }));
+      }
     });
+
+    // Register with FCM
+    await PushNotifications.register();
 
   } catch (err) {
     console.error('[push] setup error:', err);
   }
 }
+
 /**
  * Syncs the device token and service numbers with the backend.
  * @param {string} [token] - Optional token if just received from registration
@@ -99,6 +107,7 @@ export async function syncPushTokenWithServer(token, force = false) {
     const storedToken = token || await db.getSetting('push_token');
     
     if (!storedToken) {
+      if (Capacitor.getPlatform() === 'web') return false;
       throw new Error('Device not yet registered for push notifications. Please wait a moment and try again.');
     }
 

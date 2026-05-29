@@ -118,16 +118,33 @@ export function NotificationInbox({ open, onClose, onAction }) {
 
 // Helper to save a new notification to history
 export async function saveNotificationToHistory(notification) {
-  const history = await db.getSetting('notification_history') || [];
-  const newNotif = {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-    timestamp: new Date().toISOString(),
-    read: false,
-    ...notification
-  };
-  
-  // Keep only last 50 notifications
-  const updated = [newNotif, ...history].slice(0, 50);
-  await db.setSetting('notification_history', updated);
-  return updated;
+  try {
+    const history = await db.getSetting('notification_history') || [];
+    
+    // De-duplicate: If we got the same message for the same bill in the last 10 seconds, skip
+    const isDuplicate = history.length > 0 && 
+      history[0].serviceNumber === notification.serviceNumber &&
+      history[0].body === notification.body &&
+      (Date.now() - new Date(history[0].timestamp).getTime() < 10000);
+      
+    if (isDuplicate) {
+      console.log('[inbox] Skipping duplicate notification');
+      return history;
+    }
+
+    const newNotif = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      read: false,
+      ...notification
+    };
+    
+    // Keep only last 50 notifications
+    const updated = [newNotif, ...history].slice(0, 50);
+    await db.setSetting('notification_history', updated);
+    return updated;
+  } catch (err) {
+    console.error('[inbox] Failed to save history:', err);
+    return [];
+  }
 }
