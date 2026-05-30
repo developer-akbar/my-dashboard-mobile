@@ -714,7 +714,16 @@ input[type="checkbox"] {
 .scard--unknown::before { background: var(--surface-3); }
 
 /* Animation wrapper */
-.scard__body {
+.scard__input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+body {
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.35s ease-in-out;

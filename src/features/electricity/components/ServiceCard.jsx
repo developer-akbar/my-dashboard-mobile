@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
-  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock, FiAlertCircle
+  FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock, FiAlertCircle, FiShare2, FiFileText
 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill, BsQrCode } from 'react-icons/bs';
@@ -22,7 +22,7 @@ function TrendBadge({ value, unit = '', percent }) {
   if (value == null) return null;
   const up = value > 0, zero = value === 0;
   const label = zero ? 'Same'
-    : `${up ? '+' : ''}${unit === '₹' ? formatInr(Math.abs(value)) : `${Math.abs(value).toLocaleString('en-IN')} ${unit}`}`;
+    : `${up ? '+' : ''}${unit === '₹' ? formatInr(Math.abs(value)) : `${Math.abs(value).toLocaleString('en-IN')} ${unit}`}`;    
   return (
     <span className={`tbadge tbadge--${zero ? 'flat' : up ? 'up' : 'dn'}`}>
       {!zero && (up ? <FiTrendingUp size={10} /> : <FiTrendingDown size={10} />)}
@@ -49,7 +49,7 @@ const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'
 function fmtMonth(m) { if (!m) return '—'; const [y, mo] = m.split('-'); return `${MO[+mo - 1]} ${y}`; }
 function fmtK(v) { return v >= 1000 ? `₹${(v / 1000).toFixed(1)}k` : `₹${v}`; }
 
-// ── Accordion section ─────────────────────────────────────────────────────────
+// ── Accordion section ──────────────────────────────────────────────────────────
 
 function Section({ title, badge, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -67,9 +67,13 @@ function Section({ title, badge, defaultOpen = false, children }) {
   );
 }
 
-// ── Main card ─────────────────────────────────────────────────────────────────
+// ── Main card ──────────────────────────────────────────────────────────────────
 
-export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, onEdit, onShowQR, onAbout, onDelete, onTogglePin, onPay, useAccordion, selected, selecting, onToggleSelect, onCalculateBill, cardStyle = 'rich' }) {
+export function ServiceCard({ 
+  id, service, refreshing, isFlashing, onRefresh, onEdit, onShowQR, onAbout, onDelete, 
+  onTogglePin, onPay, onShare, onShareReport, useAccordion, selected, selecting, 
+  onToggleSelect, onCalculateBill, cardStyle = 'rich' 
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!useAccordion);
   const [showUpdateInfoHead, setShowUpdateInfoHead] = useState(false);
@@ -85,7 +89,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
 
   useEffect(() => {
     if (!showUpdateInfoHead && !showUpdateInfoMetrics) return;
-    const handleEsc = (e) => { 
+    const handleEsc = (e) => {
       if (e.key === 'Escape') {
         setShowUpdateInfoHead(false);
         setShowUpdateInfoMetrics(false);
@@ -122,9 +126,9 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
   const breakup = service.billBreakup;
 
   async function copyNum() {
-    try { 
-      await navigator.clipboard.writeText(service.serviceNumber); 
-      toast.success('Service number copied'); 
+    try {
+      await navigator.clipboard.writeText(service.serviceNumber);
+      toast.success('Service number copied');
     }
     catch (e) { toast.error(`Copy failed: ${e?.message || 'Unknown error'}`); }
   }
@@ -166,22 +170,22 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
   const isHistoryError = service.lastError?.includes('APSPDCL history unavailable');
 
   return (
-    <article 
+    <article
       id={id}
       className={`scard scard--${status.toLowerCase()} ${menuOpen ? 'scard--menu-open' : ''} ${selected ? 'scard--selected' : ''} ${isFlashing ? 'flash' : ''} ${isExpanded ? 'scard--expanded' : ''}`}
       onContextMenu={e => { if (longPressTimer.current || selecting) e.preventDefault(); }}
       style={{ overflow: 'visible' }}
     >
       {selecting && (
-        <div 
-          className="scard__select-overlay" 
+        <div
+          className="scard__select-overlay"
           onClick={e => { e.stopPropagation(); onToggleSelect(service.id); }}
           style={{ position: 'absolute', inset: 0, zIndex: 5, cursor: 'pointer' }}
         />
       )}
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="scard__header" 
+      {/* ── Header ────────────────────────────────────────────────────────────────── */}
+      <header className="scard__header"
         onMouseDown={handlePressStart}
         onMouseUp={handlePressEnd}
         onMouseLeave={handlePressEnd}
@@ -193,9 +197,9 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         <div className="scard__identity">
           {selecting && (
             <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', marginRight: '8px' }}>
-              <input 
-                type="checkbox" 
-                checked={!!selected} 
+              <input
+                type="checkbox"
+                checked={!!selected}
                 onChange={() => onToggleSelect(service.id)}
                 onClick={e => e.stopPropagation()}
                 style={{ width: '18px', height: '18px', margin: 0, padding: 0 }}
@@ -204,19 +208,27 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
           )}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
             <div className={`scard__status-dot scard__status-dot--${status.toLowerCase()}`} />
-            {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)', transform: 'rotate(45deg)' }} />}
+            {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)', transform: 'rotate(45deg)' }} />}        
           </div>
           <div className="scard__identity-text">
             <h3 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h3>
             <div className="scard__num-row">
               <span className="scard__num">{service.serviceNumber}</span>
-              <button 
-                className="icon-btn-micro" 
-                onClick={(e) => { e.stopPropagation(); copyNum(); }} 
+              <button
+                className="icon-btn-micro"
+                onClick={(e) => { e.stopPropagation(); copyNum(); }}
                 title={t('copy')}
                 style={{ position: 'relative', zIndex: 10 }}
               >
                 <FiCopy size={12} />
+              </button>
+              <button
+                className="icon-btn-micro"
+                onClick={(e) => { e.stopPropagation(); onShare?.(); }}
+                title="Share Status"
+                style={{ position: 'relative', zIndex: 10, marginLeft: '4px' }}
+              >
+                <FiShare2 size={12} />
               </button>
             </div>
           </div>
@@ -224,9 +236,9 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
 
         <div className="scard__header-right" style={{ position: 'relative', zIndex: 30 }}>
           {cardStyle === 'classic' && (
-            <div 
+            <div
               ref={headUpdateRef}
-              className="scard__updated-at" 
+              className="scard__updated-at"
               title={formatDateTime(service.lastFetchedAt)}
               onClick={(e) => { e.stopPropagation(); setShowUpdateInfoHead(!showUpdateInfoHead); }}
               style={{ fontSize: '10px', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -257,6 +269,9 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                 <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onCalculateBill?.(service); }}>
                   <LuCalculator size={13} /> {t('calculate_next_bill')}
                 </button>
+                <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onShareReport?.(); }}>
+                  <FiFileText size={13} /> Share Report
+                </button>
                 <button onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onAbout(); }}><FiInfo size={13} /> {t('about_service')}</button>
                 <button className="danger" onMouseDown={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}><FiTrash2 size={13} /> Trash</button>
               </div>
@@ -265,7 +280,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         </div>
       </header>
 
-      {/* ── Hero / Amount ───────────────────────────────────────────── */}
+      {/* ── Hero / Amount ────────────────────────────────────────────────────────────────── */}
       <div className="scard__hero-main" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined}>
         <div className="scard__hero-content">
           <p className="scard__hero-label">{t('amount_due')}</p>
@@ -280,15 +295,15 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                  <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
               </div>
             )}
-            {dueCopy && !service.isPaid && <span className={`text-${dueTone}`}>{dueCopy} (Due {formatDate(service.lastDueDate)})</span>}
+            {dueCopy && !service.isPaid && <span className={`text-${dueTone}`}>{dueCopy} ({formatDate(service.lastDueDate)})</span>}
             {service.isPaid && (
               <span className="text-green" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <FiCheckCircle size={12} /> {t('paid')} <b>{formatInr(service.paidAmount)}</b> on {formatDate(service.paidDate)}
+                <FiCheckCircle size={12} /> {t('paid')} <b>{formatInr(service.paidAmount)}</b> on {formatDate(service.paidDate)}  
               </span>
             )}
           </div>
         </div>
-        
+
         {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
           <div className="scard__hero-qr" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }} title={t('show_qr')} style={{ position: 'relative', zIndex: 10 }}>
             <QRCodeSVG value={generateAPSPDCLUpiString(service) || ''} size={44} level="L" includeMargin={false} />
@@ -296,13 +311,13 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         )}
       </div>
 
-      {/* ── Quick Metrics (Visible when collapsed in rich mode, or always when expanded) ────────────────── */}
+      {/* ── Quick Metrics (Visible when collapsed in rich mode, or always when expanded) ── */}
       {(cardStyle === 'rich' || isExpanded) && (
         <div className="scard__quick-metrics" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} style={{ cursor: useAccordion ? 'pointer' : 'default', paddingBottom: (service.lastThreeAmounts?.length > 0) ? '8px' : '14px' }}>
           <div className="qm-item">
             <span className="qm-label">{t('units')}</span>
             <span className="qm-val">
-              {service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')} 
+              {service.lastBilledUnits == null ? '—' : Number(service.lastBilledUnits).toLocaleString('en-IN')}
               <span style={{fontSize: '9px', fontWeight: '500', marginLeft:'2px', color: 'var(--text-3)'}}>u</span>
             </span>
           </div>
@@ -324,7 +339,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         </div>
       )}
 
-      {/* ── Quick History Chips (Visible when collapsed in rich mode, or always when expanded) ────────────────── */}
+      {/* ── Quick History Chips ── */}
       {(cardStyle === 'rich' || isExpanded) && Array.isArray(service.lastThreeAmounts) && service.lastThreeAmounts.length > 0 && (
         <div className="scard__chips" style={{ borderTop: 'none' }}>
           {service.lastThreeAmounts.map((b, i) => {
@@ -340,7 +355,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         </div>
       )}
 
-      {/* ── Action Bar ──────────────────────────────────────────────── */}
+      {/* ── Action Bar ── */}
       <div className="scard__action-bar" onClick={e => e.stopPropagation()} style={{ position: 'relative', zIndex: 20 }}>
         <div className="scard__action-left">
           <button className="btn-ghost-sm" onClick={onRefresh} disabled={refreshing}>
@@ -350,9 +365,9 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         <div className="scard__action-right">
           {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 ? (
             <>
-              <button 
-                className="btn btn--secondary btn--sm" 
-                onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }} 
+              <button
+                className="btn btn--secondary btn--sm"
+                onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }}
                 title="Calculator"
               >
                 <LuCalculator size={14} />
@@ -363,7 +378,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
             </>
           ) : (
             <>
-              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }}>
+              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }}>      
                 <BsQrCode size={14} /> <span className="hide-mobile-sm" style={{marginLeft:'4px'}}>QR</span>
               </button>
               <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }}>
@@ -374,7 +389,7 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
         </div>
       </div>
 
-      {/* ── Expanded Body ──────────────────────────────────────────── */}
+      {/* ── Expanded Body ── */}
       <div className={`scard__body ${isExpanded ? 'scard__body--expanded' : ''}`}>
         <div className="scard__body-inner">
           {insights && (
@@ -382,12 +397,12 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
               <div style={{ padding: '0 10px' }}>
                  <div className="receipt-row">
                     <span className="receipt-row__label">Units Vs Last Month</span>
-                    <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />
+                    <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />        
                  </div>
                  {insights.vsLastMonth?.amount != null && (
                    <div className="receipt-row">
                       <span className="receipt-row__label">Amount Vs Last Month</span>
-                      <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />
+                      <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />    
                    </div>
                  )}
                  {insights.vsSameMonthLastYear && (
@@ -414,6 +429,15 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
                     <span className="receipt-row__label">Avg Units (Last 12m)</span>
                     <b className="receipt-row__val">{insights.avgUnits12m?.toLocaleString('en-IN') || '—'} u</b>
                  </div>
+
+                 <button 
+                   className="btn btn--ghost btn--sm" 
+                   style={{ width: '100%', marginTop: '16px', justifyContent: 'center', border: '1px dashed var(--primary-glow)', color: 'var(--primary-hi)' }}
+                   onClick={(e) => { e.stopPropagation(); onShareReport?.(); }}
+                 >
+                   <FiFileText size={14} style={{ marginRight: '6px' }} />
+                   Share Monthly Usage Report
+                 </button>
               </div>
             </Section>
           )}
@@ -430,8 +454,8 @@ export function ServiceCard({ id, service, refreshing, isFlashing, onRefresh, on
             </Section>
           )}
 
-          <Section 
-            title={t('payment_history')} 
+          <Section
+            title={t('payment_history')}
             badge={isHistoryError ? <span style={{display:'flex', alignItems:'center', gap: '4px'}}><FiAlertTriangle size={12}/> Sync Error</span> : `${service.paymentHistory?.length || 0}`}
           >
             {isHistoryError && (
@@ -467,10 +491,10 @@ function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
     <div className="bp">
       <div className="bp__bar">
         {rows.map(r => (
-          <div key={r.key} className="bp__seg" style={{ flex: breakup[r.key] / total, background: r.color }} title={r.label} />
+          <div key={r.key} className="bp__seg" style={{ flex: breakup[r.key] / total, background: r.color }} title={r.label} />   
         ))}
       </div>
-      
+
       {rows.map(r => (
         <div key={r.key} className="receipt-row">
           <span className="receipt-row__label">
@@ -480,28 +504,28 @@ function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
           <b className="receipt-row__val">{formatInr(breakup[r.key] || 0)}</b>
         </div>
       ))}
-      
+
       <div style={{ borderTop: '1px dashed var(--border-md)', margin: '8px 0' }} />
       <div className="receipt-row">
         <span className="receipt-row__label">{t('gross_total')}</span>
         <b className="receipt-row__val">{formatInr(breakup.grossTotal || 0)}</b>
       </div>
-      
+
       {breakup.isd !== 0 && breakup.isd != null && (
         <div className="receipt-row">
           <span className="receipt-row__label">{t('isd')}</span>
           <b className="receipt-row__val" style={{ color: breakup.isd < 0 ? 'var(--green)' : 'inherit' }}>{formatInr(breakup.isd)}</b>
         </div>
       )}
-      
+
       {breakup.arrearsTotal > 0 && (
         <>
           <div style={{ borderTop: '1px dashed var(--border-md)', margin: '8px 0' }} />
           {Array.isArray(breakup.arrears) && breakup.arrears.map((a, i) => (
             <div key={i} className="receipt-row">
               <span className="receipt-row__label">
-                <FiCheckCircle size={12} color="var(--green)" /> 
-                {a.receiptNo || `Payment ${i + 1}`} 
+                <FiCheckCircle size={12} color="var(--green)" />
+                {a.receiptNo || `Payment ${i + 1}`}
                 <small style={{fontWeight:'normal', marginLeft: '4px'}}>({formatDate(a.date)})</small>
               </span>
               <b className="receipt-row__val credit">−{formatInr(a.amount)}</b>
@@ -513,7 +537,7 @@ function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
           </div>
         </>
       )}
-      
+
       {isPaid && paidAmount != null && (
         <div className="receipt-row">
           <span className="receipt-row__label">
@@ -522,7 +546,7 @@ function BreakupPanel({ breakup, isPaid, paidAmount, t }) {
           <b className="receipt-row__val credit">−{formatInr(paidAmount)}</b>
         </div>
       )}
-      
+
       <div className="receipt-row receipt-row--net">
         <span className="receipt-row__label">{t('net_due')}</span>
         <b className="receipt-row__val">{formatInr(isPaid ? 0 : (breakup.netDue ?? breakup.grossTotal ?? 0))}</b>
