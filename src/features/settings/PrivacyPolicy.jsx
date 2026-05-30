@@ -53,6 +53,10 @@ export function PrivacyPolicy({ onBack }) {
 
           <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>5. Contact Us</h2>
           <p>For any privacy-related questions, contact: <a href="mailto:mail.akbarmulla@gmail.com" style={{ color: 'var(--primary)' }}>mail.akbarmulla@gmail.com</a></p>
+
+          <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-3)', fontStyle: 'italic' }}>
+            <p><strong>Disclaimer:</strong> My Dashboard is an independent, unofficial application. It is not affiliated with, authorized by, or endorsed by APSPDCL, BillDesk, or any government entity. All product and company names are trademarks™ or registered® trademarks of their respective holders.</p>
+          </div>
         </div>
       </div>
     </div>

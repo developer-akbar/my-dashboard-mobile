@@ -323,10 +323,13 @@ function AppContent() {
               </div>
             </div>
 
-            <footer className="dev-footer" style={{ marginTop: '40px', paddingBottom: '20px' }}>
+            <footer className="dev-footer" style={{ marginTop: '40px', paddingBottom: '20px', textAlign: 'center' }}>
               <div className="dev-footer__line" />
               <p className="dev-footer__name">{t('developed_by')} Akbar</p>
               <span className="dev-footer__tag">v1.0.0</span>
+              <p style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '12px', maxWidth: '300px', marginInline: 'auto', lineHeight: '1.4' }}>
+                Unofficial app. Not affiliated with APSPDCL or BillDesk.
+              </p>
             </footer>
           </div>
         )}
