@@ -1118,10 +1118,11 @@ app.get('/api/notifications/check', async (req, res) => {
               type = 'BILL_GENERATED';
             }
           } else {
-            if (diffDays === 4) {
+            // Reminders: 4 days before or Overdue
+            if (diffDays <= 4 && diffDays >= 0) {
               shouldNotify = true;
               title = 'Bill Due Soon';
-              body = `Your bill of ₹${snapshot.amountDue} for ${sn} is due in 4 days.`;
+              body = `Your bill of ₹${snapshot.amountDue} for ${sn} is due in ${diffDays} days.`;
               type = 'BILL_REMINDER';
             } else if (diffDays < 0) {
               shouldNotify = true;
@@ -1132,11 +1133,17 @@ app.get('/api/notifications/check', async (req, res) => {
           }
 
           if (shouldNotify) {
-            notifiedSns.push({ sn, title, body, type });
-            if (notifiedSns.length === 1) {
-              summaryTitle = title;
-              summaryBody = body;
-              deepLinkSn = sn;
+            // deduplication: token + sn + amount + type
+            const dedupKey = `sent_notif:${token.substring(0, 20)}:${sn}:${snapshot.amountDue}:${type}`;
+            const alreadySent = await redis.get(dedupKey);
+            
+            if (!alreadySent) {
+              notifiedSns.push({ sn, title, body, type, dedupKey });
+              if (notifiedSns.length === 1) {
+                summaryTitle = title;
+                summaryBody = body;
+                deepLinkSn = sn;
+              }
             }
           }
         } catch (err) {
@@ -1166,6 +1173,12 @@ app.get('/api/notifications/check', async (req, res) => {
               type: notifiedSns.length > 1 ? 'MULTI_UPDATE' : notifiedSns[0].type
             }
           });
+          
+          // Mark all as sent in Redis (expire in 30 days)
+          for (const item of notifiedSns) {
+            await redis.set(item.dedupKey, '1', { ex: 60 * 60 * 24 * 30 });
+          }
+          
           results.push({ token, count: notifiedSns.length });
         } catch (err) {
           console.error(`[push] Failed to send to ${token}:`, err.message);
