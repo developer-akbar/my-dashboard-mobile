@@ -66,6 +66,12 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     }
   };
 
+  // Expose to window for push listener
+  useEffect(() => {
+    window.updateUnread = updateUnread;
+    return () => { delete window.updateUnread; };
+  }, [services]);
+
   const selfHealNotifications = async () => {
     if (loading || services.length === 0) return;
     

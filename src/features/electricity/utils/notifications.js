@@ -46,7 +46,12 @@ export async function setupPushNotifications() {
 
       await saveNotificationToHistory(payload);
 
-      // Dispatch for UI refresh
+      // Trigger UI refresh for badge and inbox
+      if (typeof window !== 'undefined' && window.updateUnread) {
+        window.updateUnread();
+      }
+
+      // Dispatch for child components
       window.dispatchEvent(new CustomEvent('notification-received', { detail: payload }));
     });
 
