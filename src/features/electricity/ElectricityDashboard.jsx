@@ -16,13 +16,13 @@ import { useTranslation } from 'react-i18next';
 import { usePostHog } from '@posthog/react';
 import { HelpFooter } from './components/CalculationSettings.jsx';
 
-import { NotificationInbox } from './components/NotificationInbox.jsx';
+import { NotificationInbox, saveNotificationToHistory } from './components/NotificationInbox.jsx';
 import { db } from '../../shared/db/storage.js';
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 
 export function ElectricityDashboard({ onOpenCalcSettings }) {
   const isWeb = Capacitor.getPlatform() === 'web';
-// ... (existing state)
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
   const [cardStyle, setCardStyle] = useState(localStorage.getItem('appearance_card_style') || 'classic'); 
@@ -46,73 +46,74 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     return () => mainContainer.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const updateUnread = async () => {
+    const history = await db.getSetting('notification_history') || [];
+    const count = history.filter(n => !n.read).length;
+    setUnreadCount(count);
+    
+    // Update App Icon Badge
+    if (window.Capacitor?.isNativePlatform()) {
+      try {
+        const { Badge } = await import('@capawesome/capacitor-badge');
+        if (count > 0) {
+          await Badge.set({ count });
+        } else {
+          await Badge.clear();
+        }
+      } catch (e) {
+        console.warn('[badge] Failed to update badge', e);
+      }
+    }
+  };
+
+  const selfHealNotifications = async () => {
+    if (loading || services.length === 0) return;
+    
+    const history = await db.getSetting('notification_history') || [];
+    let updated = false;
+
+    for (const svc of services) {
+      if (!svc.isPaid && svc.lastAmountDue > 0) {
+        const dueDate = svc.lastDueDate ? new Date(svc.lastDueDate) : null;
+        if (!dueDate) continue;
+
+        const now = new Date();
+        const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 4) {
+          // Check if we already have a notification for this specific bill amount
+          const exists = history.some(n => 
+            n.serviceNumber === svc.serviceNumber && 
+            n.body.includes(svc.lastAmountDue.toString())
+          );
+
+          if (!exists) {
+            const type = diffDays < 0 ? 'BILL_OVERDUE' : 'BILL_REMINDER';
+            const title = diffDays < 0 ? 'Bill Overdue' : 'Bill Due Soon';
+            const body = diffDays < 0 
+              ? `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is overdue!`
+              : `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is due in ${diffDays} days.`;
+
+            await saveNotificationToHistory({
+              title,
+              body,
+              serviceNumber: svc.serviceNumber,
+              type,
+              read: false
+            });
+            updated = true;
+          }
+        }
+      }
+    }
+
+    if (updated) updateUnread();
+  };
+
   useEffect(() => {
     if (isWeb) return;
 
-    const updateUnread = async () => {
-      const history = await db.getSetting('notification_history') || [];
-      const count = history.filter(n => !n.read).length;
-      setUnreadCount(count);
-      
-      // Update App Icon Badge
-      if (window.Capacitor?.isNativePlatform()) {
-        try {
-          const { Badge } = await import('@capawesome/capacitor-badge');
-          if (count > 0) {
-            await Badge.set({ count });
-          } else {
-            await Badge.clear();
-          }
-        } catch (e) {
-          console.warn('[badge] Failed to update badge', e);
-        }
-      }
-    };
     updateUnread();
-
-    const selfHealNotifications = async () => {
-      if (loading || services.length === 0) return;
-      
-      const history = await db.getSetting('notification_history') || [];
-      let updated = false;
-
-      for (const svc of services) {
-        if (!svc.isPaid && svc.lastAmountDue > 0) {
-          const dueDate = svc.lastDueDate ? new Date(svc.lastDueDate) : null;
-          if (!dueDate) continue;
-
-          const now = new Date();
-          const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-
-          if (diffDays <= 4) {
-            // Check if we already have a notification for this specific bill amount
-            const exists = history.some(n => 
-              n.serviceNumber === svc.serviceNumber && 
-              n.body.includes(svc.lastAmountDue.toString())
-            );
-
-            if (!exists) {
-              const type = diffDays < 0 ? 'BILL_OVERDUE' : 'BILL_REMINDER';
-              const title = diffDays < 0 ? 'Bill Overdue' : 'Bill Due Soon';
-              const body = diffDays < 0 
-                ? `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is overdue!`
-                : `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is due in ${diffDays} days.`;
-
-              await saveNotificationToHistory({
-                title,
-                body,
-                serviceNumber: svc.serviceNumber,
-                type,
-                read: false
-              });
-              updated = true;
-            }
-          }
-        }
-      }
-
-      if (updated) updateUnread();
-    };
 
     const processDeepLink = async (sn) => {
       if (!sn || loading || services.length === 0) return false;
@@ -174,6 +175,15 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       }
     };
 
+    // Listen for App State changes (Foreground/Background)
+    const appStateListener = CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        console.log('[dashboard] App active, running sync');
+        updateUnread();
+        selfHealNotifications();
+      }
+    });
+
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLinkSignal);
     
@@ -187,10 +197,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     }
 
     return () => {
+      appStateListener.then(h => h.remove());
       window.removeEventListener('notification-received', handleNotif);
       window.removeEventListener('notification-deep-link', handleDeepLinkSignal);
     };
-  }, [loading, services, actions]);
+  }, [loading, services]);
 
   const handleNotificationAction = (notification) => {
     setInboxOpen(false);
@@ -401,7 +412,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         setCalculator({ open: false, service: null });
-        setQrDialog({ open: false, service: null });
+        setQrDialog({ open: true, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
         setBulkResult(null);
         setInboxOpen(false);
