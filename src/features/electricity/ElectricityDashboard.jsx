@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell, FiShare2, FiFileText } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -212,7 +212,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLinkSignal);
-
+    
     if (!loading && services.length > 0) {
       if (pendingDeepLink.current) {
         processDeepLink(pendingDeepLink.current);
@@ -227,12 +227,13 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       window.removeEventListener('notification-received', handleNotif);
       window.removeEventListener('notification-deep-link', handleDeepLinkSignal);
     };
-    }, [loading, services]);
+  }, [loading, services]);
 
-    // Sync unread count when inbox closes or opens
-    useEffect(() => {
+  // Sync unread count when inbox closes or opens
+  useEffect(() => {
     if (!isWeb) updateUnread();
-    }, [inboxOpen]);
+  }, [inboxOpen]);
+
   const handleNotificationAction = (notification) => {
     setInboxOpen(false);
     if (notification.serviceNumber) {
@@ -267,12 +268,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   const [bulkResult, setBulkResult] = useState(null);
   const fileInputRef = useRef(null);
 
-  /**
-   * Exports the current list of services to a JSON file.
-   * Only includes essential data for ACTIVE (non-deleted) services.
-   */
   const handleExport = () => {
-    // Collect minimal data only for ACTIVE services
     const activeServices = services.filter(s => !s.isDeleted);
     const data = activeServices.map(s => ({
       label: s.label,
@@ -283,7 +279,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
-    // Construct filename: mydashboard_apspdcl_bills_backup_timestamp.json
     const timestamp = new Date().getTime();
     const link = document.createElement('a');
     link.href = url;
@@ -298,10 +293,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     toast.success(`${data.length} services exported successfully`);
   };
 
-  /**
-   * Imports services from a backup JSON file.
-   * Validates each service number via the /validate API and restores pinned status.
-   */
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -312,7 +303,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         const data = JSON.parse(event.target.result);
         if (!Array.isArray(data)) throw new Error('Invalid backup format');
         
-        // Map to standard entries format for bulk addition, preserving pinned state
         const entries = data.map(item => ({
           label: item.label || '',
           number: item.serviceNumber,
@@ -325,8 +315,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         }
 
         toast.success(`Found ${entries.length} services. Starting import...`);
-
-        // Trigger our standard bulk add logic (validates each number via API)
         await submitService({ isBulk: true, entries });
         if (ph) ph.capture('data_imported', { count: entries.length });
       } catch (err) {
@@ -334,7 +322,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       }
     };
     reader.readAsText(file);
-    // Reset input
     e.target.value = '';
   };
 
@@ -366,7 +353,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     setTimeout(() => setFlashingId(null), 4000);
   };
 
-  // ── Selection ──────────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const toggleSelect = (id) => {
@@ -411,11 +397,9 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   };
 
   useEffect(() => {
-    // Clear selection when view changes to avoid cross-view selection bugs
     clearSelection();
   }, [activeView]);
 
-  // ── Keydown Handling (Esc) ────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -432,17 +416,15 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedIds, bulkResult, inboxOpen]);
 
-  // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
     const handleBack = (e) => {
       if (e.detail?.handled) return;
 
-      // 1. Priority: Close any open Modal or Dialog
       if (dialog.open || aboutDialog.open || calculator.open || qrDialog.open || confirmState.open || bulkResult || inboxOpen) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         setCalculator({ open: false, service: null });
-        setQrDialog({ open: true, service: null });
+        setQrDialog({ open: false, service: null });
         setConfirmState(prev => ({ ...prev, open: false }));
         setBulkResult(null);
         setInboxOpen(false);
@@ -450,14 +432,12 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         return;
       }
 
-      // 2. Priority: Clear Selection Mode
       if (selectedIds.size > 0) {
         clearSelection();
         if (e.detail) e.detail.handled = true;
         return;
       }
 
-      // 3. Priority: Back to Active View from Trash
       if (activeView === 'trash') {
         setActiveView('active');
         if (e.detail) e.detail.handled = true;
@@ -468,7 +448,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     return () => window.removeEventListener('app-back-button', handleBack);
   }, [selectedIds, dialog.open, aboutDialog.open, calculator.open, qrDialog.open, confirmState.open, bulkResult, inboxOpen]);
 
-  // ── Pull to Refresh ────────────────────────────────────────────────────────
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const touchStart = useRef(0);
@@ -494,11 +473,9 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       const diff = currentY - touchStart.current;
 
       if (diff > 0) {
-        // Apply resistance
         const dist = Math.min(diff * 0.4, pullThreshold + 20);
         setPullDistance(dist);
         if (dist > 10) {
-           // Prevent native bounce/scroll if we are pulling
            if (e.cancelable) e.preventDefault();
         }
       }
@@ -512,12 +489,8 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       if (finalDist >= pullThreshold) {
         setPullDistance(70);
         setIsRefreshing(true);
-        
         try {
-          // Always reload from local DB first to recover from missing UI state
           await actions.reload();
-          
-          // Then attempt upstream refresh if there are services
           await handleRefreshAll();
         } catch (e) {
           console.error('[PTR] Refresh process failed', e);
@@ -561,55 +534,29 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       const { entries } = payload;
       if (ph) ph.capture('bulk_add_started', { count: entries.length });
       const tst = toast.loading(`Validating ${entries.length} services...`);
-      
-      const results = {
-        succeeded: [],
-        failed: [],
-        alreadyExists: [],
-        inTrash: []
-      };
+      const results = { succeeded: [], failed: [], alreadyExists: [], inTrash: [] };
 
       for (const entry of entries) {
         const sn = entry.number;
         const inActive = services.find(s => s.serviceNumber === sn);
         const inTrash = trash.find(t => t.serviceNumber === sn);
         
-        if (inActive) {
-          results.alreadyExists.push(sn);
-          continue;
-        }
-        if (inTrash) {
-          results.inTrash.push(sn);
-          continue;
-        }
+        if (inActive) { results.alreadyExists.push(sn); continue; }
+        if (inTrash) { results.inTrash.push(sn); continue; }
 
         try {
-          // Fix: Ensure pinned status is passed during restoration/import
-          await actions.add({ 
-            isBulk: false, 
-            serviceNumber: sn, 
-            label: entry.label, 
-            pinned: !!entry.pinned 
-          });
+          await actions.add({ isBulk: false, serviceNumber: sn, label: entry.label, pinned: !!entry.pinned });
           results.succeeded.push(sn);
           toast.loading(`Added ${results.succeeded.length}/${entries.length}...`, { id: tst });
         } catch (e) {
           if (e?.message === 'CANCELLED') {
-            toast.error(`Cancelled. Processed ${results.succeeded.length + results.failed.length + results.alreadyExists.length + results.inTrash.length} services.`, { id: tst });
-            if (ph) ph.capture('bulk_add_cancelled');
             setBulkResult(results);
             return;
           }
           results.failed.push({ number: sn, error: e?.message || 'Unknown error' });
         }
       }
-
       toast.dismiss(tst);
-      if (ph) ph.capture('bulk_add_completed', { 
-        succeeded: results.succeeded.length, 
-        failed: results.failed.length,
-        alreadyExists: results.alreadyExists.length 
-      });
       setBulkResult(results);
       if (activeView !== 'active') setActiveView('active');
       return;
@@ -619,7 +566,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
         loading: t('saving'), success: 'Updated', error: e => `Update failed: ${e?.message || 'Unknown error'}`,
       });
-      if (ph) ph.capture('service_updated', { id: dialog.service.id });
     } else {
       const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
       if (inTrash) {
@@ -630,7 +576,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
           isDanger: false,
           onConfirm: async () => {
             await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` });
-            if (ph) ph.capture('service_restored', { id: inTrash.id });
             setDialog({ open: false, service: null });
             handleViewChange('active');
             flashCard(inTrash.id);
@@ -640,84 +585,37 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       }
       
       const inActive = services.find(s => s.serviceNumber === payload.serviceNumber);
-      if (inActive) {
-        toast.error('Service number already exists in your active list.');
-        return;
-      }
+      if (inActive) { toast.error('Service number already exists.'); return; }
 
       const tst = toast.loading('Validating and fetching bill…');
       try {
         const newService = await actions.add(payload);
         toast.success('Service added', { id: tst });
-        if (ph) {
-          ph.capture('service_added', { 
-            circle: newService.circleName, 
-            amount: Number(newService.lastAmountDue || 0)
-          });
-          // Also track as a bill record if it has a date
-          if (newService.lastBillDate) {
-             ph.capture('bill_refreshed', {
-               id: newService.id,
-               circle: newService.circleName,
-               amount: Number(newService.lastAmountDue || 0),
-               bill_date: newService.lastBillDate
-             });
-             await actions.update(newService.id, { lastReportedBillDate: newService.lastBillDate });
-          }
-        }
         setDialog({ open: false, service: null });
         handleViewChange('active');
         if (newService?.id) flashCard(newService.id);
       } catch (e) {
-        if (e?.message === 'CANCELLED') {
-          toast.dismiss(tst);
-        } else {
-          toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
-          if (ph) ph.capture('service_add_failed', { error: e?.message });
-        }
-        throw e; // Re-throw to keep dialog open
+        if (e?.message !== 'CANCELLED') toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
+        throw e;
       }
     }
   }
 
   async function handleRefreshAll(options = { skipApi: false, quiet: false }) {
-    // 1. Always reload from local DB first to update UI immediately
     const currentServices = await actions.reload();
-
-    if (!currentServices.length || options.skipApi) {
-      return;
-    }
+    if (!currentServices.length || options.skipApi) return;
     
     if (!options.quiet) {
       setRefreshingAll(true);
       setRefreshProgress({ done: 0, total: currentServices.length });
     }
 
-    if (ph) ph.capture('refresh_all_started', { count: currentServices.length });
     try {
       const summary = await actions.refreshAll((done, tot) => {
         if (!options.quiet) setRefreshProgress({ done, total: tot });
       });
-      if (summary) {
-        if (ph) {
-          ph.capture('refresh_all_completed', { succeeded: summary.succeeded, failed: summary.failed });
-          // Track the latest amounts for all successfully refreshed services (deduplicated)
-          for (const res of summary.results) {
-            if (res.ok && res.snapshot) {
-              const svc = services.find(sv => sv.id === res.id);
-              if (svc) await trackBill(svc, res.snapshot);
-            }
-          }
-        }
-        if (!options.quiet) {
-          summary.failed === 0
-            ? toast.success(`All ${summary.succeeded} service(s) refreshed`)
-            : toast.error(`Refresh failed for ${summary.failed} service(s)`);
-        }
-      }
-    } catch (err) {
-      if (err?.message !== 'CANCELLED' && !options.quiet) {
-        toast.error(`Refresh all failed: ${err?.message || 'Unknown error'}`);
+      if (summary && !options.quiet) {
+        summary.failed === 0 ? toast.success(`All refreshed`) : toast.error(`Refresh failed for ${summary.failed} service(s)`);
       }
     } finally {
       if (!options.quiet) {
@@ -731,112 +629,96 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     setConfirmState({
       open: true,
       title: 'Redirecting to BillDesk',
-      description: 'You will be redirected to the APSPDCL official website to pay your bill.\n\nYour service number will be automatically copied to your clipboard so you can paste it easily.',
+      description: 'You will be redirected to the APSPDCL official website to pay your bill.',
       isDanger: false,
       onConfirm: async () => {
-        try { 
-          await navigator.clipboard.writeText(service.serviceNumber); 
-          toast.success('Service number copied to clipboard'); 
-        } catch { 
-          toast.error('Failed to copy service number'); 
-        }
+        try { await navigator.clipboard.writeText(service.serviceNumber); toast.success('Copied'); } catch {}
         window.open('https://payments.billdesk.com/MercOnline/SPDCLController', '_blank', 'noopener,noreferrer');
       }
     });
   }
 
-  const handleBulkAction = async (actionType) => {
-    const ids = Array.from(selectedIds);
-    if (!ids.length) return;
-
-    let title, description, successMsg, action;
-    if (activeView === 'active') {
-      title = `Trash ${ids.length} service(s)?`;
-      description = `These services will be moved to the Trash.`;
-      successMsg = 'Moved to trash';
-      action = () => actions.bulkRemove(ids);
+  async function handleShare(service) {
+    const isPaid = service.isPaid;
+    const name = service.label || service.customerName || 'Consumer';
+    const sn = service.serviceNumber;
+    const amount = isPaid ? (service.paidAmount || service.lastAmountDue || 0) : service.lastAmountDue;
+    const date = isPaid ? service.paidDate : service.lastDueDate;
+    
+    let text = '';
+    if (isPaid) {
+      text = `⚡ *Electricity Bill Payment Receipt*\n\n` +
+             `*Service No:* ${sn}\n` +
+             `*Name:* ${name}\n` +
+             `*Amount Paid:* ₹${amount}\n` +
+             `*Date:* ${date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}\n` +
+             `*Status:* ✅ Successfully Paid\n\n` +
+             `Shared via MyDashboard App`;
     } else {
-      if (actionType === 'restore') {
-        title = `Restore ${ids.length} service(s)?`;
-        description = `These services will be restored to your active list.`;
-        successMsg = 'Restored';
-        action = async () => {
-          await actions.bulkRestore(ids);
-          handleViewChange('active');
-          if (ids.length > 0) flashCard(ids[0]);
-        };
-      } else {
-        title = `Delete ${ids.length} service(s)?`;
-        description = `This action cannot be undone and all history will be lost.`;
-        successMsg = 'Deleted permanently';
-        action = () => actions.bulkPurge(ids);
-      }
+      text = `⚡ *Electricity Bill Update*\n\n` +
+             `*Service No:* ${sn}\n` +
+             `*Name:* ${name}\n` +
+             `*Amount Due:* ₹${amount}\n` +
+             `*Due Date:* ${date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}\n` +
+             `*Status:* ⏳ Pending Payment\n\n` +
+             `Please pay your bill to avoid late fees.\n\n` +
+             `Shared via MyDashboard App`;
     }
 
-    setConfirmState({
-      open: true,
-      title,
-      description,
-      isDanger: actionType !== 'restore',
-      onConfirm: async () => {
-        const tst = toast.loading('Processing…');
-        try {
-          await action();
-          toast.success(successMsg, { id: tst });
-          clearSelection();
-        } catch (e) {
-          toast.error(`Action failed: ${e?.message || 'Unknown error'}`, { id: tst });
-        }
-      }
-    });
-  };
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Electricity Bill Status', text }); } catch (err) { if (err.name !== 'AbortError') toast.error('Sharing failed'); }
+    } else {
+      try { await navigator.clipboard.writeText(text); toast.success('Copied to clipboard'); } catch { toast.error('Copy failed'); }
+    }
+  }
+
+  async function handleShareMonthlyReport(service) {
+    const insights = service.insights;
+    if (!insights) { toast.error('Not enough data to generate report yet'); return; }
+    
+    const name = service.label || service.customerName || 'Consumer';
+    const sn = service.serviceNumber;
+    const trend = insights.vsLastMonth;
+    const trendText = trend ? `(${trend.amountPct > 0 ? '📈 +' : '📉 '}${trend.amountPct}% vs last month)` : '';
+
+    const text = `📊 *Electricity Usage Report — ${new Date().toLocaleString('default', { month: 'long' })}*\n\n` +
+                 `*Service:* ${name} (${sn})\n` +
+                 `*Usage:* ${service.lastBilledUnits || 0} Units\n` +
+                 `*Cost:* ₹${service.lastAmountDue || service.billAmount}\n` +
+                 `${trendText}\n\n` +
+                 `*Quick Insights:*\n` +
+                 `• Monthly Average: ₹${insights.avgAmount}\n` +
+                 `• Highest ever: ₹${insights.maxAmount}\n` +
+                 `• Efficiency: ₹${insights.avgCostPerUnit}/unit\n\n` +
+                 `*Next Est:* ~₹${insights.predictedNextBill || '...'}\n\n` +
+                 `Shared via MyDashboard App`;
+
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Monthly Electricity Report', text }); } catch (err) { if (err.name !== 'AbortError') toast.error('Sharing failed'); }
+    } else {
+      await navigator.clipboard.writeText(text); toast.success('Report copied to clipboard');
+    }
+  }
 
   return (
     <div className={`page ${isScrolled ? 'page--scrolled' : ''}`}>
-      <div 
-        className={`ptr ${pullDistance > 0 || isRefreshing ? 'ptr--visible' : ''} ${isRefreshing ? 'ptr--refreshing' : ''} ${pullDistance >= pullThreshold ? 'ptr--ready' : ''}`}
-        style={{ transform: `translateY(${pullDistance - 70}px)` }}
-      >
-        <div className="ptr__icon" style={{ transform: `rotate(${pullDistance * 3}deg)` }}>
-          <FiRefreshCw size={18} />
-        </div>
-        <span className="ptr__label">
-          {isRefreshing ? 'Refreshing...' : (pullDistance >= pullThreshold ? 'Release to refresh' : 'Pull down to refresh')}
-        </span>
+      <div className={`ptr ${pullDistance > 0 || isRefreshing ? 'ptr--visible' : ''} ${isRefreshing ? 'ptr--refreshing' : ''} ${pullDistance >= pullThreshold ? 'ptr--ready' : ''}`} style={{ transform: `translateY(${pullDistance - 70}px)` }}>
+        <div className="ptr__icon" style={{ transform: `rotate(${pullDistance * 3}deg)` }}><FiRefreshCw size={18} /></div>
+        <span className="ptr__label">{isRefreshing ? 'Refreshing...' : (pullDistance >= pullThreshold ? 'Release to refresh' : 'Pull down to refresh')}</span>
       </div>
 
       {selectedIds.size > 0 && (
         <div className="selection-bar">
           <div className="selection-bar__left">
-            <input 
-              type="checkbox" 
-              checked={allSelected} 
-              onChange={toggleSelectAll}
-              style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
-            />
+            <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }} />
             <span>{selectedIds.size} selected</span>
           </div>
           <div className="selection-bar__actions">
-            <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected">
-              <FiCopy size={16} />
-              {!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}
-            </button>
+            <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected"><FiCopy size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}</button>
             {activeView === 'active' ? (
-              <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}>
-                <FiTrash2 size={16} />
-                {!isMobile && <span style={{ marginLeft: '4px' }}>Trash</span>}
-              </button>
+              <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}><FiTrash2 size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Trash</span>}</button>
             ) : (
-              <>
-                <button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}>
-                  <FiRefreshCw size={16} />
-                  {!isMobile && <span style={{ marginLeft: '4px' }}>Restore</span>}
-                </button>
-                <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}>
-                  <FiTrash2 size={13} />
-                  {!isMobile && <span style={{ marginLeft: '4px' }}>Purge</span>}
-                </button>
-              </>
+              <><button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}><FiRefreshCw size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Restore</span>}</button><button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}><FiTrash2 size={13} />{!isMobile && <span style={{ marginLeft: '4px' }}>Purge</span>}</button></>
             )}
             <button className="btn btn--ghost btn--sm" onClick={clearSelection} style={{ marginLeft: '4px' }}>Cancel</button>
           </div>
@@ -850,297 +732,49 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
             {!isScrolled && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
-                <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}>
-                  <FiSettings size={20} style={{ color: 'var(--text-3)' }} />
-                </button>
+                <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}><FiSettings size={20} style={{ color: 'var(--text-3)' }} /></button>
               </div>
             )}
           </div>
           <div style={{ display: 'flex', gap: isScrolled ? '12px' : '16px', alignItems: 'center' }}>
             {!isWeb && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                <button 
-                  className="icon-btn" 
-                  onClick={() => setInboxOpen(true)} 
-                  title="Notifications"
-                  style={{ width: '40px', height: '40px', position: 'relative' }}
-                >
+                <button className="icon-btn" onClick={() => setInboxOpen(true)} title="Notifications" style={{ width: '40px', height: '40px', position: 'relative' }}>
                   <FiBell size={20} style={{ color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-3)' }} />
-                  {unreadCount > 0 && (
-                    <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
-                  )}
+                  {unreadCount > 0 && <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 </button>
                 {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
               </div>
             )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}>
-                <FiDownload size={20} style={{ color: 'var(--text-3)' }} />
-              </button>
-              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>}
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title={t('restore', 'Restore')} style={{ width: '40px', height: '40px' }}>
-                <FiUpload size={20} style={{ color: 'var(--text-3)' }} />
-              </button>
-              {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>}
-            </div>
-            
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              accept=".json" 
-              onChange={handleImport} 
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}><FiDownload size={20} style={{ color: 'var(--text-3)' }} /></button>{!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><button className="icon-btn" onClick={() => fileInputRef.current?.click()} title={t('restore', 'Restore')} style={{ width: '40px', height: '40px' }}><FiUpload size={20} style={{ color: 'var(--text-3)' }} /></button>{!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>}</div>
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleImport} />
           </div>
         </div>
-        {refreshProgress && (
-          <div className="refresh-progress">
-            <FiRefreshCw size={12} className="spin" />
-            {refreshProgress.done} / {refreshProgress.total}
-          </div>
-        )}
+        {refreshProgress && <div className="refresh-progress"><FiRefreshCw size={12} className="spin" /> {refreshProgress.done} / {refreshProgress.total}</div>}
       </header>
 
       <SummaryBar services={services} />
 
-      <Toolbar
-        filters={filters}
-        onFiltersChange={setFilters}
-        onAdd={() => setDialog({ open: true, service: null })}
-        onRefreshAll={handleRefreshAll}
-        refreshingAll={refreshingAll}
-        activeView={activeView}
-        onViewChange={handleViewChange}
-        trashCount={trash.length}
-        hasServices={services.length > 0 && !loading}
-        services={services}
-        cardStyle={cardStyle}
-        onToggleCardStyle={toggleCardStyle}
-      />
+      <Toolbar filters={filters} onFiltersChange={setFilters} onAdd={() => setDialog({ open: true, service: null })} onRefreshAll={handleRefreshAll} refreshingAll={refreshingAll} activeView={activeView} onViewChange={handleViewChange} trashCount={trash.length} hasServices={services.length > 0 && !loading} services={services} cardStyle={cardStyle} onToggleCardStyle={toggleCardStyle} />
 
-      <NotificationInbox 
-        open={inboxOpen} 
-        onClose={() => setInboxOpen(false)} 
-        onAction={handleNotificationAction}
-      />
+      <NotificationInbox open={inboxOpen} onClose={() => setInboxOpen(false)} onAction={handleNotificationAction} />
 
       {activeView === 'active' && (
-        <>
-          {loading ? (
-            <div className="state-box">
-              <FiRefreshCw size={22} className="spin" />
-              <p>{t('loading_services')}</p>
-            </div>
-          ) : visible.length === 0 ? (
-            <div className="state-box">
-              <FiZap size={28} />
-              <h3>{t('no_services_found')}</h3>
-              <p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>
-              {services.length === 0 && (
-                <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>
-                  {t('add_service')}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid">
-              {visible.map(s => (
-                <ServiceCard
-                  key={s.id}
-                  id={`service-${s.id}`}
-                  service={s}
-                  useAccordion={useAccordion}
-                  cardStyle={cardStyle}
-                  refreshing={refreshingIds.has(s.id)}
-                  isFlashing={flashingId === s.id}
-                  selected={selectedIds.has(s.id)}
-                  selecting={selectedIds.size > 0}
-                  onToggleSelect={toggleSelect}
-                  onRefresh={async () => {
-                    const tst = toast.loading('Refreshing…');
-                    try {
-                      const updated = await actions.refresh(s.id);
-                      toast.success('Refreshed', { id: tst });
-                      if (ph) ph.capture('service_refreshed', { id: s.id });
-                      if (updated) await trackBill(s, updated);
-                    } catch (e) {
-                      if (e?.message === 'CANCELLED') toast.dismiss(tst);
-                      else {
-                        toast.error(`Refresh failed: ${e?.message || 'Unknown error'}`, { id: tst });
-                        if (ph) ph.capture('service_refresh_failed', { id: s.id, error: e?.message });
-                      }
-                    }
-                  }}
-                  onEdit={() => setDialog({ open: true, service: s })}
-                  onAbout={() => setAboutDialog({ open: true, service: s })}
-                  onDelete={() => {
-                    setConfirmState({
-                      open: true,
-                      title: 'Move to Trash?',
-                      description: 'This service will be moved to the Trash.\nYou can restore it later from the Trash section.',
-                      isDanger: true,
-                      onConfirm: async () => {
-                        const tst = toast.loading('Moving to trash…');
-                        try {
-                          await actions.remove(s.id);
-                          toast.success('Moved to trash', { id: tst });
-                          if (ph) ph.capture('service_trashed', { id: s.id });
-                          clearSelection();
-                        } catch (e) {
-                          toast.error(`Failed to move: ${e?.message || 'Unknown error'}`, { id: tst });
-                        }
-                      }
-                    });
-                  }}
-                  onTogglePin={() => {
-                    const nextPinned = !s.pinned;
-                    actions.update(s.id, { pinned: nextPinned });
-                    if (ph) ph.capture('service_pinned_toggled', { id: s.id, pinned: nextPinned });
-                  }}
-                  onCalculateBill={(svc) => {
-                    handleCalculateBill(svc);
-                    if (ph) ph.capture('calculator_opened', { id: svc.id });
-                  }}
-                  onShowQR={(svc) => setQrDialog({ open: true, service: svc })}
-                  onPay={() => {
-                    handlePay(s);
-                    if (ph) ph.capture('pay_clicked', { id: s.id });
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </>
+        <>{loading ? <div className="state-box"><FiRefreshCw size={22} className="spin" /><p>{t('loading_services')}</p></div> : visible.length === 0 ? <div className="state-box"><FiZap size={28} /><h3>{t('no_services_found')}</h3><p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>{services.length === 0 && <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>{t('add_service')}</button>}</div> : <div className="grid">
+          {visible.map(s => (
+            <ServiceCard key={s.id} id={`service-${s.id}`} service={s} useAccordion={useAccordion} cardStyle={cardStyle} refreshing={refreshingIds.has(s.id)} isFlashing={flashingId === s.id} selected={selectedIds.has(s.id)} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRefresh={async () => { const tst = toast.loading('Refreshing…'); try { const updated = await actions.refresh(s.id); toast.success('Refreshed', { id: tst }); if (updated) await trackBill(s, updated); } catch (e) { if (e?.message !== 'CANCELLED') toast.error(`Refresh failed`, { id: tst }); } }} onEdit={() => setDialog({ open: true, service: s })} onAbout={() => setAboutDialog({ open: true, service: s })} onDelete={() => { setConfirmState({ open: true, title: 'Move to Trash?', description: 'This service will be moved to the Trash.', isDanger: true, onConfirm: async () => { const tst = toast.loading('Moving to trash…'); try { await actions.remove(s.id); toast.success('Moved to trash', { id: tst }); clearSelection(); } catch (e) { toast.error(`Failed to move`, { id: tst }); } } }); }} onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })} onCalculateBill={(svc) => handleCalculateBill(svc)} onShowQR={(svc) => setQrDialog({ open: true, service: svc })} onPay={() => handlePay(s)} onShare={() => handleShare(s)} onShareReport={() => handleShareMonthlyReport(s)} />
+          ))}</div>}</>
       )}
 
-      {activeView === 'trash' && (
-        <TrashView
-          services={trash}
-          selectedIds={selectedIds}
-          selecting={selectedIds.size > 0}
-          onToggleSelect={toggleSelect}
-          onRestore={id => {
-            setConfirmState({
-              open: true,
-              title: 'Restore service?',
-              description: 'This service will be moved back to your active list.',
-              isDanger: false,
-              onConfirm: async () => {
-                const tst = toast.loading('Restoring…');
-                try {
-                  await actions.restore(id);
-                  toast.success('Restored', { id: tst });
-                  if (ph) ph.capture('service_restored_from_trash', { id });
-                  clearSelection();
-                  handleViewChange('active');
-                  flashCard(id);
-                } catch (e) {
-                  toast.error(`Restore failed: ${e?.message || 'Unknown error'}` , { id: tst });
-                }
-              }
-            });
-          }}
-          onDeletePermanent={id => {
-            setConfirmState({
-              open: true,
-              title: 'Delete permanently?',
-              description: 'This action cannot be undone and all history will be lost.',
-              isDanger: true,
-              onConfirm: () => toast.promise(actions.purge(id).then(res => {
-                if (ph) ph.capture('service_purged', { id });
-                return res;
-              }), { 
-                loading: 'Deleting…', 
-                success: () => { clearSelection(); return 'Deleted permanently'; }, 
-                error: e => `Delete failed: ${e?.message || 'Unknown error'}` 
-              })
-            });
-          }}
-        />
-      )}
+      {activeView === 'trash' && <TrashView services={trash} selectedIds={selectedIds} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRestore={id => { setConfirmState({ open: true, title: 'Restore service?', description: 'This service will be restored.', isDanger: false, onConfirm: async () => { const tst = toast.loading('Restoring…'); try { await actions.restore(id); toast.success('Restored', { id: tst }); clearSelection(); handleViewChange('active'); flashCard(id); } catch (e) { toast.error(`Restore failed`, { id: tst }); } } }); }} onDeletePermanent={id => { setConfirmState({ open: true, title: 'Delete permanently?', description: 'This action cannot be undone.', isDanger: true, onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: () => { clearSelection(); return 'Deleted permanently'; }, error: 'Delete failed' }) }); }} />}
 
-      <ServiceDialog
-        open={dialog.open}
-        service={dialog.service}
-        services={services}
-        onClose={() => setDialog({ open: false, service: null })}
-        onSubmit={submitService}
-      />
-
-      <ServiceAboutDialog
-        open={aboutDialog.open}
-        service={aboutDialog.service}
-        onClose={() => setAboutDialog({ open: false, service: null })}
-      />
-
-      <BillCalculator
-        open={calculator.open}
-        service={calculator.service}
-        onClose={() => setCalculator({ open: false, service: null })}
-      />
-
-      <QRCodeDialog
-        open={qrDialog.open}
-        service={qrDialog.service}
-        onClose={() => setQrDialog({ open: false, service: null })}
-        onUpdateTime={(id, time) => {
-          actions.update(id, { billTime: time });
-          // Update the dialog's local service state to refresh QR
-          setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } }));
-        }}
-      />
-
-      {bulkResult && (
-        <div className="overlay overlay--center" onClick={() => setBulkResult(null)}>
-          <div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}>
-            <h2 className="dialog__title">Bulk Add Results</h2>
-            <div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>
-              {bulkResult.succeeded.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p>
-                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p>
-                </div>
-              )}
-              {bulkResult.inTrash.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped - Already in Trash ({bulkResult.inTrash.length})</p>
-                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p>
-                </div>
-              )}
-              {bulkResult.alreadyExists.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Skipped - Already Active ({bulkResult.alreadyExists.length})</p>
-                  <p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.alreadyExists.length}</p>
-                </div>
-              )}
-              {bulkResult.failed.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>
-                  {bulkResult.failed.map((f, i) => (
-                    <p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="dialog__footer">
-              <button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        description={confirmState.description}
-        isDanger={confirmState.isDanger}
-        onClose={() => setConfirmState(prev => ({ ...prev, open: false }))}
-        onConfirm={confirmState.onConfirm}
-      />
+      <ServiceDialog open={dialog.open} service={dialog.service} services={services} onClose={() => setDialog({ open: false, service: null })} onSubmit={submitService} />
+      <ServiceAboutDialog open={aboutDialog.open} service={aboutDialog.service} onClose={() => setAboutDialog({ open: false, service: null })} />
+      <BillCalculator open={calculator.open} service={calculator.service} onClose={() => setCalculator({ open: false, service: null })} />
+      <QRCodeDialog open={qrDialog.open} service={qrDialog.service} onClose={() => setQrDialog({ open: false, service: null })} onUpdateTime={(id, time) => { actions.update(id, { billTime: time }); setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } })); }} />
+      {bulkResult && <div className="overlay overlay--center" onClick={() => setBulkResult(null)}><div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}><h2 className="dialog__title">Bulk Add Results</h2><div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>{bulkResult.succeeded.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p></div>}{bulkResult.inTrash.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped ({bulkResult.inTrash.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p></div>}{bulkResult.alreadyExists.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Already Active ({bulkResult.alreadyExists.length})</p></div>}{bulkResult.failed.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>{bulkResult.failed.map((f, i) => (<p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>))}</div>}</div><div className="dialog__footer"><button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button></div></div></div>}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description} isDanger={confirmState.isDanger} onClose={() => setConfirmState(prev => ({ ...prev, open: false }))} onConfirm={confirmState.onConfirm} />
     </div>
   );
 }
