@@ -225,7 +225,7 @@ function AppContent() {
             </div>
             
             <div style={{ flex: 1 }}>
-              <div className="scard" style={{ padding: '20px' }}>
+              <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
                 <h3 style={{ marginBottom: '16px', fontSize: '15px' }}>{t('appearance')}</h3>
                 <div className="field">
                   <label className="field__label">{t('theme')}</label>
@@ -275,28 +275,30 @@ function AppContent() {
                 </div>
               </div>
 
-              <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
-                <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>Notifications</h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
-                  Keep your bill reminders up to date.
-                </p>
-                <button 
-                  className="btn btn--ghost"
-                  style={{ marginTop: '16px', width: '100%', justifyContent: 'center', color: 'var(--primary)' }}
-                  onClick={async () => {
-                    try {
-                      const success = await syncPushTokenWithServer(null, true);
-                      if (success) {
-                        toast.success('Notifications synced successfully!');
+              {Capacitor.getPlatform() !== 'web' && (
+                <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
+                  <h3 style={{ marginBottom: '12px', fontSize: '15px' }}>Notifications</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
+                    Keep your bill reminders up to date.
+                  </p>
+                  <button 
+                    className="btn btn--ghost"
+                    style={{ marginTop: '16px', width: '100%', justifyContent: 'center', color: 'var(--primary)' }}
+                    onClick={async () => {
+                      try {
+                        const success = await syncPushTokenWithServer(null, true);
+                        if (success) {
+                          toast.success('Notifications synced successfully!');
+                        }
+                      } catch (err) {
+                        toast.error(err.message || 'Failed to sync notifications');
                       }
-                    } catch (err) {
-                      toast.error(err.message || 'Failed to sync notifications');
-                    }
-                  }}
-                >
-                  Sync Notifications
-                </button>
-              </div>
+                    }}
+                  >
+                    Sync Notifications
+                  </button>
+                </div>
+              )}
 
               <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
                 <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5' }}>
