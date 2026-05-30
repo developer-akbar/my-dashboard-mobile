@@ -1,12 +1,15 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const config: CapacitorConfig = {
   appId: 'com.akbar.mydashboard',
   appName: 'My Dashboard',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: false
+    // cleartext and allowMixedContent REMOVED for production.
+    // All API calls go to HTTPS (Vercel). HTTP is not needed.
   },
   plugins: {
     CapacitorSQLite: {
@@ -18,13 +21,15 @@ const config: CapacitorConfig = {
       electronMacLocation: '/Users/Shared/CapacitorDatabases',
       electronLinuxLocation: 'Databases'
     },
-    "CapacitorHttp": {"enabled": true},
-    "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
+    CapacitorHttp: { enabled: true },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert']
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#6366f1',
+      sound: 'beep.wav',
     }
-  },
-  "android": {
-    "allowMixedContent": true
   }
 };
 

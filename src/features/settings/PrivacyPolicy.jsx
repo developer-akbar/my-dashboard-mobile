@@ -13,35 +13,46 @@ export function PrivacyPolicy({ onBack }) {
       </header>
       
       <div style={{ flex: 1, paddingBottom: '40px' }}>
-        <div className="scard" style={{ padding: '20px', lineHeight: '1.6', color: 'var(--text-2)' }}>
-          <p><strong>Effective Date:</strong> May 28, 2026</p>
-          
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>1. Introduction</h3>
-          <p>Welcome to My Dashboard. This Privacy Policy explains how we collect, use, and protect your information when you use our mobile application and web services.</p>
-          
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>2. Information We Collect</h3>
-          <p><strong>Service Numbers:</strong> We collect and store APSPDCL service numbers that you add to the app to fetch and display electricity bill details.</p>
-          <p><strong>Device Information:</strong> We collect device push notification tokens to send you timely bill reminders and overdue alerts.</p>
-          <p><strong>Usage Data:</strong> We may collect anonymous usage data and crash reports to improve app performance and user experience.</p>
+        <div className="scard" style={{ padding: '24px', lineHeight: '1.7', color: 'var(--text-2)' }}>
+          <p className="meta" style={{ color: 'var(--text-3)', fontSize: '13px', marginBottom: '24px' }}>
+            <strong>Last updated:</strong> June 2025 • <strong>App:</strong> My Dashboard (com.akbar.mydashboard)
+          </p>
 
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>3. How We Use Your Information</h3>
+          <div style={{ background: 'var(--surface-3)', borderLeft: '4px solid var(--primary)', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+            <strong style={{ color: 'var(--primary)' }}>Summary:</strong> My Dashboard does not collect, store, or share any personal data on external servers. All your primary data stays on your device.
+          </div>
+
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>1. What Data We Collect</h2>
+          <p>My Dashboard does <strong>not</strong> collect any personally identifiable information. The app stores the following data <strong>locally on your device only</strong>:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li style={{ marginBottom: '4px' }}>To provide, maintain, and improve the app's core functionality.</li>
-            <li style={{ marginBottom: '4px' }}>To fetch verified bill data from external providers (APSPDCL).</li>
-            <li style={{ marginBottom: '4px' }}>To send targeted push notifications regarding your bill statuses.</li>
+            <li>APSPDCL service numbers you add (stored in local database).</li>
+            <li>Bill history and payment records fetched from public APIs.</li>
+            <li>App preferences (theme, language).</li>
+            <li>Temporary session tokens (stored in memory only).</li>
           </ul>
 
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>4. Data Storage and Security</h3>
-          <p>Your service numbers are primarily stored locally on your device. When synced for push notifications, they are securely transmitted to our backend using encrypted HTTPS connections. We employ industry-standard security measures to protect your data from unauthorized access.</p>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>2. Third-Party Services</h2>
+          <p>The app communicates with the following services to provide functionality:</p>
+          <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+            <li><strong>APSPDCL:</strong> To fetch electricity bill and payment history.</li>
+            <li><strong>BillDesk:</strong> To fetch current bill demand via captcha.</li>
+            <li><strong>Vercel:</strong> Our processing proxy. It makes requests on your behalf and <strong>does not store</strong> user data.</li>
+            <li><strong>PostHog (Web only):</strong> Provides anonymous usage analytics (page views).</li>
+          </ul>
 
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>5. Third-Party Services</h3>
-          <p>The app connects to APSPDCL and BillDesk exclusively for bill fetching and payments. We are not responsible for the privacy practices of these third-party platforms once you are redirected. We also use PostHog for anonymous usage analytics.</p>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>3. Push Notifications</h2>
+          <p>If you grant permission, we use <strong>Firebase Cloud Messaging (FCM)</strong> to send bill reminders. To enable this, your service numbers are synced with our secure backend to check for bill updates. This data is used <strong>exclusively</strong> for triggering notifications and is never shared or used for marketing.</p>
 
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>6. Your Rights</h3>
-          <p>You can delete your service numbers from the app at any time, which will immediately stop future tracking and notifications for those numbers. You may also disable push notifications completely via your device's operating system settings.</p>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>4. Data Deletion & Rights</h2>
+          <p>All data is stored locally. You can delete it at any time by:</p>
+          <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+            <li>Removing services via the <strong>Trash</strong> feature.</li>
+            <li>Uninstalling the app (clears all local data).</li>
+            <li>Clearing App Storage in your Android device settings.</li>
+          </ul>
 
-          <h3 style={{ marginTop: '20px', marginBottom: '8px', color: 'var(--text-1)' }}>7. Contact Us</h3>
-          <p>If you have any questions or concerns about this Privacy Policy, please contact us at: <strong>mail.akbarmulla@gmail.com</strong></p>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>5. Contact Us</h2>
+          <p>For any privacy-related questions, contact: <a href="mailto:mail.akbarmulla@gmail.com" style={{ color: 'var(--primary)' }}>mail.akbarmulla@gmail.com</a></p>
         </div>
       </div>
     </div>

@@ -3,19 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0f1117" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="description" content="My Dashboard – Personal tracking hub" />
+
+    <!-- Primary meta -->
+    <title>My Dashboard — Electricity Bill Tracker</title>
+    <meta name="description" content="Track your APSPDCL electricity bills, dues, payment history, and consumption trends. Free personal utility dashboard." />
+    <meta name="author" content="Akbar" />
+    <meta name="keywords" content="APSPDCL, electricity bill, bill tracker, Andhra Pradesh, utility dashboard" />
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#6366f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)" />
+
+    <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
-    <title>My Dashboard</title>
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MyDashboard" />
+
+    <!-- Icons -->
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="apple-touch-icon" href="/logo.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="My Dashboard — Electricity Bill Tracker" />
+    <meta property="og:description" content="Track your APSPDCL electricity bills, dues, and payment history." />
+    <meta property="og:image" content="/logo.svg" />
+
+    <!-- Security: prevent MIME sniffing -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="font-family:sans-serif;text-align:center;padding:40px">
+        My Dashboard requires JavaScript. Please enable it in your browser settings.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

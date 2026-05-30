@@ -7,10 +7,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      // All /api/* calls → our local API server
-      // APSPDCL endpoints never appear in browser DevTools
       '/api': {
-        target: 'http://localhost:4100',
+        target: 'http://localhost:4201',
         changeOrigin: true,
       }
     }
@@ -18,5 +16,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Warn on chunks > 1MB instead of 500KB (recharts + tesseract are large)
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom'],
+          'vendor-recharts': ['recharts'],
+          'vendor-i18n':     ['react-i18next', 'i18next', 'i18next-browser-languagedetector'],
+          'vendor-qr':       ['qrcode.react'],
+          'vendor-dayjs':    ['dayjs'],
+        }
+      }
+    }
   }
 });
