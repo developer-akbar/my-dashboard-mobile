@@ -40,6 +40,11 @@ export function NotificationInbox({ open, onClose, onAction }) {
       return new Date(b.timestamp) - new Date(a.timestamp);
     });
     setNotifications(sorted);
+    
+    // Trigger global UI update (badge)
+    if (typeof window !== 'undefined' && window.updateUnread) {
+      window.updateUnread();
+    }
   };
 
   const deleteNotification = async (id) => {
@@ -47,11 +52,21 @@ export function NotificationInbox({ open, onClose, onAction }) {
     const updated = data.filter(n => n.id !== id);
     await db.setSetting('notification_history', updated);
     setNotifications(updated);
+
+    // Trigger global UI update (badge)
+    if (typeof window !== 'undefined' && window.updateUnread) {
+      window.updateUnread();
+    }
   };
 
   const clearAll = async () => {
     await db.setSetting('notification_history', []);
     setNotifications([]);
+
+    // Trigger global UI update (badge)
+    if (typeof window !== 'undefined' && window.updateUnread) {
+      window.updateUnread();
+    }
   };
 
   if (!open) return null;
@@ -128,20 +143,22 @@ export async function saveNotificationToHistory(notification) {
   try {
     const history = await db.getSetting('notification_history') || [];
     
-    // De-duplicate: If we got the same message for the same bill in the last 10 seconds, skip
-    const isDuplicate = history.length > 0 && 
-      history[0].serviceNumber === notification.serviceNumber &&
-      history[0].body === notification.body &&
-      (Date.now() - new Date(history[0].timestamp).getTime() < 10000);
+    // De-duplicate: If a notification with the same body and SN exists, skip.
+    // This is more robust than just checking the last item or timestamp.
+    const isDuplicate = history.some(n => 
+      n.serviceNumber === notification.serviceNumber &&
+      n.body === notification.body
+    );
       
     if (isDuplicate) {
-      console.log('[inbox] Skipping duplicate notification');
+      console.log('[inbox] Skipping duplicate notification entry');
       return history;
     }
 
     const newNotif = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      timestamp: new Date().toISOString(),
+      // Use the provided ID if available (from native tray), otherwise generate unique
+      id: notification.id || `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: notification.timestamp || new Date().toISOString(),
       read: false,
       ...notification
     };

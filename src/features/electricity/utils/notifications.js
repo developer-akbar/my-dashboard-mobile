@@ -111,8 +111,21 @@ export async function setupPushNotifications() {
             await saveNotificationToHistory(payload);
           }
 
-          if (typeof window !== 'undefined' && window.updateUnread) {
-            window.updateUnread();
+          // Clear processed notifications from the system tray
+          await PushNotifications.removeAllDeliveredNotifications();
+
+          // Refresh UI - Retry 3 times with increasing delay to ensure Dashboard is ready
+          const refresh = () => {
+            if (typeof window !== 'undefined' && window.updateUnread) {
+              window.updateUnread();
+              return true;
+            }
+            return false;
+          };
+
+          if (!refresh()) {
+            setTimeout(refresh, 1000);
+            setTimeout(refresh, 3000);
           }
         }
       } catch (e) {
