@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
+import { LuZap } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import { App as CapApp } from '@capacitor/app';
 import { Analytics } from '@vercel/analytics/react';
@@ -11,6 +12,8 @@ import { ElectricityDashboard } from '../features/electricity/ElectricityDashboa
 import { CalculationSettings } from '../features/electricity/components/CalculationSettings.jsx';
 import { setupPushNotifications, syncPushTokenWithServer } from '../features/electricity/utils/notifications.js';
 import { PrivacyPolicy } from '../features/settings/PrivacyPolicy.jsx';
+import { ApplianceCalculator } from '../features/electricity/components/ApplianceCalculator.jsx';
+import { Capacitor } from '@capacitor/core';
 
 // ── PostHog Initialization ──────────────────────────────────────────────────
 if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
@@ -24,6 +27,7 @@ if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
 
 const NAV = [
   { id: 'electricity', icon: FiZap },
+  { id: 'appliances',  icon: LuZap },
   { id: 'home',        icon: FiGrid },
   { id: 'settings',    icon: FiSettings },
 ];
@@ -39,11 +43,17 @@ function AppContent() {
   const { t, i18n } = useTranslation();
   const ph = usePostHog();
 
+  const [applianceCalcOpen, setApplianceCalcOpen] = useState(false);
+
   // ── PWA Install Banner State ──────────────────────────────────────────────
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const handleNavClick = (id) => {
+    if (id === 'appliances') {
+      setApplianceCalcOpen(true);
+      return;
+    }
     if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
     setActivePage(id);
   };
@@ -53,14 +63,12 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    // 1. Listen for the install prompt event
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // 2. Timer to show banner after 1 minute
     const timer = setTimeout(() => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isCapacitor = window.Capacitor?.getPlatform() !== 'web';
@@ -70,14 +78,14 @@ function AppContent() {
       
       let isDismissed = false;
       if (dismissalTime) {
-        const hoursPassed = (Date.now() - parseInt(dismissalTime, 10)) / (1000 * 60 * 60);
+        const hoursPassed = (Date.now() - parseInt(dismissalTime, 10)) / (1000 * 60 * 60 * 24);
         if (hoursPassed < 24) isDismissed = true;
       }
 
       if (!isStandalone && !isCapacitor && !isDismissed && !isInstalled) {
         setShowInstallBanner(true);
       }
-    }, 60000); // 60 seconds
+    }, 60000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -87,7 +95,7 @@ function AppContent() {
 
   const handleInstallClick = async () => {
     setShowInstallBanner(false);
-    localStorage.setItem('pwa_installed', 'true'); // Assume intent is enough to hide for a long time
+    localStorage.setItem('pwa_installed', 'true');
 
     if (!deferredPrompt) {
       toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
@@ -122,32 +130,23 @@ function AppContent() {
   // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
     const onBack = async () => {
-      // 1. Give priority to child components (like clearing selection)
       const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
       window.dispatchEvent(backEvent);
       
       if (backEvent.detail.handled) return;
 
-      // 2. If on a sub-page, go back to dashboard
       if (activePage !== 'electricity') {
         setActivePage('electricity');
         return;
       }
 
-      // 3. Otherwise exit app (on Android)
       CapApp.exitApp();
     };
 
-    // Capacitor listener
     const capHandler = CapApp.addListener('backButton', onBack);
-
-    // Browser listener (popstate)
-    const popHandler = () => {
-       onBack();
-    };
+    const popHandler = () => { onBack(); };
     window.addEventListener('popstate', popHandler);
 
-    // Push initial state to history so back button has something to pop in browser
     if (window.history.state !== 'root') {
       window.history.replaceState('root', '');
       window.history.pushState('nav', '');
@@ -159,7 +158,6 @@ function AppContent() {
     };
   }, [activePage]);
 
-  // Sync browser history with tab changes so browser back works
   useEffect(() => {
     if (window.history.state !== 'nav') {
        window.history.pushState('nav', '');
@@ -371,6 +369,11 @@ function AppContent() {
       
       <Analytics />
       <SpeedInsights />
+
+      <ApplianceCalculator 
+        open={applianceCalcOpen} 
+        onClose={() => setApplianceCalcOpen(false)} 
+      />
     </div>
   );
 }
