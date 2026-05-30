@@ -212,11 +212,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLinkSignal);
-    
-    // Watch for inbox closing to sync unread count
-    if (!inboxOpen) {
-      updateUnread();
-    }
 
     if (!loading && services.length > 0) {
       if (pendingDeepLink.current) {
@@ -232,8 +227,12 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       window.removeEventListener('notification-received', handleNotif);
       window.removeEventListener('notification-deep-link', handleDeepLinkSignal);
     };
-  }, [loading, services]);
+    }, [loading, services]);
 
+    // Sync unread count when inbox closes or opens
+    useEffect(() => {
+    if (!isWeb) updateUnread();
+    }, [inboxOpen]);
   const handleNotificationAction = (notification) => {
     setInboxOpen(false);
     if (notification.serviceNumber) {
