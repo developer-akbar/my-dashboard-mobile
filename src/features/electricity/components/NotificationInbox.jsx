@@ -31,20 +31,27 @@ export function NotificationInbox({ open, onClose, onAction }) {
   };
 
   const markAsRead = async (id) => {
-    const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
-    setNotifications(updated);
+    const data = await db.getSetting('notification_history') || [];
+    const updated = data.map(n => n.id === id ? { ...n, read: true } : n);
     await db.setSetting('notification_history', updated);
+    // Refresh local state to reflect change immediately
+    const sorted = [...updated].sort((a, b) => {
+      if (a.read !== b.read) return a.read ? 1 : -1;
+      return new Date(b.timestamp) - new Date(a.timestamp);
+    });
+    setNotifications(sorted);
   };
 
   const deleteNotification = async (id) => {
-    const updated = notifications.filter(n => n.id !== id);
-    setNotifications(updated);
+    const data = await db.getSetting('notification_history') || [];
+    const updated = data.filter(n => n.id !== id);
     await db.setSetting('notification_history', updated);
+    setNotifications(updated);
   };
 
   const clearAll = async () => {
-    setNotifications([]);
     await db.setSetting('notification_history', []);
+    setNotifications([]);
   };
 
   if (!open) return null;
