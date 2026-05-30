@@ -70,7 +70,9 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     if (loading || services.length === 0) return;
     
     const history = await db.getSetting('notification_history') || [];
-    let updated = false;
+    const processed = await db.getSetting('processed_notifications') || {}; // { serviceNumber: { amount, type } }
+    let historyUpdated = false;
+    let processedUpdated = false;
 
     for (const svc of services) {
       if (!svc.isPaid && svc.lastAmountDue > 0) {
@@ -81,33 +83,51 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
 
         if (diffDays <= 4) {
-          // Check if we already have a notification for this specific bill amount
-          const exists = history.some(n => 
-            n.serviceNumber === svc.serviceNumber && 
-            n.body.includes(svc.lastAmountDue.toString())
-          );
+          const type = diffDays < 0 ? 'BILL_OVERDUE' : 'BILL_REMINDER';
+          const currentKey = `${svc.lastAmountDue}_${type}`;
+          
+          // Check if we have ALREADY processed this specific bill amount AND type
+          const alreadyProcessed = processed[svc.serviceNumber] === currentKey;
+          
+          if (!alreadyProcessed) {
+            // Also double check history just in case (standard check)
+            const inHistory = history.some(n => 
+              n.serviceNumber === svc.serviceNumber && 
+              n.body.includes(svc.lastAmountDue.toString()) &&
+              n.type === type
+            );
 
-          if (!exists) {
-            const type = diffDays < 0 ? 'BILL_OVERDUE' : 'BILL_REMINDER';
-            const title = diffDays < 0 ? 'Bill Overdue' : 'Bill Due Soon';
-            const body = diffDays < 0 
-              ? `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is overdue!`
-              : `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is due in ${diffDays} days.`;
+            if (!inHistory) {
+              const title = diffDays < 0 ? 'Bill Overdue' : 'Bill Due Soon';
+              const body = diffDays < 0 
+                ? `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is overdue!`
+                : `Your bill of ₹${svc.lastAmountDue} for ${svc.serviceNumber} is due in ${diffDays} days.`;
 
-            await saveNotificationToHistory({
-              title,
-              body,
-              serviceNumber: svc.serviceNumber,
-              type,
-              read: false
-            });
-            updated = true;
+              await saveNotificationToHistory({
+                title,
+                body,
+                serviceNumber: svc.serviceNumber,
+                type,
+                read: false
+              });
+              
+              processed[svc.serviceNumber] = currentKey;
+              historyUpdated = true;
+              processedUpdated = true;
+            } else {
+              // It's in history but not in our processed log (maybe from a previous version)
+              processed[svc.serviceNumber] = currentKey;
+              processedUpdated = true;
+            }
           }
         }
       }
     }
 
-    if (updated) updateUnread();
+    if (processedUpdated) {
+      await db.setSetting('processed_notifications', processed);
+    }
+    if (historyUpdated) updateUnread();
   };
 
   useEffect(() => {
