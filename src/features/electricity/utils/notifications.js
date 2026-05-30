@@ -90,6 +90,36 @@ export async function setupPushNotifications() {
     // Register with FCM
     await PushNotifications.register();
 
+    // 4. BOOT SYNC: Catch any notifications that were delivered while app was closed
+    // but the user opened the app directly (without tapping a notification).
+    setTimeout(async () => {
+      try {
+        const delivered = await PushNotifications.getDeliveredNotifications();
+        if (delivered.notifications?.length > 0) {
+          console.log('[push] Syncing delivered notifications on boot:', delivered.notifications.length);
+          
+          for (const notif of delivered.notifications) {
+            const payload = {
+              id: notif.id,
+              title: notif.title || 'Bill Update',
+              body: notif.body || '',
+              serviceNumber: notif.data?.serviceNumber,
+              type: notif.data?.type || 'BILL_REMINDER',
+              read: false,
+              timestamp: new Date().toISOString()
+            };
+            await saveNotificationToHistory(payload);
+          }
+
+          if (typeof window !== 'undefined' && window.updateUnread) {
+            window.updateUnread();
+          }
+        }
+      } catch (e) {
+        console.warn('[push] Boot sync failed', e);
+      }
+    }, 1000); // 1s delay to ensure DB and window.updateUnread are ready
+
   } catch (err) {
     console.error('[push] setup error:', err);
   }

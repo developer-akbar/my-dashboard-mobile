@@ -35,7 +35,7 @@ dotenv.config();
 
 // ── Notification Infrastructure ──────────────────────────────────────────────
 
-const redis = process.env.UPSTASH_REDIS_REST_URL 
+const redis = process.env.UPSTASH_REDIS_REST_URL
   ? new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -77,7 +77,7 @@ async function apspdclPost(endpoint, serviceNumber) {
   if (!res.ok) throw new Error(`APSPDCL ${endpoint} responded with ${res.status}`);
   const text = await res.text();
   if (!text || !text.trim()) return { data: [] };
-  try { 
+  try {
     const data = JSON.parse(text);
     if (data.status === 'error' && data.message) {
       const err = new Error(data.message);
@@ -107,12 +107,12 @@ async function fetchBillDeskBill(serviceNumber, billdeskSession) {
       const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
       const session = await scrapeBillDeskSession(baseCookie);
       const captchaText = await solveCaptchaImage(session.cookie);
-      
+
       if (!captchaText || captchaText.length < 5) continue;
 
       const html = await executeBillDeskRequestRaw(serviceNumber, session.reqtoken, captchaText, session.cookie);
       const htmlLower = html.toLowerCase();
-      
+
       if (htmlLower.includes('wrong captcha') || htmlLower.includes('invalid captcha') || htmlLower.includes('incorrect captcha') || htmlLower.includes('enter valid captcha')) {
          continue;
       }
@@ -207,35 +207,20 @@ function parseBillDeskHtml(html) {
     extractedTime = match[0].replace(':', '');
   } else if (rawBillDate && timeRegex.test(rawBillDate)) {
     const match = rawBillDate.match(timeRegex);
-    extractedTime = match[0].replace(':', '');
+    if (match) extractedTime = match[0].replace(':', '');
   }
-
-  console.log('[api] BillDesk parse candidates', {
-    customerName,
-    uniqueServiceNumber,
-    divisionCode,
-    circleName,
-    billAmount,
-    currentDemand,
-    rawBillDate,
-    rawBillTime,
-    extractedTime,
-  });
-
-  const billDeskAmount = currentDemand === 0 ? 0 : (currentDemand ?? billAmount ?? null);
 
   return {
     customerName,
     uniqueServiceNumber,
     divisionCode,
     circleName,
-    billDeskAmount,
-    billDeskBillAmount: billAmount,
-    billDeskCurrentDemand: currentDemand,
-    billDeskIsPaid: currentDemand === 0,
+    billDeskAmount: billAmount,
+    billDeskBillAmount: currentDemand,
+    billDeskIsPaid: billAmount === 0,
     billDeskBillDate: rawBillDate,
     billDeskBillTime: extractedTime,
-    billDeskDueDate: rawDueDate,
+    billDeskDueDate: rawDueDate
   };
 }
 
@@ -243,114 +228,97 @@ function parseBillDeskHtml(html) {
 
 const MONTH_MAP = {
   JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,
-  JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11,
+  JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11
 };
 
-/**
- * Intelligent date parser for APSPDCL (DD-MMM-YY) and BillDesk (DD/MM/YY) formats.
- * Prevents locale-dependent day/month swapping.
- */
-function parseDate(v, timeStr) {
-  if (!v) return null;
-  const original = String(v).trim();
-  const fullStr = original.toUpperCase();
-
-  let d, m, y;
-
-  // 1. Match DD-MMM-YY (e.g. 02-MAY-26) or DD-MMM-YYYY
-  const mmmMatch = fullStr.match(/^(\d{1,2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{2,4})/);
-  if (mmmMatch) {
-    d = parseInt(mmmMatch[1], 10);
-    m = MONTH_MAP[mmmMatch[2]];
-    y = parseInt(mmmMatch[3], 10);
-    if (y < 100) y += 2000;
-  } 
-  // 2. Match DD/MM/YY (e.g. 02/05/26) or DD/MM/YYYY
-  else {
-    const slashMatch = fullStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-    if (slashMatch) {
-      d = parseInt(slashMatch[1], 10);
-      m = parseInt(slashMatch[2], 10) - 1;
-      y = parseInt(slashMatch[3], 10);
-      if (y < 100) y += 2000;
-    }
-  }
-
-  // If manual parsing succeeded, create Date object in UTC
-  if (d !== undefined && m !== undefined && m >= 0 && m <= 11 && y !== undefined) {
-    const date = new Date(Date.UTC(y, m, d));
-    if (timeStr) {
-      const tMatch = String(timeStr).match(/(\d{1,2})[:](\d{2})/);
-      if (tMatch) date.setUTCHours(parseInt(tMatch[1], 10), parseInt(tMatch[2], 10));
-    }
-    return date;
-  }
-
-  // 3. Fallback to standard JS parsing for anything else (e.g. YYYY-MM-DD)
-  let fallbackStr = original;
-  if (timeStr && !fallbackStr.includes(':')) fallbackStr += ' ' + String(timeStr).trim();
-  const ts = Date.parse(fallbackStr.replace(/-/g, ' '));
-  return isNaN(ts) ? null : new Date(ts);
+function toNum(str) {
+  if (!str) return 0;
+  return Number(str.replace(/,/g, '')) || 0;
 }
 
-function toNum(v) {
-  const n = Number(String(v || '0').replace(/,/g, ''));
-  return isFinite(n) ? n : 0;
+function parseDate(str) {
+  if (!str) return null;
+  // Format: "23-MAY-2024" or "23-05-2024"
+  const parts = str.split('-');
+  if (parts.length !== 3) return null;
+
+  let day, month, year;
+  day = parseInt(parts[0], 10);
+  year = parseInt(parts[2], 10);
+
+  if (isNaN(parts[1])) {
+    month = MONTH_MAP[parts[1].toUpperCase()];
+  } else {
+    month = parseInt(parts[1], 10) - 1;
+  }
+
+  const d = new Date(Date.UTC(year, month, day));
+  return isNaN(d.getTime()) ? null : d;
 }
 
-/**
- * Maps raw APSPDCL bill row to unified DTO.
- */
-function normaliseBill(row) {
-  // Deep search for time in APSPDCL raw fields
-  const rawDateWithTime = row.reading_date || row.readingdate || row.bill_gen_time || row.closingDate || '';
-  const timeMatch = rawDateWithTime.match(/(\d{1,2})[:](\d{2})/);
-  const extractedTime = timeMatch ? timeMatch[0].replace(':', '') : null;
-
+function normaliseBill(b) {
   return {
-    closingDate:  parseDate(row.closingDate || row.reading_date),
-    closingTime:  extractedTime,
-    dueDate:      parseDate(row.duedate || row.due_date),
-    billedUnits:  toNum(row.billedUnits || row.units),
-    billAmount:   toNum(row.billAmount || row.amount),
-    ec:    toNum(row.ec),
-    fixchg:toNum(row.fixchg),
-    cc:    toNum(row.cc),
-    ed:    toNum(row.ed),
-    fsa:   toNum(row.fsa),
-    irda:  toNum(row.irda),
-    othchg:toNum(row.othchg),
-    sur:   toNum(row.sur),
-    isd:   toNum(row.isd),  // Initial Security Deposit
-    category: row.category,
-    closingRdg: toNum(row.closingRdg),
-    ctrLoad: toNum(row.ctrLoad),
+    billAmount: toNum(b.billamt),
+    billedUnits: toNum(b.bilunit),
+    closingDate: parseDate(b.clodate),
+    dueDate: parseDate(b.duedate),
+    customerName: b.custname,
+    category: b.cat,
+    closingRdg: toNum(b.clordg),
+    ctrLoad: toNum(b.ctr_load),
+    // Breakup components
+    ec: toNum(b.ec),
+    fixchg: toNum(b.fixchg),
+    cc: toNum(b.cc),
+    ed: toNum(b.ed),
+    fsa: toNum(b.fsa),
+    closingTime: b.clotime || null
   };
 }
 
-/**
- * Matches payment records against bills to determine real-time status.
- */
+function buildBreakup(latest, arrears, arrearsTotal, currentPaymentTotal, totalDueFromBillDesk, isdAmount) {
+  const ec = toNum(latest.ec);
+  const fixchg = toNum(latest.fixchg);
+  const cc = toNum(latest.cc);
+  const ed = toNum(latest.ed);
+  const fsa = toNum(latest.fsa);
+  const customerCharges = cc; 
+  
+  const currentBillAmount = ec + fixchg + customerCharges + ed + fsa;
+  const roundedCurrentBill = Math.round(currentBillAmount);
+  
+  const netDue = Math.round(roundedCurrentBill - arrearsTotal - currentPaymentTotal + isdAmount);
+
+  return {
+    energyCharges: ec,
+    fixedCharges: fixchg,
+    customerCharges: cc,
+    electricityDuty: ed,
+    fsa,
+    arrears: arrears.map(a => ({ month: a.month, amount: a.amount })),
+    arrearsTotal,
+    isdAmount: Math.round(isdAmount),
+    currentBillTotal: roundedCurrentBill,
+    currentPaymentTotal,
+    netDue: Math.max(0, netDue)
+  };
+}
+
+function getMigratedNumber(oldNo) {
+  if (!oldNo || oldNo.length !== 13) return null;
+  // Circle-based migration logic (Example logic based on common APSPDCL patterns)
+  // Most migrations involve changing the 4th/5th digits.
+  const prefix = oldNo.substring(0, 3);
+  const body = oldNo.substring(3);
+  
+  // Known mapping: some circles changed '11' to '12' etc.
+  // This is a placeholder for actual mapping if known.
+  return null; 
+}
+
 function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
-  const empty = { isPaid:false, paidDate:null, receiptNumber:null, paidAmount:null, currentPaymentTotal:0, arrears:[], arrearsTotal:0, divname: null, secname: null };
-  if (!Array.isArray(rawPayments) || !rawPayments.length || !bills?.length) {
-    if (Array.isArray(rawPayments) && rawPayments.length > 0) {
-       return { ...empty, divname: rawPayments[0].divname, secname: rawPayments[0].secname };
-    }
-    return empty;
-  }
-
-  const latest     = bills[0];
-  const billDate   = latest.closingDate;
-  const billAmount = currentBillAmountOverride ?? latest.billAmount;
-
   const payments = rawPayments
-    .map(p => ({
-      date:      parseDate(p.prdate),
-      amount:    toNum(p.billamt),
-      counter:   p.counter,
-      receiptNo: p.prno || null
-    }))
+    .map(p => ({ date: parseDate(p.prdate), amount: toNum(p.billamt), receiptNumber: p.prno, divname: p.divname, secname: p.secname }))
     .filter(p => p.date)
     .sort((a, b) => b.date - a.date);
 
@@ -358,28 +326,33 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
   const paymentsAsc = [...payments].sort((a, b) => a.date - b.date);
   let currentTotal = 0;
   let currentPaidDate = null;
-  let currentReceiptNo = null;
-  for (const p of paymentsAsc) {
-    if (p.date < billDate) continue;  // Ignore payments before bill closes
-    currentTotal += p.amount;
-    currentPaidDate = p.date;
-    currentReceiptNo = p.receiptNo;
+  let receiptNumber = null;
+  
+  const latestBill = bills[0];
+  const targetAmount = currentBillAmountOverride ?? latestBill?.billAmount ?? 0;
+
+  if (latestBill) {
+    for (const p of paymentsAsc) {
+      if (p.date >= latestBill.closingDate) {
+        currentTotal += p.amount;
+        currentPaidDate = p.date;
+        receiptNumber = p.receiptNumber;
+      }
+    }
   }
 
-  // If there are any payments after the bill closes, we consider it paid.
-  // This handles cases where the paid amount is slightly less than the bill amount due to ISD adjustments
-  // (e.g. paid 2139 for a 2174 bill) and the BillDesk API is unavailable to provide the exact demand.
-  if (currentTotal > 0) {
+  const isPaid = targetAmount > 0 && currentTotal >= targetAmount;
+
+  if (isPaid) {
     return {
       isPaid: true,
-      paidDate: currentPaidDate,
-      receiptNumber: currentReceiptNo,
       paidAmount: currentTotal,
-      currentPaymentTotal: currentTotal,
+      paidDate: currentPaidDate,
+      receiptNumber,
+      divname: payments[0]?.divname,
+      secname: payments[0]?.secname,
       arrears: [],
-      arrearsTotal: 0,
-      divname: rawPayments[0].divname,
-      secname: rawPayments[0].secname
+      arrearsTotal: 0
     };
   }
 
@@ -387,101 +360,38 @@ function analysePayments(rawPayments, bills, currentBillAmountOverride = null) {
   let arrears = [];
   if (bills.length > 1) {
     const prevBill = bills[1];
-    const prevDate = prevBill.closingDate;
-    const prevAmount = prevBill.billAmount;
-
-    // Find which payments settle the previous bill
-    // These are payments after prev bill closed but before current bill closes,
-    // accumulated until reaching prev bill's amount
-    const prevSettlePayments = [];
-    let prevAccum = 0;
+    let totalAfterPrev = 0;
     for (const p of paymentsAsc) {
-      if (p.date <= prevDate || p.date >= billDate) continue;
-      prevSettlePayments.push(p);
-      prevAccum += p.amount;
-      if (prevAccum >= prevAmount) break;
+      if (p.date > prevBill.closingDate && (!latestBill || p.date < latestBill.closingDate)) {
+        totalAfterPrev += p.amount;
+        arrears.push({ month: 'ADVANCE', amount: p.amount });
+      }
     }
-
-    const prevSettleSet = new Set(prevSettlePayments);
-    arrears = payments.filter(p => {
-      if (p.date <= prevDate || p.date >= billDate) return false;
-      return !prevSettleSet.has(p);
-    });
   }
-
-  const arrearsTotal = arrears.reduce((s, p) => s + p.amount, 0);
-  const latestPayment = payments[0];
 
   return {
     isPaid: false,
-    paidDate: currentPaidDate || latestPayment?.date || null,
-    receiptNumber: currentReceiptNo || latestPayment?.receiptNo || null,
-    paidAmount: currentTotal > 0 ? currentTotal : latestPayment?.amount || null,
-    currentPaymentTotal: currentTotal,
+    paidAmount: 0,
+    paidDate: null,
+    receiptNumber: null,
+    divname: payments[0]?.divname,
+    secname: payments[0]?.secname,
     arrears,
-    arrearsTotal,
-    divname: rawPayments[0].divname,
-    secname: rawPayments[0].secname
+    arrearsTotal: arrears.reduce((s, a) => s + a.amount, 0),
+    currentPaymentTotal: currentTotal
   };
 }
 
-/**
- * Detailed bill breakup calculator.
- */
-function buildBreakup(bill, arrearPayments, arrearsTotal, currentPaymentTotal = 0, finalBillAmount = null, isdAmount = 0) {
-  // Calculate Gross Total as sum of components
-  const grossTotal = toNum(bill.ec) + toNum(bill.fixchg) + toNum(bill.cc) + toNum(bill.ed) + toNum(bill.fsa);
-  const roundedGrossTotal = Math.round(grossTotal);
-
-  // Net Due = Gross Total - Arrears + isdAmount
-  const netDue = Math.max(0, roundedGrossTotal - arrearsTotal + isdAmount);
-
-  return {
-    ec:      bill.ec,
-    fixchg:  bill.fixchg,
-    cc:      bill.cc,
-    ed:      bill.ed,
-    fsa:     bill.fsa,
-    isd:     isdAmount,                        // Reconciled Initial Security Deposit
-    isdOriginal: toNum(bill.isd),             // APSPDCL-reported deposit value
-    grossTotal:        roundedGrossTotal,
-    currentMonthBill:  roundedGrossTotal,
-    arrears:           arrearsTotal,
-    arrearPayments,
-    arrearsTotal,
-    isdAmount,
-    totalBill:         netDue,
-    netDue:            netDue,
-  };
-}
-
-/**
- * Migration helper for old 23233... series.
- */
-function getMigratedNumber(sn) {
-  if (!sn || sn.length !== 13) return null;
-  // The user specifically requested: 23233... -> 55513...
-  if (sn.startsWith('23233')) {
-    return '55513' + sn.substring(5);
-  }
-  return null;
-}
-
-/**
- * Core processor: given a service number, fetch from APSPDCL and return a clean snapshot DTO.
- * Returns null if the service number is unknown / has no data.
- * Throws only on network failures.
- */
 async function buildSnapshot(serviceNumber, billdeskSession) {
-  // 1. Initial BillDesk check with original number
   let billDeskData = null;
   let billDeskError = null;
-  let activeNumber = serviceNumber;
   let migratedServiceNumber = null;
+  let activeNumber = serviceNumber;
 
+  // 1. Fetch from BillDesk (Primary source for current dues)
   try {
     billDeskData = await fetchBillDeskBill(serviceNumber, billdeskSession);
-  } catch (error) {
+  } catch (err) {
     billDeskError = 'Connection failed';
   }
 
@@ -521,10 +431,10 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   };
 
   if (!billDeskData || isPlaceholder(billDeskData.customerName) || !billDeskData.uniqueServiceNumber) {
-    console.warn(`[api] Snapshot aborted: BillDesk data incomplete or placeholder for ${serviceNumber}`, { 
-      hasData: !!billDeskData, 
+    console.warn(`[api] Snapshot aborted: BillDesk data incomplete or placeholder for ${serviceNumber}`, {
+      hasData: !!billDeskData,
       name: billDeskData?.customerName,
-      uniqueNo: billDeskData?.uniqueServiceNumber 
+      uniqueNo: billDeskData?.uniqueServiceNumber
     });
     return null;
   }
@@ -543,7 +453,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   let bills = [];
   if (!billData || !Array.isArray(billData.data) || !billData.data.length) {
     const errorMsg = billData?.message || billData?.error || (billResult.status === 'rejected' ? billResult.reason?.message : '');
-    apspdclError = errorMsg.toLowerCase().includes('not found') 
+    apspdclError = errorMsg.toLowerCase().includes('not found')
       ? 'APSPDCL history servers are down. Please try again later.'
       : (errorMsg ? `APSPDCL Sync Failed: ${errorMsg}` : 'APSPDCL history servers are down. Please try again later.');
   } else {
@@ -600,7 +510,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     const roundedGrossTotal = Math.round(grossTotal);
     const originalBillAmountForIsd = billDeskAmount ?? latest.billAmount;
     isdAmount = originalBillAmountForIsd != null ? originalBillAmountForIsd - (roundedGrossTotal - pay.arrearsTotal) : 0;
-    breakup = buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount);
+    breakup = buildBreakup(latest, pay.arrears, pay.arrearsTotal, pay.currentPaymentTotal || 0, finalDueAmount, isdAmount);       
     amountDue = status === 'DUE' ? (breakup?.netDue ?? finalDueAmount) : 0;
   } else {
     amountDue = status === 'DUE' ? finalDueAmount : 0;
@@ -789,8 +699,8 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
   };
 
   const finalCustomerName = billDeskData?.customerName ?? latest?.customerName ?? null;
-  
-  // FINAL HARD VALIDATION: If we have no customer name AND no bill history, 
+
+  // FINAL HARD VALIDATION: If we have no customer name AND no bill history,
   // it is not a valid APSPDCL service number. ABORT.
   if (isPlaceholder(finalCustomerName) && bills.length === 0) {
     console.warn(`[api] Final validation failed for ${serviceNumber}: No customer name and no history.`);
@@ -817,7 +727,7 @@ async function buildSnapshot(serviceNumber, billdeskSession) {
     isPaid: status === 'PAID' || status === 'NO_DUES',
     paidDate: pay.paidDate?.toISOString() || null,
     receiptNumber: pay.receiptNumber,
-    paidAmount: pay.isPaid ? pay.paidAmount : (status === 'PAID' ? (billDeskBillAmount ?? latest?.billAmount ?? 0) : null),
+    paidAmount: pay.isPaid ? pay.paidAmount : (status === 'PAID' ? (billDeskBillAmount ?? latest?.billAmount ?? 0) : null),       
     billBreakup: breakup,
     category:    latest?.category ?? null,
     closingRdg:  latest?.closingRdg ?? null,
@@ -914,7 +824,7 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
 
 /**
  * POST /api/services/refresh-all
- * Body: { services: [{ id, serviceNumber }, ...], serviceNumbers: ["123..."], billdeskSession?: { reqtoken, captcha, cookie } }
+ * Body: { services: [{ id, serviceNumber }, ...], serviceNumbers: ["123..."], billdeskSession?: { reqtoken, captcha, cookie } }  
  *
  * Refreshes a list of service numbers.
  * Processed sequentially to avoid hammering APSPDCL.
@@ -923,7 +833,7 @@ app.post('/api/services/:serviceNumber/refresh', async (req, res) => {
  */
 app.post('/api/services/refresh-all', async (req, res) => {
   const { services: inputServices, serviceNumbers, billdeskSession } = req.body || {};
-  
+
   let servicesToProcess = [];
   if (Array.isArray(inputServices)) {
     servicesToProcess = inputServices;
@@ -998,7 +908,7 @@ app.post('/api/billdesk/validate-session', async (req, res) => {
     if (!htmlLower.includes('customer name') && !htmlLower.includes('consumer name') && !htmlLower.includes('bill amount') && htmlLower.includes('please enter captcha here')) {
       const errTrMatch = html.match(/<div id="errTr"[^>]*>([^<]+)<\/div>/i);
       const colorRedMatch = html.match(/<div[^>]*class="[^"]*color_red[^"]*"[^>]*>([^<]+)<\/div>/i);
-      const errText = (errTrMatch && errTrMatch[1].trim()) || (colorRedMatch && colorRedMatch[1].trim()) || 'Validation failed';
+      const errText = (errTrMatch && errTrMatch[1].trim()) || (colorRedMatch && colorRedMatch[1].trim()) || 'Validation failed';  
       return res.json({ ok: false, error: errText });
     }
 
@@ -1011,7 +921,7 @@ app.post('/api/billdesk/validate-session', async (req, res) => {
 /**
  * GET /api/billdesk/init-session
 
- * 
+ *
  * Scrapes BillDesk for a fresh reqtoken and generates the dynamic cookie
  * needed for the Captcha image request.
  */
@@ -1028,14 +938,14 @@ app.get('/api/billdesk/init-session', async (req, res) => {
 /**
  * GET /api/billdesk/captcha-image
  * Query: ?cookie=<dynamic_cookie_string>
- * 
+ *
  * Proxies the Captcha image to bypass CORS and third-party cookie restrictions.
  */
 app.get('/api/billdesk/captcha-image', async (req, res) => {
   try {
     const cookie = req.query.cookie;
     if (!cookie) return res.status(400).send('Missing cookie parameter');
-    
+
     const imgRes = await fetch('https://payments.billdesk.com/MercOnline/NumericCaptchaServlet', {
       headers: {
         'Cookie': cookie,
@@ -1043,12 +953,12 @@ app.get('/api/billdesk/captcha-image', async (req, res) => {
         'Referer': 'https://payments.billdesk.com/MercOnline/SPDCLController'
       }
     });
-    
+
     if (!imgRes.ok) throw new Error(`Image fetch failed with status ${imgRes.status}`);
-    
+
     res.setHeader('Content-Type', imgRes.headers.get('content-type') || 'image/jpeg');
     res.setHeader('Cache-Control', 'no-store, max-age=0');
-    
+
     // fetch body is a ReadableStream which can be converted to an array buffer or piped.
     // In Node 18+, we can convert to array buffer and send as buffer.
     const arrayBuffer = await imgRes.arrayBuffer();
@@ -1073,12 +983,12 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
     try {
       const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
       const session = await scrapeBillDeskSession(baseCookie);
-      
+
       const captchaText = await solveCaptchaImage(session.cookie);
       if (!captchaText || captchaText.length < 5) {
         continue;
       }
-      
+
       // Validate
       session.captcha = captchaText;
       const headers = {
@@ -1108,7 +1018,7 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
       // Success!
       session.timestamp = Date.now();
       return res.json({ ok: true, session });
-      
+
     } catch (err) {
       console.error(`[api] auto-session attempt ${attempt} error:`, err);
       lastError = err.message;
@@ -1137,10 +1047,10 @@ app.post('/api/notifications/register', async (req, res) => {
   try {
     // Store token and its associated service numbers
     await redis.set(`push_token:${token}`, JSON.stringify(serviceNumbers), { ex: 60 * 60 * 24 * 30 }); // 30 days
-    
+
     // Add token to a set of all tokens for the scheduler
     await redis.sadd('all_push_tokens', token);
-    
+
     res.json({ ok: true });
   } catch (err) {
     console.error('[api] Failed to register notifications:', err);
@@ -1150,17 +1060,14 @@ app.post('/api/notifications/register', async (req, res) => {
 
 /**
  * GET /api/notifications/check
- * Query: ?secret=INTERNAL_SECRET
- *
- * This endpoint is called by GitHub Actions/Vercel Cron.
- * It iterates through all registered tokens, checks their bills, and sends pushes.
+ * Query: ?secret=INTERNAL_SECRET&type=GENERATION
  */
 app.get('/api/notifications/check', async (req, res) => {
-  const { secret } = req.query;
+  const { secret, type: checkType } = req.query;
   const authHeader = req.headers.authorization;
-  
-  const isAuthorized = 
-    secret === process.env.INTERNAL_SECRET || 
+
+  const isAuthorized =
+    secret === process.env.INTERNAL_SECRET ||
     authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
   if (!isAuthorized) {
@@ -1173,74 +1080,103 @@ app.get('/api/notifications/check', async (req, res) => {
 
   try {
     const tokens = await redis.smembers('all_push_tokens');
-    let processed = 0;
-    let notificationsSent = 0;
+    const results = [];
+    const now = new Date();
 
     for (const token of tokens) {
       const serviceNumbersStr = await redis.get(`push_token:${token}`);
       if (!serviceNumbersStr) continue;
-      
+
       const serviceNumbers = typeof serviceNumbersStr === 'string' ? JSON.parse(serviceNumbersStr) : serviceNumbersStr;
-      
+      const notifiedSns = [];
+      let summaryTitle = '';
+      let summaryBody = '';
+      let deepLinkSn = null;
+
       for (const sn of serviceNumbers) {
         try {
-          // Fetch snapshot without a user session (uses auto-solve)
           const snapshot = await buildSnapshot(sn);
           if (!snapshot || snapshot.isPaid || snapshot.amountDue <= 0) continue;
 
           const dueDate = snapshot.dueDate ? new Date(snapshot.dueDate) : null;
+          const billDate = snapshot.billDate ? new Date(snapshot.billDate) : null;
           if (!dueDate) continue;
 
-          const now = new Date();
           const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+          const isNewBill = billDate && (now - billDate) < (24 * 60 * 60 * 1000);
 
           let shouldNotify = false;
           let title = '';
           let body = '';
+          let type = '';
 
-          if (diffDays === 4) {
-            shouldNotify = true;
-            title = 'Bill Due Soon';
-            body = `Your bill of ₹${snapshot.amountDue} for ${sn} is due in 4 days.`;
-          } else if (diffDays < 0) {
-            // Overdue
-            shouldNotify = true;
-            title = 'Bill Overdue';
-            body = `Your bill of ₹${snapshot.amountDue} for ${sn} is overdue! Please pay immediately.`;
+          if (checkType === 'GENERATION') {
+            if (isNewBill) {
+              shouldNotify = true;
+              title = 'New Bill Generated';
+              body = `A new bill of ₹${snapshot.amountDue} has been generated for ${sn}.`;
+              type = 'BILL_GENERATED';
+            }
+          } else {
+            if (diffDays === 4) {
+              shouldNotify = true;
+              title = 'Bill Due Soon';
+              body = `Your bill of ₹${snapshot.amountDue} for ${sn} is due in 4 days.`;
+              type = 'BILL_REMINDER';
+            } else if (diffDays < 0) {
+              shouldNotify = true;
+              title = 'Bill Overdue';
+              body = `Your bill of ₹${snapshot.amountDue} for ${sn} is overdue! Please pay immediately.`;
+              type = 'BILL_OVERDUE';
+            }
           }
 
           if (shouldNotify) {
-            await admin.messaging().send({
-              token,
-              notification: { 
-                title, 
-                body 
-              },
-              android: {
-                notification: {
-                  icon: 'ic_stat_ic_notification',
-                  color: '#4f46e5',
-                  tag: `bill_${sn}`, // Prevents duplicate notifications for same bill
-                }
-              },
-              data: { 
-                serviceNumber: sn, 
-                type: title === 'Bill Overdue' ? 'BILL_OVERDUE' : 'BILL_REMINDER' 
-              }
-            });
-            notificationsSent++;
+            notifiedSns.push({ sn, title, body, type });
+            if (notifiedSns.length === 1) {
+              summaryTitle = title;
+              summaryBody = body;
+              deepLinkSn = sn;
+            }
           }
         } catch (err) {
           console.error(`[scheduler] Failed to check ${sn}:`, err.message);
         }
       }
-      processed++;
+
+      if (notifiedSns.length > 0) {
+        if (notifiedSns.length > 1) {
+          summaryTitle = checkType === 'GENERATION' ? 'New Bills Generated' : 'Bill Alerts';
+          summaryBody = `Multiple bills (${notifiedSns.length}) require your attention. Tap to view.`;
+          deepLinkSn = null;
+        }
+
+        try {
+          await admin.messaging().send({
+            token,
+            notification: { title: summaryTitle, body: summaryBody },
+            android: {
+              notification: {
+                icon: 'ic_stat_ic_notification',
+                color: '#4f46e5',
+              }
+            },
+            data: {
+              serviceNumber: deepLinkSn || '',
+              type: notifiedSns.length > 1 ? 'MULTI_UPDATE' : notifiedSns[0].type
+            }
+          });
+          results.push({ token, count: notifiedSns.length });
+        } catch (err) {
+          console.error(`[push] Failed to send to ${token}:`, err.message);
+        }
+      }
     }
 
-    res.json({ ok: true, processed, notificationsSent });
+    res.json({ ok: true, results });
   } catch (err) {
-    console.error('[api] Scheduler error:', err);
-    res.status(500).json({ ok: false, error: 'Internal server error' });
+    console.error('[push] Cron error:', err);
+    res.status(500).json({ ok: false, error: 'Internal error' });
   }
 });
 

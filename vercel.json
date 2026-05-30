@@ -29,7 +29,12 @@
   "crons": [
     {
       "path": "/api/notifications/check",
-      "schedule": "30 10 * * *"
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/notifications/check?type=GENERATION",
+      "schedule": "30 15 * * *"
     }
   ]
+
 }
