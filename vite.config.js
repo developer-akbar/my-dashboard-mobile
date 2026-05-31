@@ -16,8 +16,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    // Warn on chunks > 1MB instead of 500KB (recharts + tesseract are large)
     chunkSizeWarningLimit: 1000,
+    // Strip all console.* and debugger statements from production builds
+    minify: 'esbuild',
+    target: 'es2020',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -28,6 +30,9 @@ export default defineConfig({
           'vendor-dayjs':    ['dayjs'],
         }
       }
+    },
+    esbuildOptions: {
+      drop: ['console', 'debugger'],
     }
   }
 });

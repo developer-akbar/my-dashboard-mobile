@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
 import { LuZap } from 'react-icons/lu';
@@ -63,12 +63,14 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    // 1. Listen for the install prompt event
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // 2. Timer to show banner after 1 minute
     const timer = setTimeout(() => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isCapacitor = window.Capacitor?.getPlatform() !== 'web';
@@ -85,7 +87,7 @@ function AppContent() {
       if (!isStandalone && !isCapacitor && !isDismissed && !isInstalled) {
         setShowInstallBanner(true);
       }
-    }, 60000);
+    }, 60000); // 60 seconds
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -95,7 +97,7 @@ function AppContent() {
 
   const handleInstallClick = async () => {
     setShowInstallBanner(false);
-    localStorage.setItem('pwa_installed', 'true');
+    localStorage.setItem('pwa_installed', 'true'); // Assume intent is enough to hide for a long time
 
     if (!deferredPrompt) {
       toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
@@ -130,23 +132,32 @@ function AppContent() {
   // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
     const onBack = async () => {
+      // 1. Give priority to child components (like clearing selection)
       const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
       window.dispatchEvent(backEvent);
       
       if (backEvent.detail.handled) return;
 
+      // 2. If on a sub-page, go back to dashboard
       if (activePage !== 'electricity') {
         setActivePage('electricity');
         return;
       }
 
+      // 3. Otherwise exit app (on Android)
       CapApp.exitApp();
     };
 
+    // Capacitor listener
     const capHandler = CapApp.addListener('backButton', onBack);
-    const popHandler = () => { onBack(); };
+
+    // Browser listener (popstate)
+    const popHandler = () => {
+       onBack();
+    };
     window.addEventListener('popstate', popHandler);
 
+    // Push initial state to history so back button has something to pop in browser
     if (window.history.state !== 'root') {
       window.history.replaceState('root', '');
       window.history.pushState('nav', '');
@@ -158,6 +169,7 @@ function AppContent() {
     };
   }, [activePage]);
 
+  // Sync browser history with tab changes so browser back works
   useEffect(() => {
     if (window.history.state !== 'nav') {
        window.history.pushState('nav', '');
