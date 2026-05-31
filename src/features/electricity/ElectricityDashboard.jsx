@@ -20,6 +20,7 @@ import { NotificationInbox, saveNotificationToHistory } from './components/Notif
 import { db } from '../../shared/db/storage.js';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
+import { Share } from '@capacitor/share';
 
 export function ElectricityDashboard({ onOpenCalcSettings }) {
   const isWeb = Capacitor.getPlatform() === 'web';
@@ -432,6 +433,10 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         return;
       }
 
+      // Check for Custom Event detail from App.jsx about appliance calculator
+      // Actually, it's better to handle it in App.jsx as I already did.
+
+
       if (selectedIds.size > 0) {
         clearSelection();
         if (e.detail) e.detail.handled = true;
@@ -665,10 +670,36 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
              `Shared via MyDashboard App`;
     }
 
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Electricity Bill Status', text }); } catch (err) { if (err.name !== 'AbortError') toast.error('Sharing failed'); }
-    } else {
-      try { await navigator.clipboard.writeText(text); toast.success('Copied to clipboard'); } catch { toast.error('Copy failed'); }
+    // Try native share first (Capacitor)
+    if (Capacitor.getPlatform() !== 'web') {
+      try {
+        await Share.share({
+          title: 'Electricity Bill Status',
+          text: text,
+          dialogTitle: 'Share Bill Update'
+        });
+        return;
+      } catch (err) {
+        console.warn('[share] Native share failed', err);
+      }
+    }
+
+    // Web fallback
+    if (navigator.share && navigator.canShare && navigator.canShare({ text })) {
+      try {
+        await navigator.share({ title: 'Electricity Bill Status', text });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    // Clipboard fallback
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copied to clipboard. You can now paste and share.');
+    } catch {
+      toast.error('Sharing failed');
     }
   }
 
@@ -693,10 +724,34 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
                  `*Next Est:* ~₹${insights.predictedNextBill || '...'}\n\n` +
                  `Shared via MyDashboard App`;
 
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Monthly Electricity Report', text }); } catch (err) { if (err.name !== 'AbortError') toast.error('Sharing failed'); }
-    } else {
-      await navigator.clipboard.writeText(text); toast.success('Report copied to clipboard');
+    if (Capacitor.getPlatform() !== 'web') {
+      try {
+        await Share.share({
+          title: 'Monthly Electricity Report',
+          text: text,
+          dialogTitle: 'Share Report'
+        });
+        return;
+      } catch (err) {
+        console.warn('[share] Report share failed', err);
+      }
+    }
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ text })) {
+      try {
+        await navigator.share({ title: 'Monthly Electricity Report', text });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    // Fallback to clipboard
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Report copied to clipboard. You can now paste and share.');
+    } catch {
+      toast.error('Copy failed');
     }
   }
 
