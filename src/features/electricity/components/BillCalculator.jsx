@@ -128,13 +128,11 @@ export function BillCalculator({ open, service, onClose }) {
     return calculateEstimatedBill(u, load, config);
   }, [units, load, config]);
 
-  const result = mode === 'simple' ? simpleResult : null;
-
   if (!open) return null;
 
   return (
     <div className="overlay overlay--center" onClick={onClose} style={{ zIndex: 1000 }}>
-      <div className="dialog" onClick={e => e.stopPropagation()} style={{ width: '500px', maxWidth: '95vw' }}>
+      <div className="dialog" onClick={e => e.stopPropagation()} style={{ width: '500px', maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <header className="dialog__header" style={{ position: 'relative', paddingBottom: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="sidebar__logo" style={{ width: '32px', height: '32px', background: 'var(--primary-dim)', color: 'var(--primary)' }}>
@@ -145,7 +143,7 @@ export function BillCalculator({ open, service, onClose }) {
           <button className="icon-btn-ghost" onClick={onClose} style={{ position: 'absolute', top: '0', right: '0' }}><FiX size={20} /></button>
         </header>
 
-        <div className="dialog__body">
+        <div className="dialog__body" style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
           <div className="seg" style={{ marginBottom: '24px' }}>
             <button 
               className={`seg__btn ${mode === 'progress' ? 'seg__btn--active' : ''}`}
@@ -220,36 +218,40 @@ export function BillCalculator({ open, service, onClose }) {
                   type="text" inputMode="numeric" pattern="[0-9]*" className="field__input" placeholder="Reading currently on your meter" autoFocus
                   value={currentReading} onChange={e => setCurrentReading(e.target.value.replace(/\D/g, ''))}
                 />
-                <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '8px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '8px', marginBottom: '16px' }}>
                    Go to your physical meter and enter the main number displayed.
                 </p>
               </div>
             </div>
           )}
 
-          {mode === 'simple' && result && (
+          {mode === 'simple' && simpleResult && (
             <div style={{ marginTop: '24px' }}>
               <div className="scard" style={{ padding: '20px', background: 'var(--surface-2)', textAlign: 'center' }}>
                 <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>Estimated Total Bill</p>
-                <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{formatInr(result.total)}</h2>
+                <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{formatInr(simpleResult.total)}</h2>
               </div>
 
               <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                   <span style={{ color: 'var(--text-2)' }}>Energy Charges</span>
-                  <span style={{ fontWeight: '600' }}>{formatInr(result.ec)}</span>
+                  <span style={{ fontWeight: '600' }}>{formatInr(simpleResult.ec)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                   <span style={{ color: 'var(--text-2)' }}>Fixed Charges ({load}kW)</span>
-                  <span style={{ fontWeight: '600' }}>{formatInr(result.fc)}</span>
+                  <span style={{ fontWeight: '600' }}>{formatInr(simpleResult.fc)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                   <span style={{ color: 'var(--text-2)' }}>Electricity Duty (6%)</span>
-                  <span style={{ fontWeight: '600' }}>{formatInr(result.ed)}</span>
+                  <span style={{ fontWeight: '600' }}>{formatInr(simpleResult.ed)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: 'var(--text-2)' }}>Customer Charges</span>
+                  <span style={{ fontWeight: '600' }}>{formatInr(simpleResult.cc)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
                   <span style={{ color: 'var(--text-1)', fontWeight: '600' }}>Total Estimation</span>
-                  <span style={{ color: 'var(--primary-hi)', fontWeight: '700' }}>{formatInr(result.total)}</span>
+                  <span style={{ color: 'var(--primary-hi)', fontWeight: '700' }}>{formatInr(simpleResult.total)}</span>
                 </div>
               </div>
             </div>
@@ -322,7 +324,7 @@ export function BillCalculator({ open, service, onClose }) {
           )}
         </div>
 
-        <div className="dialog__footer">
+        <div className="dialog__footer" style={{ marginTop: '24px', flexShrink: 0 }}>
           <button className="btn btn--primary" style={{ width: '100%' }} onClick={onClose}>Done</button>
         </div>
       </div>

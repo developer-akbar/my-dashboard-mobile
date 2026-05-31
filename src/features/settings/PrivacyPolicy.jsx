@@ -19,39 +19,45 @@ export function PrivacyPolicy({ onBack }) {
           </p>
 
           <div style={{ background: 'var(--surface-3)', borderLeft: '4px solid var(--primary)', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
-            <strong style={{ color: 'var(--primary)' }}>Summary:</strong> My Dashboard does not collect, store, or share any personal data on external servers. All your primary data stays on your device.
+            <strong style={{ color: 'var(--primary)' }}>Summary:</strong> My Dashboard does not collect, store, or share any personal data on external servers. All your bill data stays on your device.
           </div>
 
           <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>1. What Data We Collect</h2>
-          <p>My Dashboard does <strong>not</strong> collect any personally identifiable information. The app stores the following data <strong>locally on your device only</strong>:</p>
+          <p>My Dashboard does <strong>not</strong> collect personally identifiable information. The following data is stored <strong>locally on your device only</strong>:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li>APSPDCL service numbers you add (stored in local database).</li>
-            <li>Bill history and payment records fetched from public APIs.</li>
-            <li>App preferences (theme, language).</li>
-            <li>Temporary session tokens (stored in memory only).</li>
+            <li>APSPDCL service numbers you add (stored in SQLite on Android / IndexedDB in browser)</li>
+            <li>Bill history and payment records fetched from APSPDCL public APIs on your behalf</li>
+            <li>App preferences — theme (dark/light) and language (English/Telugu)</li>
+            <li>Temporary BillDesk session tokens (held in device memory, never sent to our servers)</li>
           </ul>
 
           <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>2. Third-Party Services</h2>
-          <p>The app communicates with the following services to provide functionality:</p>
+          <p>The app communicates with these external services to fetch your bill data:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li><strong>APSPDCL:</strong> To fetch electricity bill and payment history.</li>
-            <li><strong>BillDesk:</strong> To fetch current bill demand via captcha.</li>
-            <li><strong>Vercel:</strong> Our processing proxy. It makes requests on your behalf and <strong>does not store</strong> user data.</li>
-            <li><strong>PostHog (Web only):</strong> Provides anonymous usage analytics (page views).</li>
+            <li><strong>APSPDCL:</strong> public API to fetch electricity bill and payment history</li>
+            <li><strong>BillDesk:</strong> to fetch current bill demand amount</li>
+            <li><strong>Vercel:</strong> our processing API server. Handles requests to APSPDCL/BillDesk on your behalf. Does not store user data.</li>
+            <li><strong>Firebase Cloud Messaging:</strong> for optional bill due-date notifications</li>
           </ul>
 
-          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>3. Push Notifications</h2>
-          <p>If you grant permission, we use <strong>Firebase Cloud Messaging (FCM)</strong> to send bill reminders. To enable this, your service numbers are synced with our secure backend to check for bill updates. This data is used <strong>exclusively</strong> for triggering notifications and is never shared or used for marketing.</p>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>3. Notifications</h2>
+          <p>If you grant notification permission, the app schedules local and push notifications for bill due-date reminders. Your device notification token is stored only in association with your bill data and is not used for advertising or shared with third parties.</p>
 
-          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>4. Data Deletion & Rights</h2>
-          <p>All data is stored locally. You can delete it at any time by:</p>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>4. Analytics</h2>
+          <p>The web version may collect anonymous, non-personal usage analytics (page views, feature usage counts) via Vercel Analytics. No personal data or device identifiers are included. The Android app does not include analytics SDKs.</p>
+
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>5. Data Deletion</h2>
+          <p>All data is stored locally. To delete it:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li>Removing services via the <strong>Trash</strong> feature.</li>
-            <li>Uninstalling the app (clears all local data).</li>
-            <li>Clearing App Storage in your Android device settings.</li>
+            <li>Remove individual services using the <strong>Trash</strong> feature in the app</li>
+            <li>Uninstall the app (permanently deletes all local data)</li>
+            <li>Clear app storage in your device Settings → Apps → My Dashboard → Storage</li>
           </ul>
 
-          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>5. Contact Us</h2>
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>6. Security</h2>
+          <p>All communication between the app and external services uses HTTPS encryption. No cleartext HTTP traffic is permitted.</p>
+
+          <h2 style={{ fontSize: '18px', marginTop: '32px', color: 'var(--text-1)' }}>7. Contact Us</h2>
           <p>For any privacy-related questions, contact: <a href="mailto:mail.akbarmulla@gmail.com" style={{ color: 'var(--primary)' }}>mail.akbarmulla@gmail.com</a></p>
 
           <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-3)', fontStyle: 'italic' }}>

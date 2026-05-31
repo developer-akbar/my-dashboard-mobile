@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { FiZap, FiGrid, FiSettings } from 'react-icons/fi';
+import { FiZap, FiGrid, FiSettings, FiMonitor } from 'react-icons/fi';
 import { LuZap } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import { App as CapApp } from '@capacitor/app';
@@ -27,7 +27,7 @@ if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
 
 const NAV = [
   { id: 'electricity', icon: FiZap },
-  { id: 'appliances',  icon: LuZap },
+  { id: 'appliances',  icon: FiMonitor },
   { id: 'home',        icon: FiGrid },
   { id: 'settings',    icon: FiSettings },
 ];
@@ -63,12 +63,14 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    // 1. Listen for the install prompt event
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // 2. Timer to show banner after 1 minute
     const timer = setTimeout(() => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isCapacitor = window.Capacitor?.getPlatform() !== 'web';
@@ -85,7 +87,7 @@ function AppContent() {
       if (!isStandalone && !isCapacitor && !isDismissed && !isInstalled) {
         setShowInstallBanner(true);
       }
-    }, 60000);
+    }, 60000); // 60 seconds
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -95,7 +97,7 @@ function AppContent() {
 
   const handleInstallClick = async () => {
     setShowInstallBanner(false);
-    localStorage.setItem('pwa_installed', 'true');
+    localStorage.setItem('pwa_installed', 'true'); // Assume intent is enough to hide for a long time
 
     if (!deferredPrompt) {
       toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
@@ -130,23 +132,51 @@ function AppContent() {
   // ── Back Button Handling ───────────────────────────────────────────────────
   useEffect(() => {
     const onBack = async () => {
+      console.log('[app] Back button pressed. activePage:', activePage, 'applianceCalcOpen:', applianceCalcOpen);
+      
+      // 1. If appliance calculator is open, close it FIRST (highest priority)
+      if (applianceCalcOpen) {
+        console.log('[app] Closing appliance calculator');
+        setApplianceCalcOpen(false);
+        return;
+      }
+
+      // 2. Give priority to dashboard internal dialogs
       const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
       window.dispatchEvent(backEvent);
       
-      if (backEvent.detail.handled) return;
+      if (backEvent.detail.handled) {
+        console.log('[app] Back handled by child component');
+        return;
+      }
 
+      // 3. If on privacy page, go back to settings
+      if (activePage === 'privacy') {
+        setActivePage('settings');
+        return;
+      }
+
+      // 4. If on any other sub-page, go back to dashboard
       if (activePage !== 'electricity') {
         setActivePage('electricity');
         return;
       }
 
+      // 5. Otherwise exit app (on Android)
+      console.log('[app] Exiting app');
       CapApp.exitApp();
     };
 
+    // Capacitor listener
     const capHandler = CapApp.addListener('backButton', onBack);
-    const popHandler = () => { onBack(); };
+
+    // Browser listener (popstate)
+    const popHandler = () => {
+       onBack();
+    };
     window.addEventListener('popstate', popHandler);
 
+    // Push initial state to history so back button has something to pop in browser
     if (window.history.state !== 'root') {
       window.history.replaceState('root', '');
       window.history.pushState('nav', '');
@@ -156,8 +186,9 @@ function AppContent() {
       capHandler.then(h => h.remove());
       window.removeEventListener('popstate', popHandler);
     };
-  }, [activePage]);
+  }, [activePage, applianceCalcOpen]);
 
+  // Sync browser history with tab changes so browser back works
   useEffect(() => {
     if (window.history.state !== 'nav') {
        window.history.pushState('nav', '');
