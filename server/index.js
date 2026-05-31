@@ -1009,8 +1009,14 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Missing serviceNumber' });
   }
 
+  const start = Date.now();
+  const LIMIT = 9000; // 9s limit for Vercel
   let lastError = 'Failed to solve captcha';
-  for (let attempt = 1; attempt <= 3; attempt++) {
+
+  // Reduce to 2 attempts to fit in 10s Vercel limit
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    if (Date.now() - start > LIMIT) break;
+
     try {
       const baseCookie = process.env.BILLDESK_COOKIE || process.env.BILLDESK_COOKIES || '';
       const session = await scrapeBillDeskSession(baseCookie);
@@ -1040,19 +1046,21 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
       const htmlLower = html.toLowerCase();
 
       if (htmlLower.includes('wrong captcha') || htmlLower.includes('invalid captcha') || htmlLower.includes('incorrect captcha') || htmlLower.includes('enter valid captcha')) {
+         console.warn(`[api] Attempt ${attempt} failed: Wrong Captcha ("${captchaText}")`);
          continue;
       }
 
       session.timestamp = Date.now();
+      console.log(`[api] Auto-session successful in ${Date.now() - start}ms`);
       return res.json({ ok: true, session });
 
     } catch (err) {
-      console.error(`[api] auto-session attempt ${attempt} error:`, err);
+      console.error(`[api] auto-session attempt ${attempt} error:`, err.message);
       lastError = err.message;
     }
   }
 
-  return res.json({ ok: false, error: lastError });
+  return res.json({ ok: false, error: lastError, time: Date.now() - start });
 });
 
 // ── Notification Routes ───────────────────────────────────────────────────
@@ -1080,18 +1088,30 @@ app.get('/api/notifications/check', async (req, res) => {
   if (!isAuthorized) return res.status(401).json({ ok: false, error: 'Unauthorized' });
   if (!redis || !admin.apps.length) return res.status(503).json({ ok: false, error: 'Redis/Firebase not configured' });
 
+  const start = Date.now();
+  const VERCEL_TIMEOUT = 9500; // 9.5s guard for 10s limit
+
   try {
     const tokens = await redis.smembers('all_push_tokens');
     const results = [];
     const now = new Date();
 
     for (const token of tokens) {
+      // Guard: If we are close to Vercel's 10s timeout, stop processing more tokens
+      if (Date.now() - start > VERCEL_TIMEOUT) {
+        console.warn('[cron] Approaching timeout, stopping early');
+        break;
+      }
+
       const serviceNumbersStr = await redis.get(`push_token:${token}`);
       if (!serviceNumbersStr) continue;
       const sns = typeof serviceNumbersStr === 'string' ? JSON.parse(serviceNumbersStr) : serviceNumbersStr;
       const notifiedSns = [];
 
       for (const sn of sns) {
+        // Nested Guard: Check timeout before each service check
+        if (Date.now() - start > VERCEL_TIMEOUT) break;
+
         try {
           const snapshot = await buildSnapshot(sn);
           if (!snapshot || snapshot.isPaid || snapshot.amountDue <= 0) continue;
@@ -1135,7 +1155,9 @@ app.get('/api/notifications/check', async (req, res) => {
               notifiedSns.push({ sn, title, body, type, dedupKey });
             }
           }
-        } catch (err) {}
+        } catch (err) {
+          console.error(`[cron] Build snapshot failed for ${sn}:`, err.message);
+        }
       }
 
       if (notifiedSns.length > 0) {
@@ -1149,11 +1171,14 @@ app.get('/api/notifications/check', async (req, res) => {
           await admin.messaging().send({ token, notification: { title: st, body: sb }, data: { serviceNumber: dls, type: notifiedSns.length > 1 ? 'MULTI_UPDATE' : notifiedSns[0].type } });
           for (const item of notifiedSns) await redis.set(item.dedupKey, '1', { ex: 60 * 60 * 24 * 30 });
           results.push({ token, count: notifiedSns.length });
-        } catch (err) {}
+        } catch (err) {
+          console.error('[cron] FCM send failed:', err.message);
+        }
       }
     }
-    res.json({ ok: true, results });
+    res.json({ ok: true, results, processed: tokens.length, time: Date.now() - start });
   } catch (err) {
+    console.error('[cron] Global error:', err);
     res.status(500).json({ ok: false, error: 'Internal error' });
   }
 });
