@@ -47,7 +47,7 @@ export function SessionIndicator() {
   };
 
   return (
-    <div className="session-indicator" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: sessionActive ? '#e0f2fe' : 'var(--surface-2)', color: sessionActive ? '#0369a1' : 'var(--text-3)', padding: '4px 10px', borderRadius: '12px', border: sessionActive ? 'none' : '1px solid var(--border)' }}>
+    <div className="session-indicator" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: sessionActive ? '#e0f2fe' : 'var(--surface-2)', color: sessionActive ? '#0369a1' : 'var(--text-2)', padding: '4px 10px', borderRadius: '12px', border: sessionActive ? 'none' : '1px solid var(--border)' }}>
       <FiLink size={12} />
       <span>{sessionActive ? `Session Active (${timeLeft})` : 'No Active Session'}</span>
       {sessionActive && (
@@ -55,6 +55,7 @@ export function SessionIndicator() {
           onClick={killSession} 
           style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: '#0369a1', marginLeft: '4px' }}
           title="Kill active session"
+          aria-label="Kill active session"
         >
           <FiXCircle size={14} />
         </button>

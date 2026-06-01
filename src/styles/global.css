@@ -67,8 +67,8 @@
   --border-hi:  rgba(255,255,255,0.16);
 
   --text-1:  #f0f2f8;
-  --text-2:  #8e93a8;
-  --text-3:  #555c72;
+  --text-2:  #a0a5b8; /* Improved from #8e93a8 */
+  --text-3:  #7d8396; /* Improved from #555c72 */
 
   --primary:       #6366f1;
   --primary-hi:    #818cf8;

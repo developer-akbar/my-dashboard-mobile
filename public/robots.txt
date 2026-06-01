@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Sitemap: https://my-dashboard-mobile.vercel.app/sitemap.xml

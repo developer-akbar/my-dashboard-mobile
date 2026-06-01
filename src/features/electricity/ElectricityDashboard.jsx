@@ -1,11 +1,13 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import toast from 'react-hot-toast';
 import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell, FiShare2, FiFileText } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
-import { BillCalculator } from './components/BillCalculator.jsx';
 import { QRCodeDialog } from './components/QRCodeDialog.jsx';
+
+// ── Lazy Loaded Components ──────────────────────────────────────────────────
+const BillCalculator = lazy(() => import('./components/BillCalculator.jsx').then(m => ({ default: m.BillCalculator })));
 import { SummaryBar } from './components/SummaryBar.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
@@ -826,7 +828,9 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
       <ServiceDialog open={dialog.open} service={dialog.service} services={services} onClose={() => setDialog({ open: false, service: null })} onSubmit={submitService} />
       <ServiceAboutDialog open={aboutDialog.open} service={aboutDialog.service} onClose={() => setAboutDialog({ open: false, service: null })} />
-      <BillCalculator open={calculator.open} service={calculator.service} onClose={() => setCalculator({ open: false, service: null })} />
+      <Suspense fallback={null}>
+        <BillCalculator open={calculator.open} service={calculator.service} onClose={() => setCalculator({ open: false, service: null })} />
+      </Suspense>
       <QRCodeDialog open={qrDialog.open} service={qrDialog.service} onClose={() => setQrDialog({ open: false, service: null })} onUpdateTime={(id, time) => { actions.update(id, { billTime: time }); setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } })); }} />
       {bulkResult && <div className="overlay overlay--center" onClick={() => setBulkResult(null)}><div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}><h2 className="dialog__title">Bulk Add Results</h2><div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>{bulkResult.succeeded.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p></div>}{bulkResult.inTrash.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped ({bulkResult.inTrash.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p></div>}{bulkResult.alreadyExists.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Already Active ({bulkResult.alreadyExists.length})</p></div>}{bulkResult.failed.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>{bulkResult.failed.map((f, i) => (<p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>))}</div>}</div><div className="dialog__footer"><button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button></div></div></div>}
       <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description} isDanger={confirmState.isDanger} onClose={() => setConfirmState(prev => ({ ...prev, open: false }))} onConfirm={confirmState.onConfirm} />

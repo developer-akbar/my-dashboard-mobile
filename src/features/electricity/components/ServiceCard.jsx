@@ -211,13 +211,14 @@ export function ServiceCard({
             {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)', transform: 'rotate(45deg)' }} />}        
           </div>
           <div className="scard__identity-text">
-            <h3 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h3>
+            <h2 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h2>
             <div className="scard__num-row">
               <span className="scard__num">{service.serviceNumber}</span>
               <button
                 className="icon-btn-micro"
                 onClick={(e) => { e.stopPropagation(); copyNum(); }}
                 title={t('copy')}
+                aria-label={t('copy')}
                 style={{ position: 'relative', zIndex: 10 }}
               >
                 <FiCopy size={12} />
@@ -226,6 +227,7 @@ export function ServiceCard({
                 className="icon-btn-micro"
                 onClick={(e) => { e.stopPropagation(); onShare?.(); }}
                 title="Share Status"
+                aria-label="Share Status"
                 style={{ position: 'relative', zIndex: 10, marginLeft: '4px' }}
               >
                 <FiShare2 size={12} />
@@ -254,7 +256,12 @@ export function ServiceCard({
 
           <span className={`soft-badge soft-badge--${status.toLowerCase()}`}>{t(`filter_${status.toLowerCase()}`, status.replace('_', ' '))}</span>
           <div className="scard__menu-wrap">
-            <button className="icon-btn-ghost" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} onBlur={() => setTimeout(() => setMenuOpen(false), 200)}>
+            <button 
+              className="icon-btn-ghost" 
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} 
+              onBlur={() => setTimeout(() => setMenuOpen(false), 200)}
+              aria-label={t('more_options', 'More options')}
+            >
               <FiMoreVertical size={16} />
             </button>
             {menuOpen && (
@@ -358,7 +365,12 @@ export function ServiceCard({
       {/* ── Action Bar ── */}
       <div className="scard__action-bar" onClick={e => e.stopPropagation()} style={{ position: 'relative', zIndex: 20 }}>
         <div className="scard__action-left">
-          <button className="btn-ghost-sm" onClick={onRefresh} disabled={refreshing}>
+          <button 
+            className="btn-ghost-sm" 
+            onClick={onRefresh} 
+            disabled={refreshing}
+            aria-label={t('refresh')}
+          >
             <FiRefreshCw size={14} className={refreshing ? 'spin' : ''} /> {t('refresh')}
           </button>
         </div>
@@ -369,19 +381,28 @@ export function ServiceCard({
                 className="btn btn--secondary btn--sm"
                 onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }}
                 title="Calculator"
+                aria-label="Calculator"
               >
                 <LuCalculator size={14} />
               </button>
-              <button className="btn btn--pay btn--sm" onClick={onPay}>
+              <button className="btn btn--pay btn--sm" onClick={onPay} aria-label={t('pay_now')}>
                 {t('pay_now')}
               </button>
             </>
           ) : (
             <>
-              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }}>      
+              <button 
+                className="btn btn--secondary btn--sm" 
+                onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }}
+                aria-label={t('show_qr')}
+              >      
                 <BsQrCode size={14} /> <span className="hide-mobile-sm" style={{marginLeft:'4px'}}>QR</span>
               </button>
-              <button className="btn btn--secondary btn--sm" onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }}>
+              <button 
+                className="btn btn--secondary btn--sm" 
+                onClick={(e) => { e.stopPropagation(); onCalculateBill?.(service); }}
+                aria-label={t('calculate_next_bill')}
+              >
                 <LuCalculator size={14} /> <span className="hide-mobile-sm" style={{marginLeft:'4px'}}>{t('calculate_next_bill')}</span>
               </button>
             </>
