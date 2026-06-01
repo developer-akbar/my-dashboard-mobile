@@ -9,6 +9,7 @@ import { QRCodeDialog } from './components/QRCodeDialog.jsx';
 // ── Lazy Loaded Components ──────────────────────────────────────────────────
 const BillCalculator = lazy(() => import('./components/BillCalculator.jsx').then(m => ({ default: m.BillCalculator })));
 import { SummaryBar } from './components/SummaryBar.jsx';
+import { DailyTip } from './components/DailyTip.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
@@ -812,6 +813,10 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       </header>
 
       <SummaryBar services={services} />
+      
+      {activeView === 'active' && services.length > 0 && !loading && (
+        <DailyTip />
+      )}
 
       <Toolbar filters={filters} onFiltersChange={setFilters} onAdd={() => setDialog({ open: true, service: null })} onRefreshAll={handleRefreshAll} refreshingAll={refreshingAll} activeView={activeView} onViewChange={handleViewChange} trashCount={trash.length} hasServices={services.length > 0 && !loading} services={services} cardStyle={cardStyle} onToggleCardStyle={toggleCardStyle} />
 
