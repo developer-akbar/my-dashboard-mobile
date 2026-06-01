@@ -30,7 +30,9 @@ if (typeof window !== 'undefined' && import.meta.env.VITE_POSTHOG_KEY) {
     api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
     person_profiles: 'identified_only',
     capture_pageview: false, 
-    autocapture: false, 
+    autocapture: false,
+    disable_session_recording: true, // Disable heavy recording script
+    disable_surveys: true,           // Disable heavy surveys script
   });
 }
 

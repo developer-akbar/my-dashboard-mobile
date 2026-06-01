@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
@@ -7,14 +7,13 @@ import {
 import { LuCalculator } from 'react-icons/lu';
 import { BsPin, BsPinFill, BsQrCode } from 'react-icons/bs';
 import toast from 'react-hot-toast';
-import {
-  ComposedChart, Area, BarChart, Bar, Line,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Legend,
-} from 'recharts';
 import { formatInr, formatDate, formatDateTime, fromNow, getDueTone, getDueCopy } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
+
+// ── Lazy Components ──────────────────────────────────────────────────────────
+const TrendChart = lazy(() => import('./TrendChart.jsx').then(m => ({ default: m.TrendChart })));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -31,23 +30,8 @@ function TrendBadge({ value, unit = '', percent }) {
   );
 }
 
-function ChartTip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="ctip">
-      <p className="ctip__label">{label}</p>
-      {payload.map(p => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name}: {p.name.includes('Unit') ? `${Number(p.value).toLocaleString('en-IN')} u` : formatInr(p.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
-
 const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function fmtMonth(m) { if (!m) return '—'; const [y, mo] = m.split('-'); return `${MO[+mo - 1]} ${y}`; }
-function fmtK(v) { return v >= 1000 ? `₹${(v / 1000).toFixed(1)}k` : `₹${v}`; }
 
 // ── Accordion section ──────────────────────────────────────────────────────────
 
@@ -596,42 +580,9 @@ function TrendPanel({ data, insights, t }) {
         </div>
       </div>
 
-      {view === 'amount' && (
-        <ResponsiveContainer width="100%" height={150}>
-          <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
-            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
-            <Tooltip content={<ChartTip />} />
-            <Area type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--primary)" fill="var(--primary-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--primary)' }} />
-            {insights?.avgAmount && <ReferenceLine y={insights.avgAmount} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />}
-          </ComposedChart>
-        </ResponsiveContainer>
-      )}
-
-      {view === 'units' && (
-        <ResponsiveContainer width="100%" height={150}>
-          <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
-            <YAxis tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
-            <Tooltip content={<ChartTip />} />
-            <Area type="monotone" dataKey="billedUnits" name="Units" stroke="var(--cyan)" fill="var(--cyan-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--cyan)' }} />
-            <ReferenceLine y={insights?.avgUnits} stroke="var(--text-3)" strokeDasharray="3 3" label={{ value: 'avg', fontSize: 8, fill: 'var(--text-3)', position: 'insideTopRight' }} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      )}
-
-      {view === 'combo' && (
-        <ResponsiveContainer width="100%" height={150}>
-          <ComposedChart data={chartData} margin={{ top: 4, right: 0, left: -18, bottom: 0 }}>
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} interval={2} />
-            <YAxis yAxisId="left" tickFormatter={fmtK} tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={42} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: 'var(--text-3)' }} tickLine={false} axisLine={false} width={36} />
-            <Tooltip content={<ChartTip />} />
-            <Area yAxisId="left" type="monotone" dataKey="billAmount" name="Bill Amount" stroke="var(--primary)" fill="var(--primary-dim)" strokeWidth={2} dot={{ r: 2, fill: 'var(--primary)' }} />
-            <Line yAxisId="right" type="monotone" dataKey="billedUnits" name="Units" stroke="var(--cyan)" strokeWidth={2} dot={{ r: 2, fill: 'var(--cyan)' }} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      )}
+      <Suspense fallback={<div className="state-box" style={{ height: '150px' }}><FiRefreshCw size={16} className="spin" /></div>}>
+        <TrendChart chartData={chartData} view={view} insights={insights} />
+      </Suspense>
 
       {insights && (
         <div className="trend__stats">
