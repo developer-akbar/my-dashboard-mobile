@@ -39,13 +39,19 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         </div>
         
         <div className="toolbar__group">
-          <button className="btn btn--ghost btn--sm" onClick={toggleLanguage} title={t('language')} style={{ padding: '0 8px' }}>
+          <button 
+            className="btn btn--ghost btn--sm" 
+            onClick={toggleLanguage} 
+            title={t('language')} 
+            aria-label={t('language')}
+            style={{ padding: '0 8px' }}
+          >
             <FiGlobe size={15} />
             <span className="hide-mobile-sm" style={{ marginLeft: '4px' }}>{isTelugu ? 'English' : 'తెలుగు'}</span>
             <span className="show-mobile-sm" style={{ marginLeft: '4px', fontSize: '11px', fontWeight: '800' }}>{isTelugu ? 'En' : 'తె'}</span>
           </button>
 
-          <button className="btn btn--primary btn--sm" onClick={onAdd}>
+          <button className="btn btn--primary btn--sm" onClick={onAdd} aria-label={t('add_service')}>
             <FiPlus size={15} />
             <span style={{ marginLeft: '4px' }}>{t('add')}</span>
           </button>
@@ -55,13 +61,21 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
       <div className="toolbar__row toolbar__row--bottom" style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="toolbar__group" style={{ flex: '1 1 auto', justifyContent: 'flex-start', gap: '6px', flexWrap: 'wrap' }}>
           <div className="seg">
-            <button className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('active')}>
+            <button 
+              className={`seg__btn ${activeView === 'active' ? 'seg__btn--active' : ''}`} 
+              onClick={() => onViewChange('active')}
+              aria-label={t('view_active_services', 'View active services')}
+            >
                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                  <FiZap size={14} className="show-mobile-sm" />
                  {t('active')}
                </span>
             </button>
-            <button className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} onClick={() => onViewChange('trash')}>
+            <button 
+              className={`seg__btn ${activeView === 'trash' ? 'seg__btn--active' : ''}`} 
+              onClick={() => onViewChange('trash')}
+              aria-label={t('view_trash', 'View trash')}
+            >
               <FiTrash2 size={13} />
               {trashCount > 0 && <span className="badge">{trashCount}</span>}
             </button>
@@ -71,6 +85,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             className="btn btn--ghost btn--sm" 
             onClick={onToggleCardStyle} 
             title={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
+            aria-label={cardStyle === 'classic' ? 'Switch to Quick Glance' : 'Switch to Classic'}
             style={{ padding: '0 6px', height: '32px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
             <span style={{ fontSize: '11px', fontWeight: '700' }} className="hide-xs">View Style</span>
@@ -80,7 +95,12 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
 
           <div className="toolbar__filters" style={{ display: 'flex', gap: '4px' }}>
             <div className="select-wrap">
-              <select className="select" value={filters.status} onChange={e => onFiltersChange({ ...filters, status: e.target.value })}>
+              <select 
+                className="select" 
+                value={filters.status} 
+                onChange={e => onFiltersChange({ ...filters, status: e.target.value })}
+                aria-label={t('filter_by_status', 'Filter by status')}
+              >
                 <option value="">{t('filter_all')}</option>
                 <option value="DUE">{t('filter_due')}</option>
                 <option value="PAID">{t('filter_paid')}</option>
@@ -91,7 +111,12 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             </div>
 
             <div className="select-wrap">
-              <select className="select" value={filters.sort} onChange={e => onFiltersChange({ ...filters, sort: e.target.value })}>
+              <select 
+                className="select" 
+                value={filters.sort} 
+                onChange={e => onFiltersChange({ ...filters, sort: e.target.value })}
+                aria-label={t('sort_by', 'Sort by')}
+              >
                 <option value="amount">{t('sort_amount')}</option>
                 <option value="dueDate">{t('sort_due_date')}</option>
                 <option value="name">{t('sort_name')}</option>
@@ -102,7 +127,13 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
         </div>
 
         <div className="toolbar__group toolbar__group--refresh" style={{ background: 'var(--surface-2)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-          <button className="btn btn--ghost btn--sm" onClick={onRefreshAll} disabled={refreshingAll || !hasServices} style={{ border: 'none', background: 'transparent', padding: '0 6px' }}>
+          <button 
+            className="btn btn--ghost btn--sm" 
+            onClick={onRefreshAll} 
+            disabled={refreshingAll || !hasServices} 
+            aria-label={t('refresh_all', 'Refresh all services')}
+            style={{ border: 'none', background: 'transparent', padding: '0 6px' }}
+          >
             <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
             <span className="hide-xs" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
           </button>
