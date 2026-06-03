@@ -555,7 +555,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     if (payload.isBulk) {
       const { entries } = payload;
       if (ph) ph.capture('bulk_add_started', { count: entries.length });
-      const tst = toast.loading(`Validating ${entries.length} services...`);
+      setProcessingOverlay(`Validating ${entries.length} services...`);
       const results = { succeeded: [], failed: [], alreadyExists: [], inTrash: [] };
 
       for (const entry of entries) {
@@ -569,25 +569,32 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         try {
           await actions.add({ isBulk: false, serviceNumber: sn, label: entry.label, pinned: !!entry.pinned });
           results.succeeded.push(sn);
-          toast.loading(`Added ${results.succeeded.length}/${entries.length}...`, { id: tst });
+          setProcessingOverlay(`Added ${results.succeeded.length}/${entries.length}...`);
         } catch (e) {
           if (e?.message === 'CANCELLED') {
+            setProcessingOverlay(null);
             setBulkResult(results);
             return;
           }
           results.failed.push({ number: sn, error: e?.message || 'Unknown error' });
         }
       }
-      toast.dismiss(tst);
+      setProcessingOverlay(null);
       setBulkResult(results);
       if (activeView !== 'active') setActiveView('active');
       return;
     }
 
     if (dialog.service) {
-      await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
-        loading: t('saving'), success: 'Updated', error: e => `Update failed: ${e?.message || 'Unknown error'}`,
-      });
+      setProcessingOverlay(t('saving', 'Saving...'));
+      try {
+        await actions.update(dialog.service.id, { label: payload.label });
+        toast.success('Updated');
+      } catch(e) {
+        toast.error(`Update failed: ${e?.message || 'Unknown error'}`);
+      } finally {
+        setProcessingOverlay(null);
+      }
     } else {
       const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
       if (inTrash) {
@@ -597,10 +604,18 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
           description: 'This service is currently in the Trash.\n\nWould you like to restore it instead of adding a new one?',
           isDanger: false,
           onConfirm: async () => {
-            await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` });
-            setDialog({ open: false, service: null });
-            handleViewChange('active');
-            flashCard(inTrash.id);
+            setProcessingOverlay(t('saving', 'Restoring...'));
+            try {
+              await actions.restore(inTrash.id);
+              toast.success('Restored');
+              setDialog({ open: false, service: null });
+              handleViewChange('active');
+              flashCard(inTrash.id);
+            } catch(e) {
+              toast.error(`Restore failed: ${e?.message || 'Unknown error'}`);
+            } finally {
+              setProcessingOverlay(null);
+            }
           }
         });
         return;
@@ -609,16 +624,18 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       const inActive = services.find(s => s.serviceNumber === payload.serviceNumber);
       if (inActive) { toast.error('Service number already exists.'); return; }
 
-      const tst = toast.loading('Validating and fetching bill…');
+      setProcessingOverlay('Validating and fetching bill...');
       try {
         const newService = await actions.add(payload);
-        toast.success('Service added', { id: tst });
+        toast.success('Service added');
         setDialog({ open: false, service: null });
         handleViewChange('active');
         if (newService?.id) flashCard(newService.id);
       } catch (e) {
-        if (e?.message !== 'CANCELLED') toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
+        if (e?.message !== 'CANCELLED') toast.error(`Add failed: ${e?.message || 'Unknown error'}`);
         throw e;
+      } finally {
+        setProcessingOverlay(null);
       }
     }
   }
@@ -865,8 +882,8 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         <div className="overlay overlay--center" style={{ zIndex: 9999 }}>
           <div className="state-box" style={{ background: 'var(--surface-1)', padding: '24px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
             <FiRefreshCw size={32} className="spin" style={{ color: 'var(--primary)', marginBottom: '16px' }} />
-            <h3 style={{ fontSize: '16px', margin: '0 0 8px' }}>{processingOverlay}</h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0 }}>Please wait, this might take a moment...</p>
+            <h3 style={{ fontSize: '16px', margin: '0 0 8px', color: 'var(--text-1)' }}>{processingOverlay}</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-1)', opacity: 0.8, margin: 0 }}>Please wait, this might take a moment...</p>
           </div>
         </div>
       )}
