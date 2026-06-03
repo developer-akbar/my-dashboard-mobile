@@ -146,7 +146,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     updateUnread();
 
     const processDeepLink = async (sn) => {
-      if (!sn || loading || services.length === 0) return false;
+      if (!sn || loading) return false;
+      if (services.length === 0 && sn) {
+        // Even if no services, if there is an sn, we can add it!
+        // but wait, if it's loading, we shouldn't do it yet.
+      }
       
       const svc = services.find(s => s.serviceNumber === sn);
       if (svc) {
@@ -155,12 +159,14 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         flashCard(svc.id);
-        setTimeout(() => {
-          setQrDialog({ open: true, service: svc });
-        }, 300); // 300ms to allow UI transitions
+        if (window.history.replaceState) window.history.replaceState({}, '', '/');
+        return true;
+      } else {
+        console.log('[dashboard] Service not found, opening add dialog for:', sn);
+        setDialog({ open: true, service: null, initialServiceNumber: sn });
+        if (window.history.replaceState) window.history.replaceState({}, '', '/');
         return true;
       }
-      return false;
     };
 
     const handleNotif = (e) => {
@@ -187,6 +193,16 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     };
 
     const checkBootAction = async () => {
+      // Check web URL for service number
+      const path = window.location.pathname;
+      if (path.length > 1 && path !== '/privacy') {
+        const snFromPath = path.substring(1).replace(/[^0-9]/g, '');
+        if (snFromPath.length >= 13) {
+          console.log('[dashboard] Web deep link detected:', snFromPath);
+          pendingDeepLink.current = snFromPath;
+        }
+      }
+
       const pending = await db.getSetting('pending_notification_action');
       if (pending && pending.serviceNumber) {
         if (Date.now() - pending.timestamp < 300000) {
@@ -202,6 +218,8 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
           console.log('[dashboard] Boot check: Expiring old action');
           await db.setSetting('pending_notification_action', null);
         }
+      } else if (pendingDeepLink.current) {
+         processDeepLink(pendingDeepLink.current);
       }
     };
 
@@ -648,10 +666,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
   async function handleShare(service) {
     const isPaid = service.isPaid;
-    const name = service.label || service.customerName || 'Consumer';
+    const name = service.customerName || service.label || 'Consumer';
     const sn = service.serviceNumber;
     const amount = isPaid ? (service.paidAmount || service.lastAmountDue || 0) : service.lastAmountDue;
     const date = isPaid ? service.paidDate : service.lastDueDate;
+    const url = `https://my-dashboard-mobile.vercel.app/${sn}`;
     
     let text = '';
     if (isPaid) {
@@ -661,6 +680,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
              `*Amount Paid:* ₹${amount}\n` +
              `*Date:* ${date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}\n` +
              `*Status:* ✅ Successfully Paid\n\n` +
+             `Link: ${url}\n\n` +
              `Shared via MyDashboard App`;
     } else {
       text = `⚡ *Electricity Bill Update*\n\n` +
@@ -670,6 +690,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
              `*Due Date:* ${date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}\n` +
              `*Status:* ⏳ Pending Payment\n\n` +
              `Please pay your bill to avoid late fees.\n\n` +
+             `Link: ${url}\n\n` +
              `Shared via MyDashboard App`;
     }
 
@@ -710,10 +731,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     const insights = service.insights;
     if (!insights) { toast.error('Not enough data to generate report yet'); return; }
     
-    const name = service.label || service.customerName || 'Consumer';
+    const name = service.customerName || service.label || 'Consumer';
     const sn = service.serviceNumber;
     const trend = insights.vsLastMonth;
     const trendText = trend ? `(${trend.amountPct > 0 ? '📈 +' : '📉 '}${trend.amountPct}% vs last month)` : '';
+    const url = `https://my-dashboard-mobile.vercel.app/${sn}`;
 
     const text = `📊 *Electricity Usage Report — ${new Date().toLocaleString('default', { month: 'long' })}*\n\n` +
                  `*Service:* ${name} (${sn})\n` +
@@ -725,6 +747,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
                  `• Highest ever: ₹${insights.maxAmount}\n` +
                  `• Efficiency: ₹${insights.avgCostPerUnit}/unit\n\n` +
                  `*Next Est:* ~₹${insights.predictedNextBill || '...'}\n\n` +
+                 `Link: ${url}\n\n` +
                  `Shared via MyDashboard App`;
 
     if (Capacitor.getPlatform() !== 'web') {
@@ -769,7 +792,10 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         <div className="selection-bar">
           <div className="selection-bar__left">
             <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }} />
-            <span>{selectedIds.size} selected</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span>{selectedIds.size} selected</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Total: {formatInr(currentItems.filter(s => selectedIds.has(s.id)).reduce((acc, s) => acc + Number(s.lastAmountDue || 0), 0))}</span>
+            </div>
           </div>
           <div className="selection-bar__actions">
             <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected"><FiCopy size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}</button>

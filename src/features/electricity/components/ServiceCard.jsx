@@ -35,8 +35,15 @@ function fmtMonth(m) { if (!m) return '—'; const [y, mo] = m.split('-'); retur
 
 // ── Accordion section ──────────────────────────────────────────────────────────
 
-function Section({ title, badge, defaultOpen = false, children }) {
+function Section({ title, badge, defaultOpen = false, children, isExpanded }) {
   const [open, setOpen] = useState(defaultOpen);
+  
+  useEffect(() => {
+    if (isExpanded === false) {
+      setOpen(false);
+    }
+  }, [isExpanded]);
+
   return (
     <div className={`acc ${open ? 'acc--open' : ''}`}>
       <button className="acc__head" onClick={() => setOpen(v => !v)}>

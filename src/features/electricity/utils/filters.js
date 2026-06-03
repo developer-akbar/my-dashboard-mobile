@@ -1,4 +1,4 @@
-export function filterServices(services, { query, status, sort }) {
+export function filterServices(services, { query, status, sort, sortOrder = 'desc' }) {
   let result = [...services];
 
   if (query) {
@@ -16,16 +16,24 @@ export function filterServices(services, { query, status, sort }) {
   }
 
   function compareBySort(a, b) {
+    const isAsc = sortOrder === 'asc';
     switch (sort) {
-      case 'amount':
-        return (b.lastAmountDue || 0) - (a.lastAmountDue || 0);
-      case 'dueDate': {
-        const da = a.lastDueDate ? new Date(a.lastDueDate) : new Date('9999');
-        const db2 = b.lastDueDate ? new Date(b.lastDueDate) : new Date('9999');
-        return da - db2;
+      case 'amount': {
+        const diff = (a.lastAmountDue || 0) - (b.lastAmountDue || 0);
+        return isAsc ? diff : -diff;
       }
-      case 'name':
-        return (a.label || a.serviceNumber).localeCompare(b.label || b.serviceNumber);
+      case 'dueDate': {
+        const da = a.lastDueDate ? new Date(a.lastDueDate).getTime() : Infinity;
+        const db2 = b.lastDueDate ? new Date(b.lastDueDate).getTime() : Infinity;
+        const diff = da - db2;
+        return isAsc ? diff : -diff;
+      }
+      case 'name': {
+        const nameA = a.label || a.customerName || a.serviceNumber;
+        const nameB = b.label || b.customerName || b.serviceNumber;
+        const diff = nameA.localeCompare(nameB);
+        return isAsc ? diff : -diff;
+      }
       default:
         return 0;
     }
