@@ -16,6 +16,8 @@ import { Capacitor } from '@capacitor/core';
 const CalculationSettings = lazy(() => import('../features/electricity/components/CalculationSettings.jsx').then(m => ({ default: m.CalculationSettings })));
 const ApplianceCalculator = lazy(() => import('../features/electricity/components/ApplianceCalculator.jsx').then(m => ({ default: m.ApplianceCalculator })));
 
+const OverviewTab = lazy(() => import('../features/electricity/OverviewTab.jsx').then(m => ({ default: m.OverviewTab })));
+
 // ── Loading Fallback ────────────────────────────────────────────────────────
 const PageLoader = () => (
   <div className="state-box">
@@ -137,6 +139,21 @@ function AppContent() {
   }, [activePage, ph]);
 
   useEffect(() => {
+    const handleUrlOpen = (event) => {
+      const url = event.url;
+      if (url.includes('mydashboard://action/refresh')) {
+        // We'll dispatch a custom event to trigger refresh-all
+        window.dispatchEvent(new CustomEvent('shortcut-refresh-all'));
+        if (activePage !== 'electricity') setActivePage('electricity');
+      } else if (url.includes('mydashboard://action/add')) {
+        // Dispatch custom event to open add dialog
+        window.dispatchEvent(new CustomEvent('shortcut-add-service'));
+        if (activePage !== 'electricity') setActivePage('electricity');
+      }
+    };
+    
+    const urlHandler = CapApp.addListener('appUrlOpen', handleUrlOpen);
+    
     const onBack = async () => {
       if (applianceCalcOpen) {
         setApplianceCalcOpen(false);
@@ -171,6 +188,7 @@ function AppContent() {
     }
 
     return () => {
+      urlHandler.then(h => h.remove());
       capHandler.then(h => h.remove());
       window.removeEventListener('popstate', popHandler);
     };
@@ -223,11 +241,7 @@ function AppContent() {
         <Suspense fallback={<PageLoader />}>
           {activePage === 'electricity' && <ElectricityDashboard onOpenCalcSettings={() => handleNavClick('calculation-settings')} />}
           {activePage === 'calculation-settings' && <CalculationSettings onBack={() => handleNavClick('electricity')} />}
-          {activePage === 'home' && (
-            <div className="page coming-soon">
-              <h2>{t('home')}</h2><p>Coming soon</p>
-            </div>
-          )}
+          {activePage === 'home' && <OverviewTab />}
           {activePage === 'privacy' && (
             <PrivacyPolicy onBack={() => handleNavClick('settings')} />
           )}
