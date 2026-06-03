@@ -422,7 +422,7 @@ export function ServiceCard({
           {insights && (
             <Section title="Consumption Insights" defaultOpen={false} isExpanded={isExpanded}>
               <div style={{ padding: '0 10px' }}>
-                 {insights.vsLastMonth?.amountPct > 15 && (
+                 {insights.vsLastMonth?.amountPct > 5 && (
                    <div style={{ margin: '0 0 12px', background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber)', padding: '8px', borderRadius: 'var(--radius-sm)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                      <FiZap size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
                      <span style={{ fontSize: '11px', lineHeight: 1.4 }}><b>High bill detected (+{insights.vsLastMonth.amountPct}%).</b> Setting your AC to 24°C instead of 18°C can save up to 24% on cooling costs.</span>
@@ -602,6 +602,29 @@ function TrendPanel({ data, insights, t }) {
     return { ...d, label: `${MO[+mo - 1]}'${yr.slice(2)}` };
   });
 
+  const seasonalInsight = useMemo(() => {
+    if (!data || data.length < 12) return null;
+    let summerSum = 0, summerCount = 0;
+    let otherSum = 0, otherCount = 0;
+    
+    data.forEach(d => {
+      const mo = parseInt(d.month.split('-')[1], 10);
+      const amt = Number(d.billAmount || 0);
+      if (mo >= 4 && mo <= 6) { summerSum += amt; summerCount++; }
+      else { otherSum += amt; otherCount++; }
+    });
+    
+    if (summerCount === 0 || otherCount === 0) return null;
+    const summerAvg = summerSum / summerCount;
+    const otherAvg = otherSum / otherCount;
+    
+    if (summerAvg > otherAvg * 1.15) {
+      const pct = Math.round(((summerAvg - otherAvg) / otherAvg) * 100);
+      return { type: 'summer', pct, avg: summerAvg };
+    }
+    return null;
+  }, [data]);
+
   return (
     <div className="trend">
       <div className="trend__head">
@@ -638,6 +661,18 @@ function TrendPanel({ data, insights, t }) {
               <small>{insights.predictedBasis || 'Seasonal'}</small>
             </div>
           )}
+        </div>
+      )}
+
+      {seasonalInsight && (
+        <div style={{ margin: '16px 10px 0', background: 'var(--amber-dim)', border: '1px solid var(--amber)', padding: '12px', borderRadius: 'var(--radius-sm)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+          <span style={{ fontSize: '16px' }}>☀️</span>
+          <div>
+            <h4 style={{ margin: '0 0 4px', fontSize: '12px', color: 'var(--amber)' }}>Summer Pattern Detected</h4>
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-1)', lineHeight: 1.4 }}>
+              Your Apr–Jun bills average <b>{formatInr(seasonalInsight.avg)}</b> — which is <b>{seasonalInsight.pct}% higher</b> than the rest of the year.
+            </p>
+          </div>
         </div>
       )}
     </div>
