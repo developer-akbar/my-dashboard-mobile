@@ -14,6 +14,7 @@ import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
+import { formatInr } from '../../shared/utils/index.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { useTranslation } from 'react-i18next';
 import { usePostHog } from '@posthog/react';
@@ -141,8 +142,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   };
 
   useEffect(() => {
-    if (isWeb) return;
-
     updateUnread();
 
     const processDeepLink = async (sn) => {

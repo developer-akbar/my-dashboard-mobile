@@ -202,7 +202,7 @@ export function ServiceCard({
             {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)', transform: 'rotate(45deg)' }} />}        
           </div>
           <div className="scard__identity-text">
-            <h2 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h2>
+            <h2 className="scard__name" title={service.customerName}>{service.label || service.customerName || t('untitled')}</h2>
             <div className="scard__num-row">
               <span className="scard__num">{service.serviceNumber}</span>
               <button
@@ -279,9 +279,12 @@ export function ServiceCard({
       </header>
 
       {/* ── Hero / Amount ────────────────────────────────────────────────────────────────── */}
-      <div className="scard__hero-main" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined}>
+      <div className="scard__hero-main" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined} style={{ cursor: useAccordion ? 'pointer' : 'default' }}>
         <div className="scard__hero-content">
-          <p className="scard__hero-label">{t('amount_due')}</p>
+          <p className="scard__hero-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {t('amount_due')}
+            {useAccordion && <FiChevronDown size={14} style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }} />}
+          </p>
           <div className="scard__hero-val">
             <h2 className="scard__hero-amount">
               {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
