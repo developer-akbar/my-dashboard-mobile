@@ -14,6 +14,7 @@ import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
+import { formatInr } from '../../shared/utils/index.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { useTranslation } from 'react-i18next';
 import { usePostHog } from '@posthog/react';
@@ -141,12 +142,10 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   };
 
   useEffect(() => {
-    if (isWeb) return;
-
     updateUnread();
 
     const processDeepLink = async (sn) => {
-      if (!sn || loading || services.length === 0) return false;
+      if (!sn || loading) return false;
       
       const svc = services.find(s => s.serviceNumber === sn);
       if (svc) {
@@ -155,12 +154,14 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         setDialog({ open: false, service: null });
         setAboutDialog({ open: false, service: null });
         flashCard(svc.id);
-        setTimeout(() => {
-          setQrDialog({ open: true, service: svc });
-        }, 300); // 300ms to allow UI transitions
+        if (window.history.replaceState) window.history.replaceState({}, '', '/');
+        return true;
+      } else {
+        console.log('[dashboard] Service not found, opening add dialog for:', sn);
+        setDialog({ open: true, service: null, initialServiceNumber: sn });
+        if (window.history.replaceState) window.history.replaceState({}, '', '/');
         return true;
       }
-      return false;
     };
 
     const handleNotif = (e) => {
@@ -187,6 +188,16 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     };
 
     const checkBootAction = async () => {
+      // Check web URL for service number
+      const path = window.location.pathname;
+      if (path.length > 1 && path !== '/privacy') {
+        const snFromPath = path.substring(1).replace(/[^0-9]/g, '');
+        if (snFromPath.length >= 13) {
+          console.log('[dashboard] Web deep link detected:', snFromPath);
+          pendingDeepLink.current = snFromPath;
+        }
+      }
+
       const pending = await db.getSetting('pending_notification_action');
       if (pending && pending.serviceNumber) {
         if (Date.now() - pending.timestamp < 300000) {
@@ -202,6 +213,8 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
           console.log('[dashboard] Boot check: Expiring old action');
           await db.setSetting('pending_notification_action', null);
         }
+      } else if (pendingDeepLink.current) {
+         processDeepLink(pendingDeepLink.current);
       }
     };
 
@@ -217,13 +230,13 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLinkSignal);
     
-    if (!loading && services.length > 0) {
+    if (!loading) {
       if (pendingDeepLink.current) {
         processDeepLink(pendingDeepLink.current);
         pendingDeepLink.current = null;
       }
       checkBootAction();
-      selfHealNotifications();
+      if (services.length > 0) selfHealNotifications();
     }
 
     return () => {
@@ -270,6 +283,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   const ph = usePostHog();
 
   const [bulkResult, setBulkResult] = useState(null);
+  const [processingOverlay, setProcessingOverlay] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleExport = () => {
@@ -541,7 +555,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     if (payload.isBulk) {
       const { entries } = payload;
       if (ph) ph.capture('bulk_add_started', { count: entries.length });
-      const tst = toast.loading(`Validating ${entries.length} services...`);
+      setProcessingOverlay(`Validating ${entries.length} services...`);
       const results = { succeeded: [], failed: [], alreadyExists: [], inTrash: [] };
 
       for (const entry of entries) {
@@ -555,25 +569,32 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         try {
           await actions.add({ isBulk: false, serviceNumber: sn, label: entry.label, pinned: !!entry.pinned });
           results.succeeded.push(sn);
-          toast.loading(`Added ${results.succeeded.length}/${entries.length}...`, { id: tst });
+          setProcessingOverlay(`Added ${results.succeeded.length}/${entries.length}...`);
         } catch (e) {
           if (e?.message === 'CANCELLED') {
+            setProcessingOverlay(null);
             setBulkResult(results);
             return;
           }
           results.failed.push({ number: sn, error: e?.message || 'Unknown error' });
         }
       }
-      toast.dismiss(tst);
+      setProcessingOverlay(null);
       setBulkResult(results);
       if (activeView !== 'active') setActiveView('active');
       return;
     }
 
     if (dialog.service) {
-      await toast.promise(actions.update(dialog.service.id, { label: payload.label }), {
-        loading: t('saving'), success: 'Updated', error: e => `Update failed: ${e?.message || 'Unknown error'}`,
-      });
+      setProcessingOverlay(t('saving', 'Saving...'));
+      try {
+        await actions.update(dialog.service.id, { label: payload.label });
+        toast.success('Updated');
+      } catch(e) {
+        toast.error(`Update failed: ${e?.message || 'Unknown error'}`);
+      } finally {
+        setProcessingOverlay(null);
+      }
     } else {
       const inTrash = trash.find(t => t.serviceNumber === payload.serviceNumber);
       if (inTrash) {
@@ -583,10 +604,18 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
           description: 'This service is currently in the Trash.\n\nWould you like to restore it instead of adding a new one?',
           isDanger: false,
           onConfirm: async () => {
-            await toast.promise(actions.restore(inTrash.id), { loading: t('saving'), success: 'Restored', error: e => `Restore failed: ${e?.message || 'Unknown error'}` });
-            setDialog({ open: false, service: null });
-            handleViewChange('active');
-            flashCard(inTrash.id);
+            setProcessingOverlay(t('saving', 'Restoring...'));
+            try {
+              await actions.restore(inTrash.id);
+              toast.success('Restored');
+              setDialog({ open: false, service: null });
+              handleViewChange('active');
+              flashCard(inTrash.id);
+            } catch(e) {
+              toast.error(`Restore failed: ${e?.message || 'Unknown error'}`);
+            } finally {
+              setProcessingOverlay(null);
+            }
           }
         });
         return;
@@ -595,16 +624,18 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       const inActive = services.find(s => s.serviceNumber === payload.serviceNumber);
       if (inActive) { toast.error('Service number already exists.'); return; }
 
-      const tst = toast.loading('Validating and fetching bill…');
+      setProcessingOverlay('Validating and fetching bill...');
       try {
         const newService = await actions.add(payload);
-        toast.success('Service added', { id: tst });
+        toast.success('Service added');
         setDialog({ open: false, service: null });
         handleViewChange('active');
         if (newService?.id) flashCard(newService.id);
       } catch (e) {
-        if (e?.message !== 'CANCELLED') toast.error(`Add failed: ${e?.message || 'Unknown error'}`, { id: tst });
+        if (e?.message !== 'CANCELLED') toast.error(`Add failed: ${e?.message || 'Unknown error'}`);
         throw e;
+      } finally {
+        setProcessingOverlay(null);
       }
     }
   }
@@ -615,12 +646,12 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     
     if (!options.quiet) {
       setRefreshingAll(true);
-      setRefreshProgress({ done: 0, total: currentServices.length });
+      setProcessingOverlay('Refreshing all services...');
     }
 
     try {
       const summary = await actions.refreshAll((done, tot) => {
-        if (!options.quiet) setRefreshProgress({ done, total: tot });
+        if (!options.quiet) setProcessingOverlay(`Refreshing ${done} of ${tot} services...`);
       });
       if (summary && !options.quiet) {
         summary.failed === 0 ? toast.success(`All refreshed`) : toast.error(`Refresh failed for ${summary.failed} service(s)`);
@@ -628,7 +659,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     } finally {
       if (!options.quiet) {
         setRefreshingAll(false);
-        setRefreshProgress(null);
+        setProcessingOverlay(null);
       }
     }
   }
@@ -648,10 +679,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
   async function handleShare(service) {
     const isPaid = service.isPaid;
-    const name = service.label || service.customerName || 'Consumer';
+    const name = service.customerName || service.label || 'Consumer';
     const sn = service.serviceNumber;
     const amount = isPaid ? (service.paidAmount || service.lastAmountDue || 0) : service.lastAmountDue;
     const date = isPaid ? service.paidDate : service.lastDueDate;
+    const url = `https://my-dashboard-mobile.vercel.app/${sn}`;
     
     let text = '';
     if (isPaid) {
@@ -661,6 +693,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
              `*Amount Paid:* ₹${amount}\n` +
              `*Date:* ${date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}\n` +
              `*Status:* ✅ Successfully Paid\n\n` +
+             `Link: ${url}\n\n` +
              `Shared via MyDashboard App`;
     } else {
       text = `⚡ *Electricity Bill Update*\n\n` +
@@ -670,6 +703,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
              `*Due Date:* ${date ? new Date(date).toLocaleDateString('en-IN') : 'N/A'}\n` +
              `*Status:* ⏳ Pending Payment\n\n` +
              `Please pay your bill to avoid late fees.\n\n` +
+             `Link: ${url}\n\n` +
              `Shared via MyDashboard App`;
     }
 
@@ -710,10 +744,11 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     const insights = service.insights;
     if (!insights) { toast.error('Not enough data to generate report yet'); return; }
     
-    const name = service.label || service.customerName || 'Consumer';
+    const name = service.customerName || service.label || 'Consumer';
     const sn = service.serviceNumber;
     const trend = insights.vsLastMonth;
     const trendText = trend ? `(${trend.amountPct > 0 ? '📈 +' : '📉 '}${trend.amountPct}% vs last month)` : '';
+    const url = `https://my-dashboard-mobile.vercel.app/${sn}`;
 
     const text = `📊 *Electricity Usage Report — ${new Date().toLocaleString('default', { month: 'long' })}*\n\n` +
                  `*Service:* ${name} (${sn})\n` +
@@ -725,6 +760,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
                  `• Highest ever: ₹${insights.maxAmount}\n` +
                  `• Efficiency: ₹${insights.avgCostPerUnit}/unit\n\n` +
                  `*Next Est:* ~₹${insights.predictedNextBill || '...'}\n\n` +
+                 `Link: ${url}\n\n` +
                  `Shared via MyDashboard App`;
 
     if (Capacitor.getPlatform() !== 'web') {
@@ -769,7 +805,10 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
         <div className="selection-bar">
           <div className="selection-bar__left">
             <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }} />
-            <span>{selectedIds.size} selected</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span>{selectedIds.size} selected</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>Total: {formatInr(currentItems.filter(s => selectedIds.has(s.id)).reduce((acc, s) => acc + Number(s.lastAmountDue || 0), 0))}</span>
+            </div>
           </div>
           <div className="selection-bar__actions">
             <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected"><FiCopy size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}</button>
@@ -825,19 +864,30 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       {activeView === 'active' && (
         <>{loading ? <div className="state-box"><FiRefreshCw size={22} className="spin" /><p>{t('loading_services')}</p></div> : visible.length === 0 ? <div className="state-box"><FiZap size={28} /><h3>{t('no_services_found')}</h3><p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>{services.length === 0 && <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>{t('add_service')}</button>}</div> : <div className="grid">
           {visible.map(s => (
-            <ServiceCard key={s.id} id={`service-${s.id}`} service={s} useAccordion={useAccordion} cardStyle={cardStyle} refreshing={refreshingIds.has(s.id)} isFlashing={flashingId === s.id} selected={selectedIds.has(s.id)} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRefresh={async () => { const tst = toast.loading('Refreshing…'); try { const updated = await actions.refresh(s.id); toast.success('Refreshed', { id: tst }); if (updated) await trackBill(s, updated); } catch (e) { if (e?.message !== 'CANCELLED') toast.error(`Refresh failed`, { id: tst }); } }} onEdit={() => setDialog({ open: true, service: s })} onAbout={() => setAboutDialog({ open: true, service: s })} onDelete={() => { setConfirmState({ open: true, title: 'Move to Trash?', description: 'This service will be moved to the Trash.', isDanger: true, onConfirm: async () => { const tst = toast.loading('Moving to trash…'); try { await actions.remove(s.id); toast.success('Moved to trash', { id: tst }); clearSelection(); } catch (e) { toast.error(`Failed to move`, { id: tst }); } } }); }} onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })} onCalculateBill={(svc) => handleCalculateBill(svc)} onShowQR={(svc) => setQrDialog({ open: true, service: svc })} onPay={() => handlePay(s)} onShare={() => handleShare(s)} onShareReport={() => handleShareMonthlyReport(s)} />
+            <ServiceCard key={s.id} id={`service-${s.id}`} service={s} useAccordion={useAccordion} cardStyle={cardStyle} refreshing={refreshingIds.has(s.id)} isFlashing={flashingId === s.id} selected={selectedIds.has(s.id)} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRefresh={async () => { setProcessingOverlay('Refreshing bill...'); try { const updated = await actions.refresh(s.id); toast.success('Refreshed'); if (updated) await trackBill(s, updated); } catch (e) { if (e?.message !== 'CANCELLED') toast.error(`Refresh failed`); } finally { setProcessingOverlay(null); } }} onEdit={() => setDialog({ open: true, service: s })} onAbout={() => setAboutDialog({ open: true, service: s })} onDelete={() => { setConfirmState({ open: true, title: 'Move to Trash?', description: 'This service will be moved to the Trash.', isDanger: true, onConfirm: async () => { const tst = toast.loading('Moving to trash…'); try { await actions.remove(s.id); toast.success('Moved to trash', { id: tst }); clearSelection(); } catch (e) { toast.error(`Failed to move`, { id: tst }); } } }); }} onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })} onCalculateBill={(svc) => handleCalculateBill(svc)} onShowQR={(svc) => setQrDialog({ open: true, service: svc })} onPay={() => handlePay(s)} onShare={() => handleShare(s)} onShareReport={() => handleShareMonthlyReport(s)} />
           ))}</div>}</>
       )}
 
       {activeView === 'trash' && <TrashView services={trash} selectedIds={selectedIds} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRestore={id => { setConfirmState({ open: true, title: 'Restore service?', description: 'This service will be restored.', isDanger: false, onConfirm: async () => { const tst = toast.loading('Restoring…'); try { await actions.restore(id); toast.success('Restored', { id: tst }); clearSelection(); handleViewChange('active'); flashCard(id); } catch (e) { toast.error(`Restore failed`, { id: tst }); } } }); }} onDeletePermanent={id => { setConfirmState({ open: true, title: 'Delete permanently?', description: 'This action cannot be undone.', isDanger: true, onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: () => { clearSelection(); return 'Deleted permanently'; }, error: 'Delete failed' }) }); }} />}
 
-      <ServiceDialog open={dialog.open} service={dialog.service} services={services} onClose={() => setDialog({ open: false, service: null })} onSubmit={submitService} />
+      <ServiceDialog open={dialog.open} service={dialog.service} initialServiceNumber={dialog.initialServiceNumber} services={services} onClose={() => setDialog({ open: false, service: null })} onSubmit={submitService} />
       <ServiceAboutDialog open={aboutDialog.open} service={aboutDialog.service} onClose={() => setAboutDialog({ open: false, service: null })} />
       <Suspense fallback={null}>
         <BillCalculator open={calculator.open} service={calculator.service} onClose={() => setCalculator({ open: false, service: null })} />
       </Suspense>
       <QRCodeDialog open={qrDialog.open} service={qrDialog.service} onClose={() => setQrDialog({ open: false, service: null })} onUpdateTime={(id, time) => { actions.update(id, { billTime: time }); setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } })); }} />
       {bulkResult && <div className="overlay overlay--center" onClick={() => setBulkResult(null)}><div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}><h2 className="dialog__title">Bulk Add Results</h2><div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>{bulkResult.succeeded.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p></div>}{bulkResult.inTrash.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped ({bulkResult.inTrash.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p></div>}{bulkResult.alreadyExists.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Already Active ({bulkResult.alreadyExists.length})</p></div>}{bulkResult.failed.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>{bulkResult.failed.map((f, i) => (<p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>))}</div>}</div><div className="dialog__footer"><button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button></div></div></div>}
+      
+      {processingOverlay && (
+        <div className="overlay overlay--center" style={{ zIndex: 9999 }}>
+          <div className="state-box" style={{ background: 'var(--surface-1)', padding: '24px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
+            <FiRefreshCw size={32} className="spin" style={{ color: 'var(--primary)', marginBottom: '16px' }} />
+            <h3 style={{ fontSize: '16px', margin: '0 0 8px', color: 'var(--text-1)' }}>{processingOverlay}</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-1)', opacity: 0.8, margin: 0 }}>Please wait, this might take a moment...</p>
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description} isDanger={confirmState.isDanger} onClose={() => setConfirmState(prev => ({ ...prev, open: false }))} onConfirm={confirmState.onConfirm} />
     </div>
   );

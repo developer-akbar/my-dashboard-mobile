@@ -1,4 +1,4 @@
-import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye } from 'react-icons/fi';
+import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye, FiArrowUp, FiArrowDown } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { SessionIndicator } from './SessionIndicator.jsx';
 import toast from 'react-hot-toast';
@@ -23,6 +23,11 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
     } catch (e) {
       toast.error('Failed to copy');
     }
+  };
+
+  const toggleSortOrder = () => {
+    const nextOrder = filters.sortOrder === 'asc' ? 'desc' : 'asc';
+    onFiltersChange({ ...filters, sortOrder: nextOrder });
   };
 
   return (
@@ -110,18 +115,30 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
               <FiChevronDown size={12} className="select-icon" />
             </div>
 
-            <div className="select-wrap">
-              <select 
-                className="select" 
-                value={filters.sort} 
-                onChange={e => onFiltersChange({ ...filters, sort: e.target.value })}
-                aria-label={t('sort_by', 'Sort by')}
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', paddingRight: '2px' }}>
+              <div className="select-wrap" style={{ border: 'none' }}>
+                <select 
+                  className="select" 
+                  value={filters.sort} 
+                  onChange={e => onFiltersChange({ ...filters, sort: e.target.value })}
+                  aria-label={t('sort_by', 'Sort by')}
+                  style={{ border: 'none', background: 'transparent' }}
+                >
+                  <option value="amount">{t('sort_amount')}</option>
+                  <option value="dueDate">{t('sort_due_date')}</option>
+                  <option value="name">{t('sort_name')}</option>
+                </select>
+                <FiChevronDown size={12} className="select-icon" />
+              </div>
+              <button 
+                className="icon-btn-micro" 
+                onClick={toggleSortOrder}
+                title={filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                aria-label={filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                style={{ height: '24px', width: '24px', color: 'var(--text-2)' }}
               >
-                <option value="amount">{t('sort_amount')}</option>
-                <option value="dueDate">{t('sort_due_date')}</option>
-                <option value="name">{t('sort_name')}</option>
-              </select>
-              <FiChevronDown size={12} className="select-icon" />
+                {filters.sortOrder === 'asc' ? <FiArrowUp size={14} /> : <FiArrowDown size={14} />}
+              </button>
             </div>
           </div>
         </div>

@@ -35,8 +35,16 @@ function fmtMonth(m) { if (!m) return '—'; const [y, mo] = m.split('-'); retur
 
 // ── Accordion section ──────────────────────────────────────────────────────────
 
-function Section({ title, badge, defaultOpen = false, children }) {
+function Section({ title, badge, defaultOpen = false, children, isExpanded }) {
   const [open, setOpen] = useState(defaultOpen);
+  
+  useEffect(() => {
+    if (isExpanded === false) {
+      const t = setTimeout(() => setOpen(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [isExpanded]);
+
   return (
     <div className={`acc ${open ? 'acc--open' : ''}`}>
       <button className="acc__head" onClick={() => setOpen(v => !v)}>
@@ -195,7 +203,7 @@ export function ServiceCard({
             {service.pinned && <BsPinFill size={12} style={{ color: 'var(--primary-hi)', transform: 'rotate(45deg)' }} />}        
           </div>
           <div className="scard__identity-text">
-            <h2 className="scard__name" title={service.customerName}>{service.label || t('untitled')}</h2>
+            <h2 className="scard__name" title={service.customerName}>{service.label || service.customerName || t('untitled')}</h2>
             <div className="scard__num-row">
               <span className="scard__num">{service.serviceNumber}</span>
               <button
@@ -272,15 +280,27 @@ export function ServiceCard({
       </header>
 
       {/* ── Hero / Amount ────────────────────────────────────────────────────────────────── */}
-      <div className="scard__hero-main" onClick={useAccordion ? () => setIsExpanded(!isExpanded) : undefined}>
-        <div className="scard__hero-content">
-          <p className="scard__hero-label">{t('amount_due')}</p>
-          <div className="scard__hero-val">
-            <h2 className="scard__hero-amount">
-              {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
-            </h2>
+      <div className="scard__hero-main" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="scard__hero-content" style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div>
+              <p className="scard__hero-label">{t('amount_due')}</p>
+              <div className="scard__hero-val">
+                <h2 className="scard__hero-amount">
+                  {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
+                </h2>
+              </div>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '20px', height: '20px', borderRadius: '50%',
+              background: 'var(--surface-3)', border: '1px solid var(--border)',
+              color: 'var(--text-1)', flexShrink: 0
+            }}>
+              <FiChevronDown size={22} style={{ transition: 'transform 0.3s ease', transform: isExpanded ? 'rotate(180deg)' : 'none' }} />
+            </div>
           </div>
-          <div className="scard__hero-meta">
+          <div className="scard__hero-meta" style={{ marginTop: '8px' }}>
             {insights?.vsLastMonth && (
               <div style={{marginBottom: '4px'}}>
                  <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
@@ -295,11 +315,13 @@ export function ServiceCard({
           </div>
         </div>
 
-        {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-          <div className="scard__hero-qr" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }} title={t('show_qr')} style={{ position: 'relative', zIndex: 10 }}>
-            <QRCodeSVG value={generateAPSPDCLUpiString(service) || ''} size={44} level="L" includeMargin={false} />
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
+            <div className="scard__hero-qr" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }} title={t('show_qr')} style={{ position: 'relative', zIndex: 10 }}>
+              <QRCodeSVG value={generateAPSPDCLUpiString(service) || ''} size={44} level="L" includeMargin={false} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Quick Metrics (Visible when collapsed in rich mode, or always when expanded) ── */}
@@ -396,10 +418,16 @@ export function ServiceCard({
 
       {/* ── Expanded Body ── */}
       <div className={`scard__body ${isExpanded ? 'scard__body--expanded' : ''}`}>
-        <div className="scard__body-inner">
+        <div className="scard__body-inner" key={isExpanded ? 'exp' : 'col'}>
           {insights && (
-            <Section title="Consumption Insights" defaultOpen={false}>
+            <Section title="Consumption Insights" defaultOpen={false} isExpanded={isExpanded}>
               <div style={{ padding: '0 10px' }}>
+                 {insights.vsLastMonth?.amountPct > 15 && (
+                   <div style={{ margin: '0 0 12px', background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber)', padding: '8px', borderRadius: 'var(--radius-sm)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                     <FiZap size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                     <span style={{ fontSize: '11px', lineHeight: 1.4 }}><b>High bill detected (+{insights.vsLastMonth.amountPct}%).</b> Setting your AC to 24°C instead of 18°C can save up to 24% on cooling costs.</span>
+                   </div>
+                 )}
                  <div className="receipt-row">
                     <span className="receipt-row__label">Units Vs Last Month</span>
                     <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />        
@@ -434,6 +462,12 @@ export function ServiceCard({
                     <span className="receipt-row__label">Avg Units (Last 12m)</span>
                     <b className="receipt-row__val">{insights.avgUnits12m?.toLocaleString('en-IN') || '—'} u</b>
                  </div>
+                 {service.lastBilledUnits > 0 && (
+                   <div className="receipt-row" style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed var(--border-md)' }}>
+                      <span className="receipt-row__label">Effective Rate (This Month)</span>
+                      <b className="receipt-row__val">₹{((service.lastAmountDue || service.paidAmount || 0) / service.lastBilledUnits).toFixed(2)}/u</b>
+                   </div>
+                 )}
 
                  <button 
                    className="btn btn--ghost btn--sm" 
@@ -448,13 +482,13 @@ export function ServiceCard({
           )}
 
           {breakup && (
-            <Section title={t('bill_breakup')} badge={formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)}>
+            <Section title={t('bill_breakup')} badge={formatInr(breakup.netDue ?? breakup.grossTotal ?? 0)} isExpanded={isExpanded}>
               <BreakupPanel breakup={breakup} isPaid={service.isPaid} paidAmount={service.paidAmount} t={t} />
             </Section>
           )}
 
           {service.trendData?.length > 0 && (
-            <Section title={t('trends')}>
+            <Section title={t('trends')} isExpanded={isExpanded}>
               <TrendPanel data={service.trendData} insights={insights} t={t} />
             </Section>
           )}
@@ -462,6 +496,7 @@ export function ServiceCard({
           <Section
             title={t('payment_history')}
             badge={isHistoryError ? <span style={{display:'flex', alignItems:'center', gap: '4px'}}><FiAlertTriangle size={12}/> Sync Error</span> : `${service.paymentHistory?.length || 0}`}
+            isExpanded={isExpanded}
           >
             {isHistoryError && (
               <div className="scard__error" style={{ margin: '8px 10px' }}>
@@ -626,3 +661,4 @@ function PaymentsPanel({ payments, t }) {
     </div>
   );
 }
+

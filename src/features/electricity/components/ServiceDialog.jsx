@@ -4,7 +4,7 @@ import { isValidServiceNumber } from '../../../shared/utils/index.js';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 
-export function ServiceDialog({ open, service, onClose, onSubmit, services = [] }) {
+export function ServiceDialog({ open, service, initialServiceNumber, onClose, onSubmit, services = [] }) {
   const [label, setLabel] = useState('');
   const [serviceNumber, setServiceNumber] = useState('');
   const [isBulk, setIsBulk] = useState(false);
@@ -41,7 +41,7 @@ export function ServiceDialog({ open, service, onClose, onSubmit, services = [] 
   useEffect(() => {
     if (open) { 
       setLabel(service?.label || ''); 
-      setServiceNumber(service?.serviceNumber || ''); 
+      setServiceNumber(service?.serviceNumber || initialServiceNumber || ''); 
       setIsBulk(false);
       setBulkInput('');
       setShowPrefixes(false);
