@@ -280,18 +280,27 @@ export function ServiceCard({
       </header>
 
       {/* ── Hero / Amount ────────────────────────────────────────────────────────────────── */}
-      <div className="scard__hero-main" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: 'pointer' }}>
-        <div className="scard__hero-content">
-          <p className="scard__hero-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {t('amount_due')}
-            <FiChevronDown size={14} style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }} />
-          </p>
-          <div className="scard__hero-val">
-            <h2 className="scard__hero-amount">
-              {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
-            </h2>
+      <div className="scard__hero-main" onClick={() => setIsExpanded(!isExpanded)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="scard__hero-content" style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div>
+              <p className="scard__hero-label">{t('amount_due')}</p>
+              <div className="scard__hero-val">
+                <h2 className="scard__hero-amount">
+                  {status === 'DUE' ? formatInr(service.lastAmountDue) : '₹0'}
+                </h2>
+              </div>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '20px', height: '20px', borderRadius: '50%',
+              background: 'var(--surface-3)', border: '1px solid var(--border)',
+              color: 'var(--text-1)', flexShrink: 0
+            }}>
+              <FiChevronDown size={22} style={{ transition: 'transform 0.3s ease', transform: isExpanded ? 'rotate(180deg)' : 'none' }} />
+            </div>
           </div>
-          <div className="scard__hero-meta">
+          <div className="scard__hero-meta" style={{ marginTop: '8px' }}>
             {insights?.vsLastMonth && (
               <div style={{marginBottom: '4px'}}>
                  <TrendBadge value={insights?.vsLastMonth.amount} unit="₹" percent={insights?.vsLastMonth.amountPct} />
@@ -306,11 +315,13 @@ export function ServiceCard({
           </div>
         </div>
 
-        {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
-          <div className="scard__hero-qr" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }} title={t('show_qr')} style={{ position: 'relative', zIndex: 10 }}>
-            <QRCodeSVG value={generateAPSPDCLUpiString(service) || ''} size={44} level="L" includeMargin={false} />
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {status === 'DUE' && Number(service.lastAmountDue || 0) > 0 && (
+            <div className="scard__hero-qr" onClick={(e) => { e.stopPropagation(); onShowQR?.(service); }} title={t('show_qr')} style={{ position: 'relative', zIndex: 10 }}>
+              <QRCodeSVG value={generateAPSPDCLUpiString(service) || ''} size={44} level="L" includeMargin={false} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Quick Metrics (Visible when collapsed in rich mode, or always when expanded) ── */}

@@ -283,6 +283,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   const ph = usePostHog();
 
   const [bulkResult, setBulkResult] = useState(null);
+  const [processingOverlay, setProcessingOverlay] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleExport = () => {
@@ -628,12 +629,12 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     
     if (!options.quiet) {
       setRefreshingAll(true);
-      setRefreshProgress({ done: 0, total: currentServices.length });
+      setProcessingOverlay('Refreshing all services...');
     }
 
     try {
       const summary = await actions.refreshAll((done, tot) => {
-        if (!options.quiet) setRefreshProgress({ done, total: tot });
+        if (!options.quiet) setProcessingOverlay(`Refreshing ${done} of ${tot} services...`);
       });
       if (summary && !options.quiet) {
         summary.failed === 0 ? toast.success(`All refreshed`) : toast.error(`Refresh failed for ${summary.failed} service(s)`);
@@ -641,7 +642,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     } finally {
       if (!options.quiet) {
         setRefreshingAll(false);
-        setRefreshProgress(null);
+        setProcessingOverlay(null);
       }
     }
   }
@@ -846,7 +847,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       {activeView === 'active' && (
         <>{loading ? <div className="state-box"><FiRefreshCw size={22} className="spin" /><p>{t('loading_services')}</p></div> : visible.length === 0 ? <div className="state-box"><FiZap size={28} /><h3>{t('no_services_found')}</h3><p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>{services.length === 0 && <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>{t('add_service')}</button>}</div> : <div className="grid">
           {visible.map(s => (
-            <ServiceCard key={s.id} id={`service-${s.id}`} service={s} useAccordion={useAccordion} cardStyle={cardStyle} refreshing={refreshingIds.has(s.id)} isFlashing={flashingId === s.id} selected={selectedIds.has(s.id)} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRefresh={async () => { const tst = toast.loading('Refreshing…'); try { const updated = await actions.refresh(s.id); toast.success('Refreshed', { id: tst }); if (updated) await trackBill(s, updated); } catch (e) { if (e?.message !== 'CANCELLED') toast.error(`Refresh failed`, { id: tst }); } }} onEdit={() => setDialog({ open: true, service: s })} onAbout={() => setAboutDialog({ open: true, service: s })} onDelete={() => { setConfirmState({ open: true, title: 'Move to Trash?', description: 'This service will be moved to the Trash.', isDanger: true, onConfirm: async () => { const tst = toast.loading('Moving to trash…'); try { await actions.remove(s.id); toast.success('Moved to trash', { id: tst }); clearSelection(); } catch (e) { toast.error(`Failed to move`, { id: tst }); } } }); }} onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })} onCalculateBill={(svc) => handleCalculateBill(svc)} onShowQR={(svc) => setQrDialog({ open: true, service: svc })} onPay={() => handlePay(s)} onShare={() => handleShare(s)} onShareReport={() => handleShareMonthlyReport(s)} />
+            <ServiceCard key={s.id} id={`service-${s.id}`} service={s} useAccordion={useAccordion} cardStyle={cardStyle} refreshing={refreshingIds.has(s.id)} isFlashing={flashingId === s.id} selected={selectedIds.has(s.id)} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRefresh={async () => { setProcessingOverlay('Refreshing bill...'); try { const updated = await actions.refresh(s.id); toast.success('Refreshed'); if (updated) await trackBill(s, updated); } catch (e) { if (e?.message !== 'CANCELLED') toast.error(`Refresh failed`); } finally { setProcessingOverlay(null); } }} onEdit={() => setDialog({ open: true, service: s })} onAbout={() => setAboutDialog({ open: true, service: s })} onDelete={() => { setConfirmState({ open: true, title: 'Move to Trash?', description: 'This service will be moved to the Trash.', isDanger: true, onConfirm: async () => { const tst = toast.loading('Moving to trash…'); try { await actions.remove(s.id); toast.success('Moved to trash', { id: tst }); clearSelection(); } catch (e) { toast.error(`Failed to move`, { id: tst }); } } }); }} onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })} onCalculateBill={(svc) => handleCalculateBill(svc)} onShowQR={(svc) => setQrDialog({ open: true, service: svc })} onPay={() => handlePay(s)} onShare={() => handleShare(s)} onShareReport={() => handleShareMonthlyReport(s)} />
           ))}</div>}</>
       )}
 
@@ -859,6 +860,17 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       </Suspense>
       <QRCodeDialog open={qrDialog.open} service={qrDialog.service} onClose={() => setQrDialog({ open: false, service: null })} onUpdateTime={(id, time) => { actions.update(id, { billTime: time }); setQrDialog(prev => ({ ...prev, service: { ...prev.service, billTime: time } })); }} />
       {bulkResult && <div className="overlay overlay--center" onClick={() => setBulkResult(null)}><div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}><h2 className="dialog__title">Bulk Add Results</h2><div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>{bulkResult.succeeded.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p></div>}{bulkResult.inTrash.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped ({bulkResult.inTrash.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p></div>}{bulkResult.alreadyExists.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Already Active ({bulkResult.alreadyExists.length})</p></div>}{bulkResult.failed.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>{bulkResult.failed.map((f, i) => (<p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>))}</div>}</div><div className="dialog__footer"><button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button></div></div></div>}
+      
+      {processingOverlay && (
+        <div className="overlay overlay--center" style={{ zIndex: 9999 }}>
+          <div className="state-box" style={{ background: 'var(--surface-1)', padding: '24px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
+            <FiRefreshCw size={32} className="spin" style={{ color: 'var(--primary)', marginBottom: '16px' }} />
+            <h3 style={{ fontSize: '16px', margin: '0 0 8px' }}>{processingOverlay}</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0 }}>Please wait, this might take a moment...</p>
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description} isDanger={confirmState.isDanger} onClose={() => setConfirmState(prev => ({ ...prev, open: false }))} onConfirm={confirmState.onConfirm} />
     </div>
   );
