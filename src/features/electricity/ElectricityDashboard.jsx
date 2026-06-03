@@ -146,10 +146,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
     const processDeepLink = async (sn) => {
       if (!sn || loading) return false;
-      if (services.length === 0 && sn) {
-        // Even if no services, if there is an sn, we can add it!
-        // but wait, if it's loading, we shouldn't do it yet.
-      }
       
       const svc = services.find(s => s.serviceNumber === sn);
       if (svc) {
@@ -234,13 +230,13 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLinkSignal);
     
-    if (!loading && services.length > 0) {
+    if (!loading) {
       if (pendingDeepLink.current) {
         processDeepLink(pendingDeepLink.current);
         pendingDeepLink.current = null;
       }
       checkBootAction();
-      selfHealNotifications();
+      if (services.length > 0) selfHealNotifications();
     }
 
     return () => {
@@ -856,7 +852,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
 
       {activeView === 'trash' && <TrashView services={trash} selectedIds={selectedIds} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRestore={id => { setConfirmState({ open: true, title: 'Restore service?', description: 'This service will be restored.', isDanger: false, onConfirm: async () => { const tst = toast.loading('Restoring…'); try { await actions.restore(id); toast.success('Restored', { id: tst }); clearSelection(); handleViewChange('active'); flashCard(id); } catch (e) { toast.error(`Restore failed`, { id: tst }); } } }); }} onDeletePermanent={id => { setConfirmState({ open: true, title: 'Delete permanently?', description: 'This action cannot be undone.', isDanger: true, onConfirm: () => toast.promise(actions.purge(id), { loading: 'Deleting…', success: () => { clearSelection(); return 'Deleted permanently'; }, error: 'Delete failed' }) }); }} />}
 
-      <ServiceDialog open={dialog.open} service={dialog.service} services={services} onClose={() => setDialog({ open: false, service: null })} onSubmit={submitService} />
+      <ServiceDialog open={dialog.open} service={dialog.service} initialServiceNumber={dialog.initialServiceNumber} services={services} onClose={() => setDialog({ open: false, service: null })} onSubmit={submitService} />
       <ServiceAboutDialog open={aboutDialog.open} service={aboutDialog.service} onClose={() => setAboutDialog({ open: false, service: null })} />
       <Suspense fallback={null}>
         <BillCalculator open={calculator.open} service={calculator.service} onClose={() => setCalculator({ open: false, service: null })} />
