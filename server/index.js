@@ -28,6 +28,7 @@ import express from 'express';
 import cors from 'cors';
 import { solveCaptchaImage } from './utils/billdesk/ocr.js';
 import { scrapeBillDeskSession } from './utils/billdesk/session.js';
+import { validateVPA, getPrioritizedTimeSequence, formatVpaDate } from './utils/billdesk/discover.js';
 import { Redis } from '@upstash/redis';
 import admin from 'firebase-admin';
 
@@ -1063,7 +1064,7 @@ app.post('/api/billdesk/auto-session', async (req, res) => {
   return res.json({ ok: false, error: lastError, time: Date.now() - start });
 });
 
-// ── Notification Routes ───────────────────────────────────────────────────
+app.post(\x27/api/vpa/discover\x27, async (req, res) => { const { serviceNumber, billDate, offset = 0, batchSize = 15 } = req.body || {}; if (!serviceNumber || !billDate) return res.status(400).json({ ok: false, error: \x27Missing parameters\x27 }); const datePart = formatVpaDate(billDate); const sequence = getPrioritizedTimeSequence(); const batch = sequence.slice(offset, offset + batchSize); for (const time of batch) { const vpa = serviceNumber + \x27.\x27 + datePart + time + \x27.shaikjanib@indianbk\x27; try { const validation = await validateVPA(vpa, process.env.RAZORPAY_KEY_ID); if (validation.ok && validation.success) return res.json({ ok: true, found: true, billTime: time, vpa, customerName: validation.customerName }); } catch (err) {} } const nextOffset = offset + batchSize >= sequence.length ? null : offset + batchSize; res.json({ ok: true, found: false, nextOffset, totalCount: sequence.length, processedCount: Math.min(offset + batchSize, sequence.length) }); });\n\n// ── Notification Routes ───────────────────────────────────────────────────
 
 app.post('/api/notifications/register', async (req, res) => {
   const { token, serviceNumbers } = req.body || {};
