@@ -1,0 +1,27 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="refresh_bills"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_refresh_short"
+        android:shortcutLongLabel="@string/shortcut_refresh_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="mydashboard://action/refresh"
+            android:targetPackage="com.akbar.mydashboard"
+            android:targetClass="com.akbar.mydashboard.MainActivity" />
+    </shortcut>
+    
+    <shortcut
+        android:shortcutId="add_service"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_short"
+        android:shortcutLongLabel="@string/shortcut_add_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="mydashboard://action/add"
+            android:targetPackage="com.akbar.mydashboard"
+            android:targetClass="com.akbar.mydashboard.MainActivity" />
+    </shortcut>
+</shortcuts>
