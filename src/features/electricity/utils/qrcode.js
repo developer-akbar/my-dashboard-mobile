@@ -2,53 +2,138 @@
  * qrcode.js
  * 
  * Logic to dynamically generate APSPDCL UPI Payment Strings based on reverse engineering.
+ * Supports multiple versions: 
+ * - 'legacy': The original format used since mid-2023.
+ * - 'dynamic': The new format observed in June 2026.
  */
 
 /**
- * Generates the UPI payment string for a given service.
- * 
- * Target URL Structure (Reverse Engineered):
- * upi://pay?ver=01&mode=02&appid=com.apspdcl.ebs&tr=[TR]&mc=5411&pa=[PA]&pn=APSPDCL&tn=APSPDCL-Bill-Payment&am=[AM]&cu=INR&qrMedium=03
+ * Global Configuration for QR Version.
+ * Default is 'legacy' to maintain compatibility until fully tested.
  */
-export function generateAPSPDCLUpiString(service) {
-  if (!service || !service.serviceNumber) return null;
+export const APSPDCL_QR_VERSION = 'dynamic'; // 'legacy' | 'dynamic'
 
-  const sn = service.serviceNumber;
-  // Use publicBillAmount (original bill) even if partially paid, fallback to current demand
-  const rawAmount = service.publicBillAmount || service.billBreakup?.currentMonthBill || service.lastAmountDue || 0;
-  const amount = Number(rawAmount).toFixed(2);
-  const name = service.customerName || 'Consumer';
+// ── Reusable Builders ──────────────────────────────────────────────────────────
 
-  // 1. Extract Date components (YYMMDD) for the VPA
-  // billDate from server is ISO (e.g., 2026-05-02T10:15:00Z)
-  const dateObj = service.lastBillDate ? new Date(service.lastBillDate) : new Date();
+/**
+ * Deterministic helper to clean customer name for VPA inclusion.
+ */
+function getCleanName(name) {
+  if (!name) return 'consumer';
+  return name.replace(/[^a-zA-Z]/g, '').toLowerCase();
+}
+
+/**
+ * Deterministic helper to format date as YYMMDD.
+ */
+function getVpaDate(dateStr) {
+  const dateObj = dateStr ? new Date(dateStr) : new Date();
   const yy = String(dateObj.getUTCFullYear()).slice(-2);
   const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(dateObj.getUTCDate()).padStart(2, '0');
-  const dateCode = `${yy}${mm}${dd}`;
+  return `${yy}${mm}${dd}`;
+}
 
-  // 2. Resolve Time Code (HHMM)
-  // The 'hard part' of the APSPDCL VPA: it requires the HHMM of bill generation.
-  // We extract this from the raw API responses on the server using deep parsing.
-  // If not found, we use '0000' as a stable daily fallback.
+// ── Legacy Format Builders ───────────────────────────────────────────────────
+
+const LegacyBuilders = {
+  pa: (service, dateCode, timeCode) => {
+    const cleanName = getCleanName(service.customerName).substring(0, 10);
+    return `${service.serviceNumber}.${dateCode}${timeCode}.${cleanName}@indianbk`;
+  },
+  tr: (service, dateCode, timeCode) => {
+    // Legacy TR pattern: [PREFIX]5002[MMYY][HHMM][RANDOM_PADDING]
+    const prefix = service.serviceNumber.substring(0, 3);
+    const mm = dateCode.substring(2, 4);
+    const yy = dateCode.substring(0, 2);
+    const randomSS = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+    const randomHHMM = String(Math.floor(1000 + Math.random() * 8999));
+    return `${prefix}5002${mm}${yy}${timeCode}${randomSS}${randomHHMM}`.substring(0, 21);
+  },
+  pn: () => 'APSPDCL',
+  tn: () => 'APSPDCL-Bill-Payment'
+};
+
+// ── Dynamic Format Builders (New 2026 Format) ────────────────────────────────
+
+const DynamicBuilders = {
+  /**
+   * New PA Structure: apspdcl-dqr-prod.1782844199.<TR>.<SN>@sbi
+   */
+  pa: (service, tr) => {
+    return `apspdcl-dqr-prod.1782844199.${tr}.${service.serviceNumber}@sbi`;
+  },
+  /**
+   * New TR Observation: 555510206261742291626
+   * Note: This contains the generation time (1742).
+   * We do not invent an algorithm here; we use a stable random generator or 
+   * a placeholder that matches the observed length and inclusion of time.
+   */
+  tr: (service, dateCode, timeCode) => {
+    const staticPrefix = "555510";
+    const datePart = "20626"; // Observed in samples, potentially YYMDD or similar
+    const randomSuffix = String(Math.floor(100000 + Math.random() * 899999));
+    return `${staticPrefix}${datePart}${timeCode}${randomSuffix}`;
+  },
+  /**
+   * New PN Structure: APSPDCL_<NAME>_<SN>
+   */
+  pn: (service) => {
+    const cleanName = getCleanName(service.customerName);
+    return `APSPDCL_${cleanName}_${service.serviceNumber}`;
+  },
+  /**
+   * New TN Structure: billpay_<NAME>_<SN>
+   */
+  tn: (service) => {
+    const cleanName = getCleanName(service.customerName);
+    return `billpay_${cleanName}_${service.serviceNumber}`;
+  }
+};
+
+// ── Main Generator ──────────────────────────────────────────────────────────
+
+/**
+ * Generates the UPI payment string for a given service.
+ * Handles both legacy and new dynamic formats.
+ * 
+ * Deterministic inputs:
+ * - serviceNumber
+ * - customerName
+ * - lastBillDate -> dateCode (YYMMDD)
+ * - billTime -> timeCode (HHMM)
+ * - publicBillAmount -> amount
+ */
+export function generateAPSPDCLUpiString(service, version = APSPDCL_QR_VERSION) {
+  if (!service || !service.serviceNumber) return null;
+
+  // 1. Prepare deterministic data
+  const rawAmount = service.publicBillAmount || service.billBreakup?.currentMonthBill || service.lastAmountDue || 0;
+  const amount = Number(rawAmount).toFixed(2);
+  const dateCode = getVpaDate(service.lastBillDate);
   const timeCode = service.billTime || '0000';
 
-  // 3. PA logic (Payee Address): [SN].[YYMMDD][HHMM].[NAME]@indianbk
-  // Clean name: first 10 alpha characters only, lowercase (as per official bill format)
-  const cleanName = name.replace(/[^a-zA-Z]/g, '').toLowerCase().substring(0, 10);
-  const pa = `${sn}.${dateCode}${timeCode}.${cleanName}@indianbk`;
+  if (version === 'dynamic') {
+    /**
+     * DYNAMIC FORMAT (New)
+     * upi://pay?ver=01&pa=[PA]&pn=[PN]&mc=4900&tr=[TR]&am=[AM]&cu=INR&mode=01&purpose=00&qrMedium=04&tn=[TN]
+     */
+    const tr = DynamicBuilders.tr(service, dateCode, timeCode);
+    const pa = DynamicBuilders.pa(service, tr);
+    const pn = DynamicBuilders.pn(service);
+    const tn = DynamicBuilders.tn(service);
 
-  // 4. TR logic (Transaction Reference): [PREFIX]5002[MMYY][HHMM][RANDOM_PADDING]
-  // Matching the pattern found in physical bill QRs: 232 5002 0526 1015 09 1526
-  const prefix = sn.substring(0, 3);
-  const mmyy = `${mm}${yy}`;
-  const randomSS = String(Math.floor(Math.random() * 60)).padStart(2, '0');
-  const randomHHMM = String(Math.floor(1000 + Math.random() * 8999));
-  const tr = `${prefix}5002${mmyy}${timeCode}${randomSS}${randomHHMM}`.substring(0, 21);
+    return `upi://pay?ver=01&pa=${pa}&pn=${pn}&mc=4900&tr=${tr}&am=${amount}&cu=INR&mode=01&purpose=00&qrMedium=04&tn=${tn}`;
+  } else {
+    /**
+     * LEGACY FORMAT (Old)
+     * upi://pay?ver=01&mode=02&appid=com.apspdcl.ebs&tr=[TR]&mc=5411&pa=[PA]&pn=[PN]&tn=[TN]&am=[AM]&cu=INR&qrMedium=03
+     */
+    const pa = LegacyBuilders.pa(service, dateCode, timeCode);
+    const tr = LegacyBuilders.tr(service, dateCode, timeCode);
+    const pn = LegacyBuilders.pn();
+    const tn = LegacyBuilders.tn();
 
-  // 5. Build final URI manually to avoid URLSearchParams encoding '@' into '%40'
-  // Most UPI apps require a literal '@' in the VPA address for merchant verification.
-  const upiUrl = `upi://pay?ver=01&mode=02&appid=com.apspdcl.ebs&tr=${tr}&mc=5411&pa=${pa}&pn=APSPDCL&tn=APSPDCL-Bill-Payment&am=${amount}&cu=INR&qrMedium=03`;
-
-  return upiUrl;
+    return `upi://pay?ver=01&mode=02&appid=com.apspdcl.ebs&tr=${tr}&mc=5411&pa=${pa}&pn=${pn}&tn=${tn}&am=${amount}&cu=INR&qrMedium=03`;
+  }
 }

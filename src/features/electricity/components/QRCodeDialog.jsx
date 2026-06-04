@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { FiX, FiExternalLink, FiClock, FiCheck, FiInfo, FiCopy, FiAlertCircle } from 'react-icons/fi';
+import { useEffect, useState, useRef } from 'react';
+import { FiX, FiExternalLink, FiClock, FiCheck, FiInfo, FiCopy, FiAlertCircle, FiSearch, FiRefreshCw } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
+import { apiBase } from '../api/servicesApi.js';
 import toast from 'react-hot-toast';
 
 export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
@@ -12,7 +13,13 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
   const [showInfo, setShowInfo] = useState(false);
   const [isTimeInfoHighlighted, setIsTimeInfoHighlighted] = useState(false);
 
-  const isTimeMissing = !service?.billTime;
+  // Discovery State
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveryProgress, setDiscoveryProgress] = useState({ current: 0, total: 1440 });
+  const discoveryAbort = useRef(false);
+
+  const currentCleanTime = timeInput.replace(/\D/g, '');
+  const isTimeMissing = !service?.billTime && currentCleanTime.length !== 4;
 
   // Extract time from current service data
   const dateObj = service?.lastBillDate ? new Date(service.lastBillDate) : null;
@@ -30,6 +37,8 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
       setIsEditing(!service.billTime); // Auto-open edit mode if time is missing
       setShowInfo(false);
       setIsTimeInfoHighlighted(false);
+      setIsDiscovering(false);
+      discoveryAbort.current = false;
     }
   }, [open, service]);
 
@@ -66,13 +75,69 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
 
   if (!open || !service) return null;
 
-  const upiString = generateAPSPDCLUpiString(service);
+  // Use live time input for dynamic QR preview
+  const upiString = generateAPSPDCLUpiString({ 
+    ...service, 
+    billTime: currentCleanTime.length === 4 ? currentCleanTime : null 
+  });
 
   const handleSaveTime = () => {
-    const cleaned = timeInput.replace(/\D/g, '');
-    if (cleaned.length !== 4) return;
-    onUpdateTime(service.id, cleaned);
+    if (currentCleanTime.length !== 4) return;
+    onUpdateTime(service.id, currentCleanTime);
     setIsEditing(false);
+  };
+
+  const runDiscovery = async () => {
+    if (!service || isDiscovering) return;
+    
+    setIsDiscovering(true);
+    discoveryAbort.current = false;
+    setDiscoveryProgress({ current: 0, total: 1440 });
+
+    let offset = 0;
+    const batchSize = 25;
+
+    try {
+      while (!discoveryAbort.current) {
+        const url = `${apiBase()}/vpa/discover`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceNumber: service.serviceNumber,
+            billDate: service.billDate || service.lastBillDate,
+            offset,
+            batchSize
+          })
+        });
+
+        if (!res.ok) throw new Error('Discovery server error');
+        const data = await res.json();
+
+        if (data.found) {
+          toast.success(`Success! Valid QR discovered.`);
+          const bt = data.billTime;
+          setTimeInput(`${bt.substring(0, 2)}:${bt.substring(2)}`);
+          onUpdateTime?.(service.id, bt);
+          setIsDiscovering(false);
+          setIsEditing(false);
+          return;
+        }
+
+        if (data.nextOffset === null) {
+          toast.error('Could not discover a valid payment time.');
+          break;
+        }
+
+        offset = data.nextOffset;
+        setDiscoveryProgress({ current: data.processedCount, total: data.totalCount });
+      }
+    } catch (err) {
+      console.error('[discovery] Error:', err);
+      toast.error(err.message);
+    } finally {
+      if (!discoveryAbort.current) setIsDiscovering(false);
+    }
   };
 
   const copyUpiString = async () => {
@@ -106,22 +171,44 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
 
         <div className="dialog__body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', maxHeight: '70vh', overflowY: 'auto', scrollbarGutter: 'stable' }}>
 
-          <div style={{ 
-            background: '#fff', 
-            padding: '16px', 
-            borderRadius: '12px', 
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
-            marginBottom: '16px', 
-            flexShrink: 0,
-            border: isTimeMissing ? '2px solid var(--red)' : 'none'
-          }}>
-            <QRCodeSVG
-              value={upiString}
-              size={200}
-              level="M"
-              includeMargin={false}
-            />
-          </div>
+          {isDiscovering ? (
+            <div className="state-box" style={{ padding: '30px 20px', minHeight: 'auto', margin: '20px 0', width: '100%' }}>
+              <FiRefreshCw size={40} className="spin" style={{ color: 'var(--primary)', marginBottom: '16px' }} />
+              <h3 style={{ fontSize: '16px', marginBottom: '4px', color: 'var(--text-1)' }}>Scanning Timings...</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: '20px' }}>
+                Checking prioritized time slots for valid payment link
+              </p>
+              <div style={{ width: '100%', height: '8px', background: 'var(--surface-3)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{ 
+                  height: '100%', 
+                  width: `${(discoveryProgress.current / discoveryProgress.total) * 100}%`, 
+                  background: 'var(--primary)',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-2)' }}>
+                {discoveryProgress.current} / {discoveryProgress.total} slots scanned
+              </span>
+              <button className="btn btn--ghost" onClick={() => { discoveryAbort.current = true; setIsDiscovering(false); }} style={{ marginTop: '24px', width: '100%' }}>Cancel</button>
+            </div>
+          ) : (
+            <div style={{ 
+              background: '#fff', 
+              padding: '16px', 
+              borderRadius: '12px', 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+              marginBottom: '16px', 
+              flexShrink: 0,
+              border: isTimeMissing ? '2px solid var(--red)' : 'none'
+            }}>
+              <QRCodeSVG
+                value={upiString}
+                size={200}
+                level="M"
+                includeMargin={false}
+              />
+            </div>
+          )}
 
           {/* Time Configuration Section */}
           <div style={{ 
@@ -134,7 +221,7 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <p style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: '700' }}>Bill generation info</p>
-              {!isEditing && (
+              {!isEditing && !isDiscovering && (
                 <button
                   onClick={() => setIsEditing(true)}
                   style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 6px' }}
@@ -150,14 +237,14 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
                 <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)' }}>{displayDate}</p>
               </div>
 
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1.2 }}>
                 <p style={{ fontSize: '10px', color: 'var(--text-3)' }}>Gen. Time (HH:MM)</p>
-                {isEditing ? (
+                {isEditing && !isDiscovering ? (
                   <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
                     <input
                       type="text"
                       className="field__input"
-                      style={{ height: '28px', padding: '0 8px', fontSize: '12px', width: '60px', textAlign: 'center', fontFamily: 'var(--mono)', borderColor: isTimeMissing ? 'var(--red)' : 'var(--border-md)' }}
+                      style={{ height: '32px', padding: '0 4px', fontSize: '12px', width: '56px', textAlign: 'center', fontFamily: 'var(--mono)', borderColor: isTimeMissing ? 'var(--red)' : 'var(--border-md)' }}
                       placeholder="10:15"
                       value={timeInput}
                       onChange={e => {
@@ -169,8 +256,8 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
                     />
                     <button
                       onClick={handleSaveTime}
-                      disabled={timeInput.replace(/\D/g, '').length !== 4}
-                      style={{ background: 'var(--primary)', border: 'none', borderRadius: '4px', color: '#fff', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: timeInput.replace(/\D/g, '').length === 4 ? 1 : 0.5 }}
+                      disabled={currentCleanTime.length !== 4}
+                      style={{ background: 'var(--primary)', border: 'none', borderRadius: '4px', color: '#fff', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: currentCleanTime.length === 4 ? 1 : 0.5 }}
                     >
                       <FiCheck size={14} />
                     </button>
@@ -184,6 +271,20 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
               </div>
             </div>
 
+            {/* Discovery Button Row */}
+            {isEditing && !isDiscovering && (
+              <div style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <button 
+                  className="btn btn--secondary btn--sm" 
+                  onClick={runDiscovery}
+                  style={{ width: '100%', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  <FiSearch size={14} />
+                  <span style={{ fontSize: '11px', fontWeight: '800' }}>Discover Time Automatically</span>
+                </button>
+              </div>
+            )}
+
             <p style={{ 
               fontSize: '10px', 
               color: isTimeInfoHighlighted ? 'var(--text-1)' : 'var(--text-3)', 
@@ -196,7 +297,7 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
               borderRadius: '4px',
               transition: 'all 0.3s ease'
             }}>
-              * Providing the exact bill generation time (found on your bill receipt at the top) helps us generate a valid QR code for hassle-free payments directly to APSPDCL. This is required because APSPDCL currently does not store generation times in their public history database.
+              * Providing the exact bill generation time (found on your receipt) generates a valid QR code for payments directly to APSPDCL.
             </p>
           </div>
 
@@ -204,13 +305,13 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
             <h2 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-1)' }}>
               ₹{Number(service.publicBillAmount || service.lastAmountDue).toLocaleString('en-IN')}
             </h2>
-            {isTimeMissing && (
+            {isTimeMissing && !isDiscovering && (
               <button 
                 onClick={() => {
                   setIsTimeInfoHighlighted(true);
                   setTimeout(() => setIsTimeInfoHighlighted(false), 3000);
                 }}
-                style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
+                style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0 }}
                 title="Why is this required?"
               >
                 <FiInfo size={16} />
@@ -219,7 +320,8 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
           </div>
 
           <a
-            href={upiString}
+            href={isTimeMissing ? '#' : upiString}
+            onClick={e => isTimeMissing && e.preventDefault()}
             className={`btn btn--primary ${isTimeMissing ? 'btn--danger-outline' : ''}`}
             style={{ 
               width: '100%', 
@@ -228,23 +330,25 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
               fontSize: '15px', 
               padding: '6px 12px', 
               textDecoration: 'none',
-              ...(isTimeMissing ? { borderColor: 'var(--red)', color: 'var(--red)', background: 'transparent', borderWidth: '2px' } : {})
+              ...(isTimeMissing ? { borderColor: 'var(--red)', color: 'var(--red)', background: 'transparent', borderWidth: '2px', pointerEvents: 'none', opacity: 0.7 } : {})
             }}
           >
             {isTimeMissing && <FiAlertCircle size={18} style={{ marginRight: '8px' }} />}
             Pay via UPI
           </a>
 
-          <div style={{ padding: '12px', background: 'var(--red-dim)', borderRadius: '8px', border: '1px solid var(--red-glow)', marginTop: '24px' }}>
-            <p style={{ fontSize: '11px', color: 'var(--red)', fontWeight: '600', lineHeight: '1.4' }}>
-              ⚠️ EXPERIMENTAL FEATURE
-            </p>
-            <p style={{ fontSize: '10px', color: 'var(--text-2)', marginTop: '4px', lineHeight: '1.6', textAlign: 'left' }}>
-              We are working hard to automatically fetch the exact bill generation time. Currently, APSPDCL does not store this specific data in their public history database, so <b>manual entry</b> is required to generate a valid QR code for payment.
-              <br /><br />
-              Use at your own risk. For confirmed safety, go back and use the <b>Pay Now</b> button on Service Card.
-            </p>
-          </div>
+          {!isDiscovering && (
+            <div style={{ padding: '12px', background: 'var(--red-dim)', borderRadius: '8px', border: '1px solid var(--red-glow)', marginTop: '24px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--red)', fontWeight: '600', lineHeight: '1.4' }}>
+                ⚠️ EXPERIMENTAL FEATURE
+              </p>
+              <p style={{ fontSize: '10px', color: 'var(--text-2)', marginTop: '4px', lineHeight: '1.6', textAlign: 'left' }}>
+                Currently, APSPDCL does not store generation times in public records, so <b>manual entry</b> or <b>auto-discovery</b> is required for valid Direct UPI payment.
+                <br /><br />
+                For confirmed safety, use the <b>Pay Now</b> button on Service Card.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Info Sub-popup */}
@@ -267,14 +371,14 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
                   <button
                     onClick={copyUpiString}
                     className="icon-btn"
-                    style={{ position: 'absolute', right: '8px', top: '8px', color: 'var(--primary)' }}
+                    style={{ position: 'absolute', right: '8px', top: '8px', color: 'var(--primary)', background: 'none', border: 'none' }}
                     title="Copy UPI String"
                   >
                     <FiCopy size={16} />
                   </button>
                 </div>
                 <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '12px', textAlign: 'left', lineHeight: '1.6' }}>
-                  These segments are used to construct the UPI payment URI. Use them for technical validation.
+                  These segments are used to construct the UPI payment URI.
                 </p>
               </div>
               <div className="dialog__footer" style={{ marginTop: 0, justifyContent: 'center' }}>
