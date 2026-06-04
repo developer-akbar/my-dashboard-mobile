@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { FiX, FiZap, FiInfo, FiTrendingUp, FiTrendingDown, FiClock, FiAlertCircle, FiPlus, FiMinus, FiChevronDown, FiActivity } from 'react-icons/fi';
+import { FiX, FiZap, FiInfo, FiTrendingUp, FiTrendingDown, FiClock, FiAlertCircle, FiPlus, FiMinus, FiChevronDown, FiActivity, FiAward, FiCheckCircle } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -75,6 +75,35 @@ export function BillCalculator({ open, service, onClose }) {
     };
   }, [mode, currentReading, manualLastReading, service, load, config]);
 
+  const historyPrediction = useMemo(() => {
+    if (!readings || readings.length < 3 || !service) return null;
+    
+    const latest = readings[0]; 
+    const billDateStr = service.lastBillDate || service.billDate;
+    if (!billDateStr) return null;
+
+    const startReading = parseFloat(String(service.closingRdg || 0).replace(/[^0-9.]/g, ''));
+    const latestReading = parseFloat(String(latest.reading).replace(/[^0-9.]/g, ''));
+    
+    const unitsSoFar = latestReading - startReading;
+    if (unitsSoFar <= 0) return null;
+
+    const startDate = new Date(billDateStr);
+    const latestDate = new Date(latest.date);
+    const msDiff = latestDate.getTime() - startDate.getTime();
+    const daysPassed = Math.max(1, Math.floor(msDiff / (1000 * 60 * 60 * 24)));
+    
+    const predictedUnits = Math.round((unitsSoFar / daysPassed) * 30);
+    const predictedBill = calculateEstimatedBill(predictedUnits, load, config);
+    
+    return {
+      units: predictedUnits,
+      amount: predictedBill.total,
+      readingsCount: readings.length,
+      daysSpanned: daysPassed
+    };
+  }, [readings, service, load, config]);
+
   const handleSaveReading = useCallback(async () => {
     if (!currentReading || !progressResult) return;
     const newReading = {
@@ -113,6 +142,20 @@ export function BillCalculator({ open, service, onClose }) {
         </header>
 
         <div className="dialog__body" style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+          {historyPrediction && (
+             <div className="scard" style={{ padding: '12px', background: 'var(--primary-dim)', border: '1px solid var(--primary-hi)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
+                <div style={{ background: 'var(--primary-hi)', color: '#fff', width: '32px', height: '32px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
+                   <FiAward size={18} />
+                </div>
+                <div style={{ flex: 1 }}>
+                   <p style={{ fontSize: '11px', color: 'var(--primary-hi)', fontWeight: '800', textTransform: 'uppercase', margin: 0 }}>Final Average Prediction</p>
+                   <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0 }}>
+                      Based on last <b>{historyPrediction.readingsCount}</b> logs: <b>{formatInr(historyPrediction.amount)}</b> ({historyPrediction.units}u)
+                   </p>
+                </div>
+             </div>
+          )}
+
           <div className="seg" style={{ marginBottom: '24px' }}>
             <button className={`seg__btn ${mode === 'progress' ? 'seg__btn--active' : ''}`} onClick={() => setMode('progress')}>Progress Check</button>
             <button className={`seg__btn ${mode === 'simple' ? 'seg__btn--active' : ''}`} onClick={() => setMode('simple')}>Custom Units</button>
@@ -198,9 +241,9 @@ export function BillCalculator({ open, service, onClose }) {
               <div className="scard" style={{ padding: '20px', background: 'var(--surface-2)', textAlign: 'center' }}>
                  <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>Monthly Units Prediction</p>
                  <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{progressResult.predictedUnits} <span style={{ fontSize: '16px', fontWeight: '400' }}>Units</span></h2>
-                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', marginTop: '8px', background: progressResult.isHigher ? 'var(--red-dim)' : 'var(--green-dim)', color: progressResult.isHigher ? 'var(--red)' : 'var(--green)' }}>
+                 <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', marginTop: '8px', background: progressResult.isHigher ? 'var(--red-dim)' : 'var(--green-dim)', color: progressResult.isHigher ? 'var(--red)' : 'var(--green)' }}>
                     {progressResult.isHigher ? <FiTrendingUp size={14} /> : <FiTrendingDown size={14} />}
-                    <strong>{Math.abs(progressResult.diffPct)}% {progressResult.isHigher ? 'higher' : 'lower'}</strong>
+                    <strong>{Math.abs(progressResult.diffPct)}% {progressResult.isHigher ? 'higher' : 'lower'}</strong> than last month
                  </div>
               </div>
 
@@ -238,7 +281,7 @@ export function BillCalculator({ open, service, onClose }) {
                     <FiInfo size={16} color="var(--amber)" style={{ marginTop: '2px' }} />
                     <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0, lineHeight: '1.5' }}>
                        {progressResult.isHigher 
-                         ? `Faster consumption detected. Target daily units: ${Math.round((service?.lastBilledUnits || 100) / 30)}.`
+                         ? `You are consuming units faster than last month. Target daily: ${Math.round((service?.lastBilledUnits || 100) / 30)}u.`
                          : `Great! Saving ${formatInr(Math.abs((service?.billAmount || 0) - progressResult.predictedBill))} vs last month.`}
                     </p>
                  </div>
@@ -252,15 +295,18 @@ export function BillCalculator({ open, service, onClose }) {
             </div>
           )}
 
-          {mode === 'progress' && readings.length > 0 && (
+          {readings.length > 0 && (
             <div style={{ marginTop: '32px' }}>
-              <h3 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-1)' }}>Reading History</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                 <h3 style={{ fontSize: '14px', margin: 0, color: 'var(--text-1)' }}>Reading History</h3>
+                 {readings.length >= 3 && <span className="paid-tag" style={{ fontSize: '9px' }}>Trend Analysis Active</span>}
+              </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {readings.map((r) => (
-                  <div key={r.id} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center', flex: '1' }}>
+                  <div key={r.id} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center' }}>
                     <div>
                       <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px 0' }}>{r.reading} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-3)' }}>({r.unitsSoFar}u)</span></p>
-                      <p style={{ fontSize: '11px', color: 'var(--text-2)', margin: 0 }}>{new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-2)', margin: 0 }}>{new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--primary-hi)', margin: 0 }}>{formatInr(r.predictedBill)}</p>
                   </div>
