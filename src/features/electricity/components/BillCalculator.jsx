@@ -301,7 +301,7 @@ export function BillCalculator({ open, service, onClose }) {
                  <h3 style={{ fontSize: '14px', margin: 0, color: 'var(--text-1)' }}>Reading History</h3>
                  {readings.length >= 3 && <span className="paid-tag" style={{ fontSize: '9px' }}>Trend Analysis Active</span>}
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 {readings.map((r) => (
                   <div key={r.id} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center' }}>
                     <div>
