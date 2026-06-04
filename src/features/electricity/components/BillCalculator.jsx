@@ -255,9 +255,9 @@ export function BillCalculator({ open, service, onClose }) {
           {mode === 'progress' && readings.length > 0 && (
             <div style={{ marginTop: '32px' }}>
               <h3 style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--text-1)' }}>Reading History</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {readings.map((r) => (
-                  <div key={r.id} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={r.id} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center', flex: '1' }}>
                     <div>
                       <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px 0' }}>{r.reading} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-3)' }}>({r.unitsSoFar}u)</span></p>
                       <p style={{ fontSize: '11px', color: 'var(--text-2)', margin: 0 }}>{new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</p>
