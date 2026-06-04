@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { FiX, FiClock, FiCheck, FiInfo, FiCopy, FiSearch, FiRefreshCw } from 'react-icons/fi';
+import { FiX, FiExternalLink, FiClock, FiCheck, FiInfo, FiCopy, FiAlertCircle, FiSearch, FiRefreshCw } from 'react-icons/fi';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
@@ -8,31 +8,80 @@ import toast from 'react-hot-toast';
 
 export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [timeInput, setTimeInput] = useState('');
   const [showInfo, setShowInfo] = useState(false);
-  
+  const [isTimeInfoHighlighted, setIsTimeInfoHighlighted] = useState(false);
+
   // Discovery State
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoveryProgress, setDiscoveryProgress] = useState({ current: 0, total: 1440 });
   const discoveryAbort = useRef(false);
 
-  const upiString = service ? generateAPSPDCLUpiString(service) : '';
+  const isTimeMissing = !service?.billTime && !timeInput.replace(/\D/g, '').length;
+
+  // Extract time from current service data
+  const dateObj = service?.lastBillDate ? new Date(service.lastBillDate) : null;
+  const displayDate = dateObj ? dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
   useEffect(() => {
-    if (!open) {
+    if (open && service) {
+      // billTime is stored as HHMM (e.g. 1015)
+      const bt = service.billTime || '';
+      if (bt.length === 4) {
+        setTimeInput(`${bt.substring(0, 2)}:${bt.substring(2)}`);
+      } else {
+        setTimeInput('');
+      }
+      setIsEditing(!service.billTime); // Auto-open edit mode if time is missing
+      setShowInfo(false);
+      setIsTimeInfoHighlighted(false);
       setIsDiscovering(false);
-      discoveryAbort.current = true;
-    } else {
       discoveryAbort.current = false;
     }
-  }, [open]);
+  }, [open, service]);
 
-  const handleCopy = () => {
-    if (!upiString) return;
-    navigator.clipboard.writeText(upiString);
-    setCopied(true);
-    toast.success(t('copied_clipboard', 'UPI Link copied!'));
-    setTimeout(() => setCopied(false), 2000);
+  // Handle Esc and Back button
+  useEffect(() => {
+    const handleKeyDown = (e) => { 
+      if (e.key === 'Escape' && open) {
+        if (showInfo) setShowInfo(false);
+        else if (isEditing && service?.billTime) setIsEditing(false);
+        else onClose();
+      }
+    };
+    const handleBack = (e) => {
+      if (open && !e.detail?.handled) {
+        if (showInfo) {
+          setShowInfo(false);
+          if (e.detail) e.detail.handled = true;
+        } else if (isEditing && service?.billTime) {
+          setIsEditing(false);
+          if (e.detail) e.detail.handled = true;
+        } else {
+          onClose();
+          if (e.detail) e.detail.handled = true;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('app-back-button', handleBack);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('app-back-button', handleBack);
+    };
+  }, [open, onClose, showInfo, isEditing, service]);
+
+  if (!open || !service) return null;
+
+  const currentCleanTime = timeInput.replace(/\D/g, '');
+  const upiString = generateAPSPDCLUpiString({ ...service, billTime: currentCleanTime.length === 4 ? currentCleanTime : null });
+
+  const handleSaveTime = () => {
+    const cleaned = timeInput.replace(/\D/g, '');
+    if (cleaned.length !== 4) return;
+    onUpdateTime(service.id, cleaned);
+    setIsEditing(false);
   };
 
   const runDiscovery = async () => {
@@ -43,20 +92,17 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
     setDiscoveryProgress({ current: 0, total: 1440 });
 
     let offset = 0;
-    const batchSize = 20;
+    const batchSize = 25;
 
     try {
-      // Loop until found, aborted, or finished
       while (!discoveryAbort.current) {
         const url = `${apiBase()}/vpa/discover`;
-        console.log(`[discovery] Fetching: ${url} (Offset: ${offset})`);
-        
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             serviceNumber: service.serviceNumber,
-            billDate: service.billDate,
+            billDate: service.billDate || service.lastBillDate,
             offset,
             batchSize
           })
@@ -67,13 +113,16 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
 
         if (data.found) {
           toast.success(`Success! Valid QR discovered.`);
-          onUpdateTime?.(service.id, data.billTime);
+          const bt = data.billTime;
+          setTimeInput(`${bt.substring(0, 2)}:${bt.substring(2)}`);
+          onUpdateTime?.(service.id, bt);
           setIsDiscovering(false);
+          setIsEditing(false);
           return;
         }
 
         if (data.nextOffset === null) {
-          toast.error('Could not discover a valid payment time for this bill.');
+          toast.error('Could not discover a valid payment time.');
           break;
         }
 
@@ -88,35 +137,41 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
     }
   };
 
-  if (!open || !service) return null;
-
-  const hasTime = !!service.billTime;
+  const copyUpiString = async () => {
+    try {
+      await navigator.clipboard.writeText(upiString);
+      toast.success('UPI String copied');
+    } catch (e) {
+      toast.error('Failed to copy');
+    }
+  };
 
   return (
-    <div className="overlay overlay--center" onClick={onClose} style={{ zIndex: 1000 }}>
-      <div className="dialog" onClick={e => e.stopPropagation()} style={{ width: '420px', maxWidth: '95vw', textAlign: 'center', position: 'relative' }}>
-        <header className="dialog__header" style={{ marginBottom: '20px' }}>
-          <h2 className="dialog__title">{t('upi_qr_payment', 'UPI QR Payment')}</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>{service.label || service.customerName}</p>
-          <button className="icon-btn-ghost" onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px' }}><FiX size={20} /></button>
-        </header>
+    <div className="overlay overlay--center" onClick={onClose}>
+      <div className="dialog" onClick={e => e.stopPropagation()} style={{ width: '85%', maxWidth: '340px', position: 'relative' }}>
+        <div className="sheet__header" style={{ padding: '0 0 16px 0', borderBottom: '1px solid var(--border)', display: 'block', position: 'relative' }}>
+          <h3 className="sheet__title" style={{ textAlign: 'center', width: '100%', marginBottom: '4px', fontSize: '18px' }}>{t('pay_bill', 'Pay Bill')}</h3>
+          <p className="sheet__eyebrow" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '10px' }}>
+            <span style={{ fontWeight: '600' }}>{service.label || t('untitled')}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: '8px' }}>•</span>
+            <span className="mono">{service.serviceNumber}</span>
+            <button 
+              onClick={() => setShowInfo(true)}
+              className="icon-btn" 
+              style={{ width: '18px', height: '18px', padding: 0, marginLeft: '2px', background: 'none', border: 'none' }}
+            >
+              <FiInfo size={13} style={{ color: 'var(--text-3)' }} />
+            </button>
+          </p>
+          <button className="icon-btn sheet__close" onClick={onClose} style={{ position: 'absolute', right: '-14px', top: '-14px', border: 'none', background: 'none' }}><FiX size={18} /></button>
+        </div>
 
-        <div className="dialog__body">
-          {!hasTime && !isDiscovering ? (
-            <div className="state-box" style={{ padding: '20px', border: '1px dashed var(--border-hi)', borderRadius: '12px', background: 'var(--surface-2)', minHeight: 'auto' }}>
-              <FiClock size={32} style={{ color: 'var(--amber)', marginBottom: '12px' }} />
-              <h3 style={{ fontSize: '15px', marginBottom: '8px' }}>QR Discovery Required</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-2)', marginBottom: '16px' }}>
-                APSPDCL requires the exact bill generation time for QR codes. We can scan for it automatically.
-              </p>
-              <button className="btn btn--primary" onClick={runDiscovery} style={{ width: '100%' }}>
-                <FiSearch size={16} style={{ marginRight: '8px' }} /> Start Discovery
-              </button>
-            </div>
-          ) : isDiscovering ? (
-            <div className="state-box" style={{ padding: '30px 20px', minHeight: 'auto' }}>
+        <div className="dialog__body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', maxHeight: '70vh', overflowY: 'auto', scrollbarGutter: 'stable' }}>
+
+          {isDiscovering ? (
+            <div className="state-box" style={{ padding: '30px 20px', minHeight: 'auto', margin: '20px 0' }}>
               <FiRefreshCw size={40} className="spin" style={{ color: 'var(--primary)', marginBottom: '16px' }} />
-              <h3 style={{ fontSize: '16px', marginBottom: '4px' }}>Scanning Timings...</h3>
+              <h3 style={{ fontSize: '16px', marginBottom: '4px', color: 'var(--text-1)' }}>Scanning Timings...</h3>
               <p style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: '20px' }}>
                 Checking prioritized time slots for valid payment link
               </p>
@@ -131,63 +186,194 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
               <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-2)' }}>
                 {discoveryProgress.current} / {discoveryProgress.total} slots scanned
               </span>
-              <button className="btn btn--ghost" onClick={() => setIsDiscovering(false)} style={{ marginTop: '24px', width: '100%' }}>Cancel</button>
+              <button className="btn btn--ghost" onClick={() => { discoveryAbort.current = true; setIsDiscovering(false); }} style={{ marginTop: '24px', width: '100%' }}>Cancel</button>
             </div>
           ) : (
-            <>
-              <div style={{ 
-                background: '#fff', 
-                padding: '24px', 
-                borderRadius: '16px', 
-                display: 'inline-block',
-                boxShadow: 'inset 0 0 0 1px var(--border-hi)',
-                marginBottom: '20px'
-              }}>
-                <QRCodeSVG value={upiString} size={220} level="M" includeMargin={false} />
-              </div>
-
-              <div className="scard" style={{ padding: '12px', background: 'var(--surface-2)', marginBottom: '20px', textAlign: 'left' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: '700', textTransform: 'uppercase' }}>Amount to Pay</span>
-                  <span style={{ fontSize: '11px', color: 'var(--green)', fontWeight: '700' }}>Verified Merchant</span>
-                </div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-1)' }}>
-                  ₹{Number(service.lastAmountDue || 0).toLocaleString('en-IN')}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                <button className="btn btn--primary" onClick={handleCopy} style={{ flex: 1 }}>
-                  {copied ? <FiCheck size={16} /> : <FiCopy size={16} />}
-                  <span style={{ marginLeft: '8px' }}>{copied ? 'Copied' : 'Copy UPI Link'}</span>
-                </button>
-                <button className="btn btn--ghost" onClick={() => setShowInfo(true)} title="How it works">
-                  <FiInfo size={18} />
-                </button>
-              </div>
-            </>
+            <div style={{ 
+              background: '#fff', 
+              padding: '16px', 
+              borderRadius: '12px', 
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+              marginBottom: '16px', 
+              flexShrink: 0,
+              border: isTimeMissing ? '2px solid var(--red)' : 'none'
+            }}>
+              <QRCodeSVG
+                value={upiString}
+                size={200}
+                level="M"
+                includeMargin={false}
+              />
+            </div>
           )}
 
-          <p style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: '1.4', marginTop: '10px' }}>
-            Scan using PhonePe, Google Pay, or any UPI app.<br />
-            Payments go directly to <b>APSPDCL</b> account.
-          </p>
+          {/* Time Configuration Section */}
+          <div style={{ 
+            width: '100%', 
+            marginBottom: '20px', 
+            padding: '12px', 
+            background: 'var(--surface-2)', 
+            borderRadius: '10px', 
+            border: '1px solid var(--border)' 
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: '700' }}>Bill generation info</p>
+              {!isEditing && !isDiscovering && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '11px', fontWeight: '600', cursor: 'pointer', padding: '2px 6px' }}
+                >
+                  Edit Time
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-3)' }}>Bill Date</p>
+                <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)' }}>{displayDate}</p>
+              </div>
+
+              <div style={{ flex: 1.2 }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-3)' }}>Gen. Time (HH:MM)</p>
+                {isEditing && !isDiscovering ? (
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                    <input
+                      type="text"
+                      className="field__input"
+                      style={{ height: '32px', padding: '0 4px', fontSize: '12px', width: '56px', textAlign: 'center', fontFamily: 'var(--mono)', borderColor: isTimeMissing ? 'var(--red)' : 'var(--border-md)' }}
+                      placeholder="10:15"
+                      value={timeInput}
+                      onChange={e => {
+                        let val = e.target.value.replace(/\D/g, '');
+                        if (val.length > 4) val = val.substring(0, 4);
+                        if (val.length > 2) val = val.substring(0, 2) + ':' + val.substring(2);
+                        setTimeInput(val);
+                      }}
+                    />
+                    <button
+                      onClick={handleSaveTime}
+                      disabled={timeInput.replace(/\D/g, '').length !== 4}
+                      style={{ background: 'var(--primary)', border: 'none', borderRadius: '4px', color: '#fff', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: timeInput.replace(/\D/g, '').length === 4 ? 1 : 0.5 }}
+                    >
+                      <FiCheck size={14} />
+                    </button>
+                    <button 
+                      className="btn btn--secondary btn--sm" 
+                      onClick={runDiscovery}
+                      title="Discover Automatically"
+                      style={{ height: '32px', padding: '0 6px', display: 'flex', alignItems: 'center' }}
+                    >
+                      <FiSearch size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <FiClock size={12} style={{ color: isTimeMissing ? 'var(--red)' : 'var(--primary)' }} />
+                    {timeInput || '—'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p style={{ 
+              fontSize: '10px', 
+              color: isTimeInfoHighlighted ? 'var(--text-1)' : 'var(--text-3)', 
+              marginTop: '10px', 
+              fontStyle: 'italic', 
+              textAlign: 'left', 
+              lineHeight: '1.6',
+              background: isTimeInfoHighlighted ? 'var(--amber-dim)' : 'transparent',
+              padding: isTimeInfoHighlighted ? '6px' : '0',
+              borderRadius: '4px',
+              transition: 'all 0.3s ease'
+            }}>
+              * Providing the exact bill generation time (found on your receipt) generates a valid QR code for payments directly to APSPDCL.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-1)' }}>
+              ₹{Number(service.publicBillAmount || service.lastAmountDue).toLocaleString('en-IN')}
+            </h2>
+            {isTimeMissing && !isDiscovering && (
+              <button 
+                onClick={() => {
+                  setIsTimeInfoHighlighted(true);
+                  setTimeout(() => setIsTimeInfoHighlighted(false), 3000);
+                }}
+                style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0 }}
+                title="Why is this required?"
+              >
+                <FiInfo size={16} />
+              </button>
+            )}
+          </div>
+
+          <a
+            href={isTimeMissing ? '#' : upiString}
+            onClick={e => isTimeMissing && e.preventDefault()}
+            className={`btn btn--primary ${isTimeMissing ? 'btn--danger-outline' : ''}`}
+            style={{ 
+              width: '100%', 
+              justifyContent: 'center', 
+              height: '44px', 
+              fontSize: '15px', 
+              padding: '6px 12px', 
+              textDecoration: 'none',
+              ...(isTimeMissing ? { borderColor: 'var(--red)', color: 'var(--red)', background: 'transparent', borderWidth: '2px', pointerEvents: 'none', opacity: 0.7 } : {})
+            }}
+          >
+            {isTimeMissing && <FiAlertCircle size={18} style={{ marginRight: '8px' }} />}
+            Pay via UPI
+          </a>
+
+          {!isDiscovering && (
+            <div style={{ padding: '12px', background: 'var(--red-dim)', borderRadius: '8px', border: '1px solid var(--red-glow)', marginTop: '24px' }}>
+              <p style={{ fontSize: '11px', color: 'var(--red)', fontWeight: '600', lineHeight: '1.4' }}>
+                ⚠️ EXPERIMENTAL FEATURE
+              </p>
+              <p style={{ fontSize: '10px', color: 'var(--text-2)', marginTop: '4px', lineHeight: '1.6', textAlign: 'left' }}>
+                Currently, APSPDCL does not store generation times in public records, so <b>manual entry</b> or <b>auto-discovery</b> is required for valid Direct UPI payment.
+                <br /><br />
+                For confirmed safety, use the <b>Pay Now</b> button on Service Card.
+              </p>
+            </div>
+          )}
         </div>
 
+        {/* Info Sub-popup */}
         {showInfo && (
-          <div className="overlay overlay--center" style={{ zIndex: 1100, background: 'rgba(0,0,0,0.8)' }}>
-            <div className="dialog" style={{ width: '340px' }}>
-              <h3 style={{ marginBottom: '12px' }}>How it works</h3>
-              <div style={{ textAlign: 'left', fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.6' }}>
-                <p style={{ marginBottom: '12px' }}>
-                  This QR code uses the <b>APSPDCL Direct UPI</b> system. It generates a unique payment address (VPA) for your specific bill.
+          <div
+            className="overlay overlay--center"
+            style={{ position: 'absolute', zIndex: 100, borderRadius: 'inherit' }}
+            onClick={() => setShowInfo(false)}
+          >
+            <div className="dialog" onClick={e => e.stopPropagation()} style={{ width: '90%', margin: '0 20px' }}>
+              <div className="sheet__header" style={{ padding: '0 0 12px 0', borderBottom: '1px solid var(--border)' }}>
+                <h3 className="sheet__title" style={{ fontSize: '15px' }}>Internal Segments</h3>
+                <button className="icon-btn" onClick={() => setShowInfo(false)}><FiX size={16} /></button>
+              </div>
+              <div className="dialog__body" style={{ padding: '16px 0' }}>
+                <div style={{ padding: '12px', background: 'var(--surface-3)', borderRadius: '8px', border: '1px solid var(--border)', position: 'relative' }}>
+                  <code style={{ display: 'block', fontSize: '11px', wordBreak: 'break-all', textAlign: 'left', color: 'var(--text-2)', fontFamily: 'var(--mono)', lineHeight: '1.5', paddingRight: '32px' }}>
+                    {upiString}
+                  </code>
+                  <button
+                    onClick={copyUpiString}
+                    className="icon-btn"
+                    style={{ position: 'absolute', right: '8px', top: '8px', color: 'var(--primary)', background: 'none', border: 'none' }}
+                    title="Copy UPI String"
+                  >
+                    <FiCopy size={16} />
+                  </button>
+                </div>
+                <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '12px', textAlign: 'left', lineHeight: '1.6' }}>
+                  These segments are used to construct the UPI payment URI.
                 </p>
-                <ul style={{ paddingLeft: '20px', marginBottom: '16px' }}>
-                  <li>Direct settlement to APSPDCL</li>
-                  <li>Instant payment confirmation</li>
-                  <li>No extra gateway charges</li>
-                </ul>
-                <button className="btn btn--primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setShowInfo(false)}>Close</button>
+              </div>
+              <div className="dialog__footer" style={{ marginTop: 0, justifyContent: 'center' }}>
+                <button className="btn btn--ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setShowInfo(false)}>Close</button>
               </div>
             </div>
           </div>
