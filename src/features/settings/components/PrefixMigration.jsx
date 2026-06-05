@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FiArrowRight, FiClock, FiAlertTriangle, FiCheckCircle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiArrowRight, FiClock, FiAlertTriangle, FiCheckCircle, FiChevronDown, FiChevronUp, FiRefreshCw } from 'react-icons/fi';
 import { migrateServicePrefix, getMigrationHistory } from '../utils/migration.js';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
@@ -13,6 +13,7 @@ export function PrefixMigration() {
   const [showHistory, setShowHistory] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [status, setStatus] = useState(null);
 
   useEffect(() => {
     loadHistory();
@@ -34,8 +35,13 @@ export function PrefixMigration() {
   const proceedWithMigration = async () => {
     setConfirmOpen(false);
     setIsMigrating(true);
+    setStatus({ key: 'finding_services' });
+
     try {
-      const count = await migrateServicePrefix(oldPrefix, newPrefix);
+      const count = await migrateServicePrefix(oldPrefix, newPrefix, (key, params) => {
+        setStatus({ key, params });
+      });
+
       if (count > 0) {
         toast.success(t('migration_completed', { count }));
         setOldPrefix('');
@@ -45,22 +51,38 @@ export function PrefixMigration() {
         toast.error(t('no_matching_services', { prefix: oldPrefix }));
       }
     } catch (err) {
-      toast.error(err.message || 'Migration failed');
+      console.error('[migration] Error:', err);
+      if (err.message.startsWith('validation_failed|')) {
+        const number = err.message.split('|')[1];
+        toast.error(t('migration_failed_invalid', { number }), { duration: 6000 });
+      } else {
+        toast.error(err.message || 'Migration failed');
+      }
     } finally {
       setIsMigrating(false);
+      setStatus(null);
     }
   };
 
   return (
-    <div className="scard" style={{ padding: '20px' }}>
+    <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
       <h3 style={{ marginBottom: '16px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <FiArrowRight size={18} color="var(--primary)" />
         {t('prefix_migration')}
       </h3>
-      
+
       <p style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: '1.5', marginBottom: '20px' }}>
         Batch update service numbers if your region's prefix has changed.
       </p>
+
+      {status && (
+        <div className="scard" style={{ padding: '12px', background: 'var(--primary-dim)', border: '1px solid var(--primary-hi)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <FiRefreshCw size={16} className="spin" color="var(--primary-hi)" />
+          <span style={{ fontSize: '12px', color: 'var(--text-1)', fontWeight: '600' }}>
+            {t(`status_${status.key}`, status.params)}
+          </span>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <div className="field">

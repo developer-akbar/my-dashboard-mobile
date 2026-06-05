@@ -145,5 +145,9 @@
   "migration_desc": "Migrated {{old}} to {{new}}",
   "migrate_now": "Migrate Now",
   "migration_in_progress": "Migrating services...",
-  "invalid_prefix": "Prefix must be 5 digits"
+  "invalid_prefix": "Prefix must be 5 digits",
+  "status_finding_services": "Searching for matching services...",
+  "status_verifying_prefix": "Verifying new prefix with APSPDCL ({{number}})...",
+  "status_migrating_all": "Applying new prefix to {{count}} services...",
+  "migration_failed_invalid": "Migration aborted. Validation failed for service {{number}}. Please check the new prefix."
 }
