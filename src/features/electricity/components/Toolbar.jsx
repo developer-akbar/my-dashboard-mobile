@@ -1,5 +1,6 @@
 import { FiPlus, FiRefreshCw, FiSearch, FiTrash2, FiChevronDown, FiGlobe, FiZap, FiCopy, FiLayout, FiEye, FiArrowUp, FiArrowDown } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
+import { Loader } from '../../../shared/components/Loader.jsx';
 import { SessionIndicator } from './SessionIndicator.jsx';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
@@ -151,7 +152,7 @@ export function Toolbar({ filters, onFiltersChange, onAdd, onRefreshAll, refresh
             aria-label={t('refresh_all', 'Refresh all services')}
             style={{ border: 'none', background: 'transparent', padding: '0 6px' }}
           >
-            <FiRefreshCw size={13} className={refreshingAll ? 'spin' : ''} />
+            {refreshingAll ? <Loader size={13} /> : <FiRefreshCw size={13} />}
             <span className="hide-xs" style={{ marginLeft: '4px' }}>{t('refresh')}</span>
           </button>
           <SessionIndicator />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
-  FiCopy, FiExternalLink, FiRefreshCw, FiMoreVertical,
+  FiCopy, FiExternalLink, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
   FiCalendar, FiCheckCircle, FiAlertTriangle, FiZap, FiInfo, FiClock, FiAlertCircle, FiShare2, FiFileText
 } from 'react-icons/fi';
@@ -11,6 +11,7 @@ import { formatInr, formatDate, formatDateTime, fromNow, getDueTone, getDueCopy 
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
+import { Loader } from '../../../shared/components/Loader.jsx';
 
 // ── Lazy Components ──────────────────────────────────────────────────────────
 const TrendChart = lazy(() => import('./TrendChart.jsx').then(m => ({ default: m.TrendChart })));
@@ -377,7 +378,7 @@ export function ServiceCard({
             disabled={refreshing}
             aria-label={t('refresh')}
           >
-            <FiRefreshCw size={14} className={refreshing ? 'spin' : ''} /> {t('refresh')}
+            {refreshing ? <Loader size={14} /> : <FiClock size={14} />} {t('refresh')}
           </button>
         </div>
         <div className="scard__action-right">
@@ -638,7 +639,7 @@ function TrendPanel({ data, insights, t }) {
         </div>
       </div>
 
-      <Suspense fallback={<div className="state-box" style={{ height: '150px' }}><FiRefreshCw size={16} className="spin" /></div>}>
+      <Suspense fallback={<div className="state-box" style={{ height: '150px' }}><Loader size={16} /></div>}>
         <TrendChart chartData={chartData} view={view} insights={insights} />
       </Suspense>
 
