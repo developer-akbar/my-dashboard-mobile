@@ -225,6 +225,10 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
           <a
             href={upiString}
             className={`btn btn--primary ${isTimeMissing ? 'btn--danger-outline' : ''}`}
+            onClick={(e) => {
+              // Ensure navigation happens even if href is weird
+              if (!upiString) e.preventDefault();
+            }}
             style={{ 
               width: '100%', 
               justifyContent: 'center', 
@@ -232,6 +236,10 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
               fontSize: '15px', 
               padding: '6px 12px', 
               textDecoration: 'none',
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+              display: 'flex',
+              alignItems: 'center',
               ...(isTimeMissing ? { borderColor: 'var(--red)', color: 'var(--red)', background: 'transparent', borderWidth: '2px' } : {})
             }}
           >
