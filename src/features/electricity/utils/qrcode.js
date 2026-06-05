@@ -66,15 +66,25 @@ const DynamicBuilders = {
   },
   /**
    * New TR Observation: 555510206261742291626
-   * Note: This contains the generation time (1742).
-   * We do not invent an algorithm here; we use a stable random generator or 
-   * a placeholder that matches the observed length and inclusion of time.
+   * Structure:
+   * - '5' + <first 4 digits of SN>
+   * - DDMMYY (from receipt)
+   * - HHMM (from receipt)
+   * - 2 random digits (possibly milliseconds)
+   * - '1626' static suffix
    */
   tr: (service, dateCode, timeCode) => {
-    const staticPrefix = "555510";
-    const datePart = "20626"; // Observed in samples, potentially YYMDD or similar
-    const randomSuffix = String(Math.floor(100000 + Math.random() * 899999));
-    return `${staticPrefix}${datePart}${timeCode}${randomSuffix}`;
+    const prefix = '5' + service.serviceNumber.substring(0, 4);
+    
+    const yy = dateCode.substring(0, 2);
+    const mm = dateCode.substring(2, 4);
+    const dd = dateCode.substring(4, 6);
+    const ddmmyy = `${dd}${mm}${yy}`;
+    
+    const randomMs = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const staticSuffix = '1626';
+    
+    return `${prefix}${ddmmyy}${timeCode}${randomMs}${staticSuffix}`;
   },
   /**
    * New PN Structure: APSPDCL_<NAME>_<SN>
