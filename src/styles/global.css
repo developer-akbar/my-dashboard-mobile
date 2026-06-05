@@ -205,28 +205,18 @@ h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; color: var(--text-1); letter-s
   overflow-x: hidden;
   background: var(--bg);
   scroll-behavior: smooth;
-  scrollbar-gutter: stable;
-  padding-right: 4px; /* Tiny buffer for the gutter */
+  padding-right: 0;
 }
 
-/* Custom scrollbar for better visual integration with the gutter */
+/* Hide scrollbar for Chrome, Safari and Opera */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  display: none;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border-hi);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-3);
-}
+
+/* Hide scrollbar for IE, Edge and Firefox */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-hi) transparent;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 /* ── Page ───────────────────────────────────────────────────────────────────── */
@@ -1419,6 +1409,13 @@ input[type="number"] {
 .state-box svg { color: var(--text-3); }
 .state-box h3  { font-size: 17px; color: var(--text-1); }
 .state-box p   { font-size: 13.5px; max-width: 280px; }
+
+@media (max-width: 700px) {
+  .state-box {
+    width: 90%;
+    padding: 20px 0;
+  }
+}
 
 .empty-state {
   display: flex;

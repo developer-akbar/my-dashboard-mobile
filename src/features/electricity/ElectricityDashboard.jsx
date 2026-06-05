@@ -879,11 +879,13 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       {bulkResult && <div className="overlay overlay--center" onClick={() => setBulkResult(null)}><div className="dialog" role="dialog" style={{ width: '400px', maxWidth: '90vw' }}><h2 className="dialog__title">Bulk Add Results</h2><div className="dialog__body" style={{ maxHeight: '60vh', overflowY: 'auto', marginTop: '12px' }}>{bulkResult.succeeded.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--green)', fontWeight: '700', fontSize: '13px' }}>✅ Added ({bulkResult.succeeded.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.succeeded.join(', ')}</p></div>}{bulkResult.inTrash.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--amber)', fontWeight: '700', fontSize: '13px' }}>⚠️ Skipped ({bulkResult.inTrash.length})</p><p className="mono-sm" style={{ color: 'var(--text-2)' }}>{bulkResult.inTrash.join(', ')}</p></div>}{bulkResult.alreadyExists.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--text-3)', fontWeight: '700', fontSize: '13px' }}>ℹ️ Already Active ({bulkResult.alreadyExists.length})</p></div>}{bulkResult.failed.length > 0 && <div style={{ marginBottom: '12px' }}><p style={{ color: 'var(--red)', fontWeight: '700', fontSize: '13px' }}>❌ Failed ({bulkResult.failed.length})</p>{bulkResult.failed.map((f, i) => (<p key={i} className="mono-sm" style={{ color: 'var(--text-2)' }}>{f.number}: {f.error}</p>))}</div>}</div><div className="dialog__footer"><button className="btn btn--primary" onClick={() => setBulkResult(null)} style={{ width: '100%' }}>Got it</button></div></div></div>}
       
       {processingOverlay && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="state-box" style={{ background: 'var(--surface-1)', padding: '32px', textAlign: 'center', width: '100%', maxWidth: '280px' }}>
-            <FiRefreshCw size={36} className="spin" style={{ color: 'var(--primary)', marginBottom: '20px' }} />
-            <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 10px', color: 'var(--text-1)' }}>{processingOverlay}</h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-1)', opacity: 0.9, margin: 0, fontWeight: '600' }}>Please wait, this might take a moment...</p>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 150000, background: 'rgba(0,0,0,0.15)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'var(--bg-2)', padding: '40px 24px', borderRadius: '28px', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-hi)', textAlign: 'center', width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <FiRefreshCw size={44} className="spin" style={{ color: 'var(--primary)' }} />
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 6px', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>{processingOverlay}</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-1)', opacity: 0.7, margin: 0, fontWeight: '600' }}>Please wait, this might take a moment...</p>
+            </div>
           </div>
         </div>
       )}
