@@ -2,10 +2,11 @@ import { useMemo } from 'react';
 import { FiGrid, FiZap, FiBarChart2, FiAward, FiShare2 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
-import { formatInr } from '../../shared/utils/index.js';
+import { formatInr, generateShareTable } from '../../shared/utils/index.js';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
+import { Loader } from '../../shared/components/Loader.jsx';
 
 export function OverviewTab() {
   const { t } = useTranslation();
@@ -65,13 +66,14 @@ export function OverviewTab() {
   const handleShareSummary = async () => {
     if (!overviewData) return;
     
-    const text = `📊 *MyDashboard Electricity Summary ${overviewData.currentYear}*\n\n` +
-                 `*Active Services:* ${activeServices.length}\n` +
-                 `*Total Spent this Year:* ${formatInr(overviewData.totalSpentThisYear)}\n` +
-                 `*Total Units this Year:* ${overviewData.totalUnitsThisYear.toLocaleString('en-IN')}u\n\n` +
-                 `*Efficiency Ranking (₹/unit)*\n` +
-                 overviewData.comparisons.map((c, i) => `${i === 0 ? '🏆' : '▪️'} ${c.name}: ₹${c.rate.toFixed(2)}/u`).join('\n') + `\n\n` +
-                 `Tracked via My Dashboard app`;
+    const monthYear = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
+    const sortedByAmount = [...overviewData.comparisons].sort((a, b) => b.amount - a.amount);
+    
+    const tableText = generateShareTable(sortedByAmount);
+    
+    const text = `*Electricity Bill for ${monthYear}*\n\n` +
+                 tableText + `\n\n` +
+                 `Link: https://my-dashboard-mobile.vercel.app`;
 
     if (Capacitor.getPlatform() !== 'web') {
       try {
@@ -96,7 +98,7 @@ export function OverviewTab() {
   };
 
   if (loading) {
-    return <div className="page"><div className="state-box"><FiZap size={22} className="spin" /><p>Loading Overview...</p></div></div>;
+    return <div className="page"><div className="state-box"><Loader size={22} /><p>Loading Overview...</p></div></div>;
   }
 
   if (activeServices.length === 0) {
@@ -129,7 +131,7 @@ export function OverviewTab() {
         </div>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
           <div className="scard" style={{ padding: '16px', background: 'var(--primary-dim)', border: '1px solid var(--primary-glow)' }}>
             <p style={{ fontSize: '11px', color: 'var(--primary)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Total Spent ({currentYear})</p>
