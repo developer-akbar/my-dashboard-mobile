@@ -61,16 +61,10 @@ function AppContent() {
   const { t, i18n } = useTranslation();
   const ph = usePostHog();
 
-  const [applianceCalcOpen, setApplianceCalcOpen] = useState(false);
-
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const handleNavClick = (id) => {
-    if (id === 'appliances') {
-      setApplianceCalcOpen(true);
-      return;
-    }
     if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
     setActivePage(id);
   };
@@ -411,13 +405,6 @@ function AppContent() {
       
       <Analytics />
       <SpeedInsights />
-
-      <Suspense fallback={null}>
-        <ApplianceCalculator 
-          open={applianceCalcOpen} 
-          onClose={() => setApplianceCalcOpen(false)} 
-        />
-      </Suspense>
     </div>
   );
 }
