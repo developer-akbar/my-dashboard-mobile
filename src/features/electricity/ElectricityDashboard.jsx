@@ -356,6 +356,59 @@ export function ElectricityDashboard() {
     }
   };
 
+  const handleShareSelected = async () => {
+    const selectedServices = currentItems.filter(s => selectedIds.has(s.id));
+    if (selectedServices.length === 0) return;
+
+    const monthYear = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
+    
+    // Sort descending by amount due
+    const sortedServices = [...selectedServices].sort((a, b) => (b.lastAmountDue || 0) - (a.lastAmountDue || 0));
+    
+    let totalAmount = 0;
+    const formattedLines = sortedServices.map(s => {
+      const name = s.label || s.customerName || t('untitled');
+      const amt = s.lastAmountDue || 0;
+      const units = s.lastBilledUnits || 0;
+      totalAmount += amt;
+      return `▪️ ${name}: ${formatInr(amt)} (${units} units)`;
+    });
+
+    const text = `*Electricity Bill for ${monthYear}*\n\n` +
+                 formattedLines.join('\n') + `\n\n` +
+                 `*Total Amount:* ${formatInr(totalAmount)}\n\n` +
+                 `Link: https://my-dashboard-mobile.vercel.app`;
+
+    if (Capacitor.getPlatform() !== 'web') {
+      try {
+        await Share.share({
+          title: 'Electricity Bill Summary',
+          text: text,
+          dialogTitle: 'Share Summary'
+        });
+        return;
+      } catch (err) {
+        console.warn('[share] Native share failed', err);
+      }
+    }
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ text })) {
+      try {
+        await navigator.share({ title: 'Electricity Bill Summary', text });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Summary copied to clipboard!');
+    } catch {
+      toast.error('Sharing failed');
+    }
+  };
+
   useEffect(() => {
     clearSelection();
   }, [activeView]);
@@ -753,6 +806,7 @@ export function ElectricityDashboard() {
             </div>
           </div>
           <div className="selection-bar__actions">
+            <button className="btn btn--ghost btn--sm" onClick={handleShareSelected} title="Share Selected"><FiShare2 size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Share</span>}</button>
             <button className="btn btn--ghost btn--sm" onClick={handleCopySelected} title="Copy Selected"><FiCopy size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Copy</span>}</button>
             {activeView === 'active' ? (
               <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}><FiTrash2 size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Trash</span>}</button>
