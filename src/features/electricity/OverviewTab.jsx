@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { FiGrid, FiZap, FiBarChart2, FiAward, FiShare2 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
-import { formatInr } from '../../shared/utils/index.js';
+import { formatInr, generateShareTable } from '../../shared/utils/index.js';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
@@ -69,8 +69,10 @@ export function OverviewTab() {
     const monthYear = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
     const sortedByAmount = [...overviewData.comparisons].sort((a, b) => b.amount - a.amount);
     
+    const tableText = generateShareTable(sortedByAmount);
+    
     const text = `*Electricity Bill for ${monthYear}*\n\n` +
-                 sortedByAmount.map(c => `${c.name}: ${formatInr(c.amount)} (${c.units} units)`).join('\n') + `\n\n` +
+                 tableText + `\n\n` +
                  `Link: https://my-dashboard-mobile.vercel.app`;
 
     if (Capacitor.getPlatform() !== 'web') {

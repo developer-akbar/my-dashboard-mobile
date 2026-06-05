@@ -14,7 +14,7 @@ import { Toolbar } from './components/Toolbar.jsx';
 import { TrashView } from './components/TrashView.jsx';
 import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
-import { formatInr } from '../../shared/utils/index.js';
+import { formatInr, generateShareTable } from '../../shared/utils/index.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
 import { Loader } from '../../shared/components/Loader.jsx';
 import { useTranslation } from 'react-i18next';
