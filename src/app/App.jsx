@@ -10,6 +10,7 @@ import { PostHogProvider, usePostHog } from '@posthog/react';
 import { ElectricityDashboard } from '../features/electricity/ElectricityDashboard.jsx';
 import { setupPushNotifications, syncPushTokenWithServer } from '../features/electricity/utils/notifications.js';
 import { PrivacyPolicy } from '../features/settings/PrivacyPolicy.jsx';
+import { PrefixMigration } from '../features/settings/components/PrefixMigration.jsx';
 import { Capacitor } from '@capacitor/core';
 
 // ── Lazy Loaded Components ──────────────────────────────────────────────────
@@ -253,6 +254,8 @@ function AppContent() {
                   <p>Application preferences</p>
                 </div>
               </div>
+
+              <PrefixMigration />
               
               <div style={{ flex: 1 }}>
                 <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>

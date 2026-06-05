@@ -133,5 +133,21 @@
   "developed_by": "Developed by",
   "feedback_support": "Feedback & Support",
   "feedback_desc": "Have suggestions, encountered a bug, or need help? We value your feedback to make My Dashboard better.",
-  "contact_developer": "Contact Developer"
+  "contact_developer": "Contact Developer",
+  "prefix_migration": "Service Prefix Migration",
+  "old_prefix": "Old 5-digit Prefix",
+  "new_prefix": "New 5-digit Prefix",
+  "migrate": "Migrate",
+  "migration_warning": "Are you sure you want to proceed? This will update the service number of all matching services. This action cannot be undone.",
+  "migration_completed": "Migration completed! {{count}} services updated.",
+  "no_matching_services": "No services found with prefix {{prefix}}.",
+  "migration_history": "Migration History",
+  "migration_desc": "Migrated {{old}} to {{new}}",
+  "migrate_now": "Migrate Now",
+  "migration_in_progress": "Migrating services...",
+  "invalid_prefix": "Prefix must be 5 digits",
+  "status_finding_services": "Searching for matching services...",
+  "status_verifying_prefix": "Verifying new prefix with APSPDCL ({{number}})...",
+  "status_migrating_all": "Applying new prefix to {{count}} services...",
+  "migration_failed_invalid": "Migration aborted. Validation failed for service {{number}}. Please check the new prefix."
 }
