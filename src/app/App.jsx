@@ -264,27 +264,31 @@ function AppContent() {
                   <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Data Management
                   </h3>
-                  <BackupRestore />
+                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
+                    <BackupRestore />
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: '24px' }}>
                   <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Tools & Utilities
                   </h3>
-                  <SettingsItem 
-                    icon={FiShuffle} 
-                    label={t('prefix_migration')} 
-                    description="Batch update service prefixes"
-                    onClick={() => setActivePage('prefix-migration')}
-                    color="var(--blue)"
-                  />
-                  <SettingsItem 
-                    icon={FiActivity} 
-                    label="Slab Configuration" 
-                    description="Configure billing rates & slabs"
-                    onClick={() => setActivePage('calculation-settings')}
-                    color="var(--orange)"
-                  />
+                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
+                    <SettingsItem 
+                      icon={FiShuffle} 
+                      label={t('prefix_migration')} 
+                      description="Batch update service prefixes"
+                      onClick={() => setActivePage('prefix-migration')}
+                      color="var(--blue)"
+                    />
+                    <SettingsItem 
+                      icon={FiActivity} 
+                      label="Slab Configuration" 
+                      description="Configure billing rates & slabs"
+                      onClick={() => setActivePage('calculation-settings')}
+                      color="var(--orange)"
+                    />
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: '24px' }}>
@@ -325,16 +329,18 @@ function AppContent() {
                     <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       System
                     </h3>
-                    <SettingsItem 
-                      icon={FiBell} 
-                      label="Notifications" 
-                      description="Sync push notification token"
-                      onClick={async () => {
-                        const success = await syncPushTokenWithServer(null, true);
-                        if (success) toast.success('Notifications synced!');
-                      }}
-                      color="var(--purple)"
-                    />
+                    <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
+                      <SettingsItem 
+                        icon={FiBell} 
+                        label="Notifications" 
+                        description="Sync push notification token"
+                        onClick={async () => {
+                          const success = await syncPushTokenWithServer(null, true);
+                          if (success) toast.success('Notifications synced!');
+                        }}
+                        color="var(--purple)"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -342,20 +348,22 @@ function AppContent() {
                   <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Support & Legal
                   </h3>
-                  <SettingsItem 
-                    icon={FiMail} 
-                    label={t('contact_developer')} 
-                    description="Report bugs or suggest features"
-                    onClick={() => window.location.href = "mailto:mail.akbarmulla@gmail.com?subject=My Dashboard App Feedback"}
-                    color="var(--primary)"
-                  />
-                  <SettingsItem 
-                    icon={FiShield} 
-                    label="Privacy Policy" 
-                    description="How we handle your data"
-                    onClick={() => setActivePage('privacy')}
-                    color="var(--text-2)"
-                  />
+                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
+                    <SettingsItem 
+                      icon={FiMail} 
+                      label={t('contact_developer')} 
+                      description="Report bugs or suggest features"
+                      onClick={() => window.location.href = "mailto:mail.akbarmulla@gmail.com?subject=My Dashboard App Feedback"}
+                      color="var(--primary)"
+                    />
+                    <SettingsItem 
+                      icon={FiShield} 
+                      label="Privacy Policy" 
+                      description="How we handle your data"
+                      onClick={() => setActivePage('privacy')}
+                      color="var(--text-2)"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -19,16 +19,17 @@ export function SettingsItem({ icon: Icon, label, description, onClick, color = 
           align-items: center;
           width: 100%;
           padding: 16px;
-          background: var(--surface-2);
-          border: 1px solid var(--border);
-          border-radius: 16px;
+          background: transparent;
+          border: none;
+          border-bottom: 1px solid var(--border);
           text-align: left;
           gap: 16px;
-          transition: all 0.2s ease;
-          margin-bottom: 12px;
+          transition: background 0.2s ease;
+        }
+        .settings-item:last-child {
+          border-bottom: none;
         }
         .settings-item:active {
-          transform: scale(0.98);
           background: var(--surface-3);
         }
         .settings-item__icon {
