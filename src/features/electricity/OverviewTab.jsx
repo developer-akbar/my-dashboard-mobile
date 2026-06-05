@@ -66,13 +66,12 @@ export function OverviewTab() {
   const handleShareSummary = async () => {
     if (!overviewData) return;
     
-    const text = `📊 *MyDashboard Electricity Summary ${overviewData.currentYear}*\n\n` +
-                 `*Active Services:* ${activeServices.length}\n` +
-                 `*Total Spent this Year:* ${formatInr(overviewData.totalSpentThisYear)}\n` +
-                 `*Total Units this Year:* ${overviewData.totalUnitsThisYear.toLocaleString('en-IN')}u\n\n` +
-                 `*Efficiency Ranking (₹/unit)*\n` +
-                 overviewData.comparisons.map((c, i) => `${i === 0 ? '🏆' : '▪️'} ${c.name}: ₹${c.rate.toFixed(2)}/u`).join('\n') + `\n\n` +
-                 `Tracked via My Dashboard app`;
+    const monthYear = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
+    const sortedByAmount = [...overviewData.comparisons].sort((a, b) => b.amount - a.amount);
+    
+    const text = `*Electricity Bill for ${monthYear}*\n\n` +
+                 sortedByAmount.map(c => `${c.name}: ${formatInr(c.amount)} (${c.units} units)`).join('\n') + `\n\n` +
+                 `Link: https://my-dashboard-mobile.vercel.app`;
 
     if (Capacitor.getPlatform() !== 'web') {
       try {
