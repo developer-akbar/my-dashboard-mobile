@@ -154,18 +154,13 @@ function AppContent() {
     const urlHandler = CapApp.addListener('appUrlOpen', handleUrlOpen);
     
     const onBack = async () => {
-      if (applianceCalcOpen) {
-        setApplianceCalcOpen(false);
-        return;
-      }
-
       const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
       window.dispatchEvent(backEvent);
       
       if (backEvent.detail.handled) return;
 
-      if (['privacy', 'prefix-migration', 'calculation-settings'].includes(activePage)) {
-        setActivePage('settings');
+      if (['privacy', 'prefix-migration', 'calculation-settings', 'appliances'].includes(activePage)) {
+        setActivePage(activePage === 'appliances' ? 'electricity' : 'settings');
         return;
       }
 
@@ -191,7 +186,7 @@ function AppContent() {
       capHandler.then(h => h.remove());
       window.removeEventListener('popstate', popHandler);
     };
-  }, [activePage, applianceCalcOpen]);
+  }, [activePage]);
 
   useEffect(() => {
     if (window.history.state !== 'nav') {
