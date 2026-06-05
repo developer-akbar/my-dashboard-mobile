@@ -17,10 +17,11 @@ export const APSPDCL_QR_VERSION = 'dynamic'; // 'legacy' | 'dynamic'
 
 /**
  * Deterministic helper to clean customer name for VPA inclusion.
+ * Strips non-alphabetic characters (including spaces), converts to lowercase, and limits to 10 characters.
  */
 function getCleanName(name) {
   if (!name) return 'consumer';
-  return name.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  return name.replace(/[^a-zA-Z]/g, '').toLowerCase().substring(0, 10);
 }
 
 /**
@@ -38,7 +39,7 @@ function getVpaDate(dateStr) {
 
 const LegacyBuilders = {
   pa: (service, dateCode, timeCode) => {
-    const cleanName = getCleanName(service.customerName).substring(0, 10);
+    const cleanName = getCleanName(service.customerName);
     return `${service.serviceNumber}.${dateCode}${timeCode}.${cleanName}@indianbk`;
   },
   tr: (service, dateCode, timeCode) => {
@@ -65,15 +66,26 @@ const DynamicBuilders = {
   },
   /**
    * New TR Observation: 555510206261742291626
-   * Note: This contains the generation time (1742).
-   * We do not invent an algorithm here; we use a stable random generator or 
-   * a placeholder that matches the observed length and inclusion of time.
+   * Structure:
+   * - '5' + <first 4 digits of SN>
+   * - DDMMYY (from receipt)
+   * - HHMM (from receipt)
+   * - SS (seconds from receipt)
+   * - '1626' static suffix
    */
   tr: (service, dateCode, timeCode) => {
-    const staticPrefix = "555510";
-    const datePart = "20626"; // Observed in samples, potentially YYMDD or similar
-    const randomSuffix = String(Math.floor(100000 + Math.random() * 899999));
-    return `${staticPrefix}${datePart}${timeCode}${randomSuffix}`;
+    const prefix = '5' + service.serviceNumber.substring(0, 4);
+    
+    const yy = dateCode.substring(0, 2);
+    const mm = dateCode.substring(2, 4);
+    const dd = dateCode.substring(4, 6);
+    const ddmmyy = `${dd}${mm}${yy}`;
+    
+    const hhmm = timeCode.substring(0, 4);
+    const ss = timeCode.length >= 6 ? timeCode.substring(4, 6) : String(Math.floor(Math.random() * 60)).padStart(2, '0');
+    const staticSuffix = '1626';
+    
+    return `${prefix}${ddmmyy}${hhmm}${ss}${staticSuffix}`;
   },
   /**
    * New PN Structure: APSPDCL_<NAME>_<SN>
@@ -101,7 +113,7 @@ const DynamicBuilders = {
  * - serviceNumber
  * - customerName
  * - lastBillDate -> dateCode (YYMMDD)
- * - billTime -> timeCode (HHMM)
+ * - billTime -> timeCode (HHMMSS)
  * - publicBillAmount -> amount
  */
 export function generateAPSPDCLUpiString(service, version = APSPDCL_QR_VERSION) {
@@ -112,7 +124,7 @@ export function generateAPSPDCLUpiString(service, version = APSPDCL_QR_VERSION) 
   const rawAmount = service.amountDue || service.billDeskAmount || service.publicBillAmount || service.lastAmountDue || 0;
   const amount = Number(rawAmount).toFixed(2);
   const dateCode = getVpaDate(service.lastBillDate);
-  const timeCode = service.billTime || '0000';
+  const timeCode = service.billTime || '000000';
 
   if (version === 'dynamic') {
     /**

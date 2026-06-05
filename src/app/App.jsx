@@ -253,22 +253,13 @@ function AppContent() {
           )}
           {activePage === 'settings' && (
             <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: 'var(--bg-1)' }}>
-              <div className="page__header" style={{ marginBottom: '8px' }}>
+              <div className="page__header">
                 <div>
                   <h2 className="page__title">{t('settings')}</h2>
                 </div>
               </div>
 
               <div style={{ flex: 1 }}>
-                <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Data Management
-                  </h3>
-                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
-                    <BackupRestore />
-                  </div>
-                </div>
-
                 <div style={{ marginBottom: '24px' }}>
                   <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Tools & Utilities
@@ -321,6 +312,15 @@ function AppContent() {
                         <button className={`seg__btn ${i18n.language === 'te' ? 'seg__btn--active' : ''}`} onClick={() => changeLanguage('te')}>తెలుగు</button>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Data Management
+                  </h3>
+                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
+                    <BackupRestore />
                   </div>
                 </div>
 

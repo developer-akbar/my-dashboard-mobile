@@ -13,7 +13,7 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
   const [isTimeInfoHighlighted, setIsTimeInfoHighlighted] = useState(false);
 
   const currentCleanTime = timeInput.replace(/\D/g, '');
-  const isTimeMissing = !service?.billTime && currentCleanTime.length !== 4;
+  const isTimeMissing = !service?.billTime && currentCleanTime.length !== 6;
 
   // Extract time from current service data
   const dateObj = service?.lastBillDate ? new Date(service.lastBillDate) : null;
@@ -21,10 +21,10 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
 
   useEffect(() => {
     if (open && service) {
-      // billTime is stored as HHMM (e.g. 1015)
+      // billTime is stored as HHMMSS (e.g. 101530)
       const bt = service.billTime || '';
-      if (bt.length === 4) {
-        setTimeInput(`${bt.substring(0, 2)}:${bt.substring(2)}`);
+      if (bt.length === 6) {
+        setTimeInput(`${bt.substring(0, 2)}:${bt.substring(2, 4)}:${bt.substring(4, 6)}`);
       } else {
         setTimeInput('');
       }
@@ -70,11 +70,11 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
   // Use live time input for dynamic QR preview
   const upiString = generateAPSPDCLUpiString({ 
     ...service, 
-    billTime: currentCleanTime.length === 4 ? currentCleanTime : null 
+    billTime: currentCleanTime.length === 6 ? currentCleanTime : null 
   });
 
   const handleSaveTime = () => {
-    if (currentCleanTime.length !== 4) return;
+    if (currentCleanTime.length !== 6) return;
     onUpdateTime(service.id, currentCleanTime);
     setIsEditing(false);
   };
@@ -155,26 +155,27 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
               </div>
 
               <div style={{ flex: 1.2 }}>
-                <p style={{ fontSize: '10px', color: 'var(--text-3)' }}>Gen. Time (HH:MM)</p>
+                <p style={{ fontSize: '10px', color: 'var(--text-3)' }}>Gen. Time (HH:MM:SS)</p>
                 {isEditing ? (
                   <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
                     <input
                       type="text"
                       className="field__input"
-                      style={{ height: '32px', padding: '0 4px', fontSize: '12px', width: '56px', textAlign: 'center', fontFamily: 'var(--mono)', borderColor: isTimeMissing ? 'var(--red)' : 'var(--border-md)' }}
-                      placeholder="10:15"
+                      style={{ height: '32px', padding: '0 4px', fontSize: '12px', width: '72px', textAlign: 'center', fontFamily: 'var(--mono)', borderColor: isTimeMissing ? 'var(--red)' : 'var(--border-md)' }}
+                      placeholder="10:15:30"
                       value={timeInput}
                       onChange={e => {
                         let val = e.target.value.replace(/\D/g, '');
-                        if (val.length > 4) val = val.substring(0, 4);
-                        if (val.length > 2) val = val.substring(0, 2) + ':' + val.substring(2);
+                        if (val.length > 6) val = val.substring(0, 6);
+                        if (val.length > 4) val = val.substring(0, 2) + ':' + val.substring(2, 4) + ':' + val.substring(4);
+                        else if (val.length > 2) val = val.substring(0, 2) + ':' + val.substring(2);
                         setTimeInput(val);
                       }}
                     />
                     <button
                       onClick={handleSaveTime}
-                      disabled={currentCleanTime.length !== 4}
-                      style={{ background: 'var(--primary)', border: 'none', borderRadius: '4px', color: '#fff', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: currentCleanTime.length === 4 ? 1 : 0.5 }}
+                      disabled={currentCleanTime.length !== 6}
+                      style={{ background: 'var(--primary)', border: 'none', borderRadius: '4px', color: '#fff', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: currentCleanTime.length === 6 ? 1 : 0.5 }}
                     >
                       <FiCheck size={14} />
                     </button>
