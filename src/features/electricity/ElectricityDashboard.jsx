@@ -361,22 +361,18 @@ export function ElectricityDashboard() {
     if (selectedServices.length === 0) return;
 
     const monthYear = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
-    
-    // Sort descending by amount due
     const sortedServices = [...selectedServices].sort((a, b) => (b.lastAmountDue || 0) - (a.lastAmountDue || 0));
     
-    let totalAmount = 0;
-    const formattedLines = sortedServices.map(s => {
-      const name = s.label || s.customerName || t('untitled');
-      const amt = s.lastAmountDue || 0;
-      const units = s.lastBilledUnits || 0;
-      totalAmount += amt;
-      return `▪️ ${name}: ${formatInr(amt)} (${units} units)`;
-    });
+    const items = sortedServices.map(s => ({
+      name: s.label || s.customerName || t('untitled'),
+      amount: s.lastAmountDue || 0,
+      units: s.lastBilledUnits || 0
+    }));
+
+    const tableText = generateShareTable(items);
 
     const text = `*Electricity Bill for ${monthYear}*\n\n` +
-                 formattedLines.join('\n') + `\n\n` +
-                 `*Total Amount:* ${formatInr(totalAmount)}\n\n` +
+                 tableText + `\n\n` +
                  `Link: https://my-dashboard-mobile.vercel.app`;
 
     if (Capacitor.getPlatform() !== 'web') {

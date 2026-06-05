@@ -81,3 +81,30 @@ export function getDueCopy(dueDate, isPaid) {
 export function isValidServiceNumber(value) {
   return /^\d{13}$/.test(String(value || '').trim());
 }
+
+export function generateShareTable(items) {
+  if (!items || items.length === 0) return '';
+  
+  const maxName = Math.min(Math.max(...items.map(i => i.name.length), 4), 14);
+  const maxAmt = Math.max(...items.map(i => i.amount.toLocaleString('en-IN').length), 9);
+  const maxUnits = Math.max(...items.map(i => String(i.units).length), 5);
+
+  const padL = (str, len) => String(str).length > len ? String(str).substring(0, len-2) + '..' : String(str).padEnd(len, ' ');
+  const padR = (str, len) => String(str).length > len ? String(str).substring(0, len-2) + '..' : String(str).padStart(len, ' ');
+
+  let table = '```text\n';
+  table += `${padL('Name', maxName)} | ${padR('Amount(₹)', maxAmt)} | ${padR('Units', maxUnits)}\n`;
+  table += '-'.repeat(maxName + maxAmt + maxUnits + 6) + '\n';
+  
+  let totalAmount = 0;
+  let totalUnits = 0;
+  items.forEach(c => {
+    totalAmount += c.amount;
+    totalUnits += c.units;
+    table += `${padL(c.name, maxName)} | ${padR(c.amount.toLocaleString('en-IN'), maxAmt)} | ${padR(c.units, maxUnits)}\n`;
+  });
+  table += '-'.repeat(maxName + maxAmt + maxUnits + 6) + '\n';
+  table += `${padL('Total', maxName)} | ${padR(totalAmount.toLocaleString('en-IN'), maxAmt)} | ${padR(totalUnits, maxUnits)}\n`;
+  table += '```';
+  return table;
+}
