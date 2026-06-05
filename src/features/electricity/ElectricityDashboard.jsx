@@ -880,7 +880,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       
       {processingOverlay && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="state-box" style={{ background: 'var(--surface-1)', padding: '32px', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)', border: '1px solid var(--border)', textAlign: 'center', width: '100%', maxWidth: '280px' }}>
+          <div className="state-box" style={{ background: 'var(--surface-1)', padding: '32px', textAlign: 'center', width: '100%', maxWidth: '280px' }}>
             <FiRefreshCw size={36} className="spin" style={{ color: 'var(--primary)', marginBottom: '20px' }} />
             <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 10px', color: 'var(--text-1)' }}>{processingOverlay}</h3>
             <p style={{ fontSize: '13px', color: 'var(--text-1)', opacity: 0.9, margin: 0, fontWeight: '600' }}>Please wait, this might take a moment...</p>

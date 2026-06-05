@@ -108,7 +108,8 @@ export function generateAPSPDCLUpiString(service, version = APSPDCL_QR_VERSION) 
   if (!service || !service.serviceNumber) return null;
 
   // 1. Prepare deterministic data
-  const rawAmount = service.publicBillAmount || service.billBreakup?.currentMonthBill || service.lastAmountDue || 0;
+  // Prioritize amountDue (final payable) or billDeskAmount (live demand) over gross bill.
+  const rawAmount = service.amountDue || service.billDeskAmount || service.publicBillAmount || service.lastAmountDue || 0;
   const amount = Number(rawAmount).toFixed(2);
   const dateCode = getVpaDate(service.lastBillDate);
   const timeCode = service.billTime || '0000';
