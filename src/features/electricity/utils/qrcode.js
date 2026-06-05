@@ -17,10 +17,11 @@ export const APSPDCL_QR_VERSION = 'dynamic'; // 'legacy' | 'dynamic'
 
 /**
  * Deterministic helper to clean customer name for VPA inclusion.
+ * Strips non-alphabetic characters (including spaces), converts to lowercase, and limits to 10 characters.
  */
 function getCleanName(name) {
   if (!name) return 'consumer';
-  return name.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  return name.replace(/[^a-zA-Z]/g, '').toLowerCase().substring(0, 10);
 }
 
 /**
@@ -38,7 +39,7 @@ function getVpaDate(dateStr) {
 
 const LegacyBuilders = {
   pa: (service, dateCode, timeCode) => {
-    const cleanName = getCleanName(service.customerName).substring(0, 10);
+    const cleanName = getCleanName(service.customerName);
     return `${service.serviceNumber}.${dateCode}${timeCode}.${cleanName}@indianbk`;
   },
   tr: (service, dateCode, timeCode) => {
