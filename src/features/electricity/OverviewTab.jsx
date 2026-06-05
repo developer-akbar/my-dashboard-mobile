@@ -6,6 +6,7 @@ import { formatInr } from '../../shared/utils/index.js';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
+import { Loader } from '../../shared/components/Loader.jsx';
 
 export function OverviewTab() {
   const { t } = useTranslation();
@@ -95,7 +96,7 @@ export function OverviewTab() {
     }
   };
 
-  if (loading || servicesLoading) {
+  if (loading) {
     return <div className="page"><div className="state-box"><Loader size={22} /><p>Loading Overview...</p></div></div>;
   }
 
