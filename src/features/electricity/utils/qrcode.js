@@ -70,7 +70,7 @@ const DynamicBuilders = {
    * - '5' + <first 4 digits of SN>
    * - DDMMYY (from receipt)
    * - HHMM (from receipt)
-   * - 2 random digits (possibly milliseconds)
+   * - SS (seconds from receipt)
    * - '1626' static suffix
    */
   tr: (service, dateCode, timeCode) => {
@@ -81,10 +81,11 @@ const DynamicBuilders = {
     const dd = dateCode.substring(4, 6);
     const ddmmyy = `${dd}${mm}${yy}`;
     
-    const randomMs = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const hhmm = timeCode.substring(0, 4);
+    const ss = timeCode.length >= 6 ? timeCode.substring(4, 6) : String(Math.floor(Math.random() * 60)).padStart(2, '0');
     const staticSuffix = '1626';
     
-    return `${prefix}${ddmmyy}${timeCode}${randomMs}${staticSuffix}`;
+    return `${prefix}${ddmmyy}${hhmm}${ss}${staticSuffix}`;
   },
   /**
    * New PN Structure: APSPDCL_<NAME>_<SN>
@@ -112,7 +113,7 @@ const DynamicBuilders = {
  * - serviceNumber
  * - customerName
  * - lastBillDate -> dateCode (YYMMDD)
- * - billTime -> timeCode (HHMM)
+ * - billTime -> timeCode (HHMMSS)
  * - publicBillAmount -> amount
  */
 export function generateAPSPDCLUpiString(service, version = APSPDCL_QR_VERSION) {
@@ -123,7 +124,7 @@ export function generateAPSPDCLUpiString(service, version = APSPDCL_QR_VERSION) 
   const rawAmount = service.amountDue || service.billDeskAmount || service.publicBillAmount || service.lastAmountDue || 0;
   const amount = Number(rawAmount).toFixed(2);
   const dateCode = getVpaDate(service.lastBillDate);
-  const timeCode = service.billTime || '0000';
+  const timeCode = service.billTime || '000000';
 
   if (version === 'dynamic') {
     /**
