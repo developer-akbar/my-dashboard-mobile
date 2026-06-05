@@ -9,7 +9,7 @@ import { db } from '../../../shared/db/storage.js';
 
 export function BillCalculator({ open, service, onClose }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState('progress'); 
+  const [mode, setMode] = useState('progress');
   const [units, setUnits] = useState('');
   const [currentReading, setCurrentReading] = useState('');
   const [manualLastReading, setManualLastReading] = useState('');
@@ -25,7 +25,7 @@ export function BillCalculator({ open, service, onClose }) {
         else setReadings([]);
       });
       setMode('progress');
-      
+
       const cat = (service.category || '').toUpperCase();
       const isCommercial = cat.includes('LT-II') || cat.includes('LT II') || cat.includes('LT-2') || cat.includes('CAT-II') || cat.includes('COMMERCIAL');
       setType(isCommercial ? 'commercial' : 'domestic');
@@ -54,7 +54,7 @@ export function BillCalculator({ open, service, onClose }) {
     const msDiff = now.getTime() - billDate.getTime();
     const daysPassed = Math.max(1, Math.floor(msDiff / (1000 * 60 * 60 * 24)));
     const remainingDays = Math.max(0, 30 - daysPassed);
-    
+
     const currentBill = calculateEstimatedBill(unitsSoFar, load, config);
     const predictedUnits = Math.round((unitsSoFar / daysPassed) * 30);
     const predictedBill = calculateEstimatedBill(predictedUnits, load, config);
@@ -77,14 +77,14 @@ export function BillCalculator({ open, service, onClose }) {
 
   const historyPrediction = useMemo(() => {
     if (!readings || readings.length < 3 || !service) return null;
-    
-    const latest = readings[0]; 
+
+    const latest = readings[0];
     const billDateStr = service.lastBillDate || service.billDate;
     if (!billDateStr) return null;
 
     const startReading = parseFloat(String(service.closingRdg || 0).replace(/[^0-9.]/g, ''));
     const latestReading = parseFloat(String(latest.reading).replace(/[^0-9.]/g, ''));
-    
+
     const unitsSoFar = latestReading - startReading;
     if (unitsSoFar <= 0) return null;
 
@@ -92,10 +92,10 @@ export function BillCalculator({ open, service, onClose }) {
     const latestDate = new Date(latest.date);
     const msDiff = latestDate.getTime() - startDate.getTime();
     const daysPassed = Math.max(1, Math.floor(msDiff / (1000 * 60 * 60 * 24)));
-    
+
     const predictedUnits = Math.round((unitsSoFar / daysPassed) * 30);
     const predictedBill = calculateEstimatedBill(predictedUnits, load, config);
-    
+
     return {
       units: predictedUnits,
       amount: predictedBill.total,
@@ -134,7 +134,7 @@ export function BillCalculator({ open, service, onClose }) {
         <header className="dialog__header" style={{ position: 'relative', paddingBottom: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="sidebar__logo" style={{ width: '32px', height: '32px', background: 'var(--primary-dim)', color: 'var(--primary)' }}>
-               <LuCalculator size={18} />
+              <LuCalculator size={18} />
             </div>
             <h2 className="dialog__title" style={{ margin: 0 }}>Bill Predictor</h2>
           </div>
@@ -143,17 +143,17 @@ export function BillCalculator({ open, service, onClose }) {
 
         <div className="dialog__body" style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
           {historyPrediction && (
-             <div className="scard" style={{ padding: '12px', background: 'var(--primary-dim)', border: '1px solid var(--primary-hi)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
-                <div style={{ background: 'var(--primary-hi)', color: '#fff', width: '32px', height: '32px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
-                   <FiAward size={18} />
-                </div>
-                <div style={{ flex: 1 }}>
-                   <p style={{ fontSize: '11px', color: 'var(--primary-hi)', fontWeight: '800', textTransform: 'uppercase', margin: 0 }}>Final Average Prediction</p>
-                   <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0 }}>
-                      Based on last <b>{historyPrediction.readingsCount}</b> logs: <b>{formatInr(historyPrediction.amount)}</b> ({historyPrediction.units}u)
-                   </p>
-                </div>
-             </div>
+            <div className="scard" style={{ padding: '12px', background: 'var(--primary-dim)', border: '1px solid var(--primary-hi)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
+              <div style={{ background: 'var(--primary-hi)', color: '#fff', width: '32px', height: '32px', borderRadius: '50%', display: 'grid', placeItems: 'center' }}>
+                <FiAward size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '11px', color: 'var(--primary-hi)', fontWeight: '800', textTransform: 'uppercase', margin: 0 }}>Final Average Prediction</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0 }}>
+                  Based on last <b>{historyPrediction.readingsCount}</b> logs: <b>{formatInr(historyPrediction.amount)}</b> ({historyPrediction.units}u)
+                </p>
+              </div>
+            </div>
           )}
 
           <div className="seg" style={{ marginBottom: '24px' }}>
@@ -190,13 +190,13 @@ export function BillCalculator({ open, service, onClose }) {
               )}
               <div className="field">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                   <label className="field__label" style={{ marginBottom: 0 }}>Current Meter Reading</label>
-                   {(service?.closingRdg || manualLastReading) && (
-                     <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block' }}>Last Reading</span>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary-hi)' }}>{manualLastReading || service.closingRdg}</span>
-                     </div>
-                   )}
+                  <label className="field__label" style={{ marginBottom: 0 }}>Current Meter Reading</label>
+                  {(service?.closingRdg || manualLastReading) && (
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block' }}>Last Reading</span>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary-hi)' }}>{manualLastReading || service.closingRdg}</span>
+                    </div>
+                  )}
                 </div>
                 <input type="text" inputMode="numeric" pattern="[0-9]*" className="field__input" placeholder="Reading currently on your meter" autoFocus value={currentReading} onChange={e => setCurrentReading(e.target.value.replace(/\D/g, ''))} />
               </div>
@@ -229,77 +229,74 @@ export function BillCalculator({ open, service, onClose }) {
             <div style={{ marginTop: '24px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div className="scard" style={{ padding: '16px', background: 'var(--surface-2)', textAlign: 'center' }}>
-                   <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>Bill So Far</p>
-                   <h2 style={{ fontSize: '20px', color: 'var(--text-1)' }}>{formatInr(progressResult.currentBill)}</h2>
+                  <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>Bill So Far</p>
+                  <h2 style={{ fontSize: '20px', color: 'var(--text-1)' }}>{formatInr(progressResult.currentBill)}</h2>
                 </div>
                 <div className="scard" style={{ padding: '16px', background: 'var(--primary-dim)', textAlign: 'center', border: '1px solid var(--primary-hi)' }}>
-                   <p style={{ fontSize: '11px', color: 'var(--primary-hi)', marginBottom: '4px', textTransform: 'uppercase' }}>Est. 30 Days</p>
-                   <h2 style={{ fontSize: '20px', color: 'var(--primary-hi)' }}>{formatInr(progressResult.predictedBill)}</h2>
+                  <p style={{ fontSize: '11px', color: 'var(--primary-hi)', marginBottom: '4px', textTransform: 'uppercase' }}>Est. 30 Days</p>
+                  <h2 style={{ fontSize: '20px', color: 'var(--primary-hi)' }}>{formatInr(progressResult.predictedBill)}</h2>
                 </div>
               </div>
 
               <div className="scard" style={{ padding: '20px', background: 'var(--surface-2)', textAlign: 'center' }}>
-                 <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>Monthly Units Prediction</p>
-                 <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{progressResult.predictedUnits} <span style={{ fontSize: '16px', fontWeight: '400' }}>Units</span></h2>
-                 <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', marginTop: '8px', background: progressResult.isHigher ? 'var(--red-dim)' : 'var(--green-dim)', color: progressResult.isHigher ? 'var(--red)' : 'var(--green)' }}>
-                    {progressResult.isHigher ? <FiTrendingUp size={14} /> : <FiTrendingDown size={14} />}
-                    <strong>{Math.abs(progressResult.diffPct)}% {progressResult.isHigher ? 'higher' : 'lower'}</strong> than last month
-                 </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>Monthly Units Prediction</p>
+                <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{progressResult.predictedUnits} <span style={{ fontSize: '16px', fontWeight: '400' }}>Units</span></h2>
+                <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', marginTop: '8px', background: progressResult.isHigher ? 'var(--red-dim)' : 'var(--green-dim)', color: progressResult.isHigher ? 'var(--red)' : 'var(--green)' }}>
+                  {progressResult.isHigher ? <FiTrendingUp size={14} /> : <FiTrendingDown size={14} />}
+                  <strong>{Math.abs(progressResult.diffPct)}% {progressResult.isHigher ? 'higher' : 'lower'}</strong> than last month
+                </div>
               </div>
 
-              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 8px' }}>
-                {[
-                  { label: 'Predicted Energy Charges', val: progressResult.predictedDetails.ec },
-                  { label: `Predicted Fixed Charges`, val: progressResult.predictedDetails.fc },
-                  { label: 'Predicted Duty (6%)', val: progressResult.predictedDetails.ed },
-                  { label: 'Customer Charges', val: progressResult.predictedDetails.cc }
-                ].map(r => (
-                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                    <span style={{ color: 'var(--text-3)' }}>{r.label}</span>
-                    <span style={{ fontWeight: '600' }}>{formatInr(r.val)}</span>
-                  </div>
-                ))}
+              <div style={{ marginBlock: '20px', padding: '0 8px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: '800', marginBottom: '10px', textAlign: 'center', textDecoration: 'underline' }}>Predicted Bill Breakdown</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { label: 'Predicted Energy Charges', val: progressResult.predictedDetails.ec },
+                    { label: `Predicted Fixed Charges`, val: progressResult.predictedDetails.fc },
+                    { label: 'Predicted Duty (6%)', val: progressResult.predictedDetails.ed },
+                    { label: 'Customer Charges', val: progressResult.predictedDetails.cc }
+                  ].map(r => (
+                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: 'var(--text-3)' }}>{r.label}</span>
+                      <span style={{ fontWeight: '600' }}>{formatInr(r.val)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
-                 <div className="scard" style={{ padding: '12px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>Used So Far</p>
-                    <p style={{ fontSize: '16px', fontWeight: '700' }}>{progressResult.unitsSoFar} <span style={{ fontSize: '12px', fontWeight: '400' }}>Units</span></p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-2)', marginTop: '4px' }}>
-                       <FiClock size={10} /> {progressResult.daysPassed} days
-                    </div>
-                 </div>
-                 <div className="scard" style={{ padding: '12px' }}>
-                    <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>Days Remaining</p>
-                    <p style={{ fontSize: '16px', fontWeight: '700' }}>{progressResult.remainingDays} <span style={{ fontSize: '12px', fontWeight: '400' }}>Days</span></p>
-                    <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '4px' }}>In cycle</div>
-                 </div>
+                <div className="scard" style={{ padding: '12px' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>Used So Far</p>
+                  <p style={{ fontSize: '16px', fontWeight: '700' }}>{progressResult.unitsSoFar} <span style={{ fontSize: '12px', fontWeight: '400' }}>Units</span></p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-2)', marginTop: '4px' }}>
+                    <FiClock size={10} /> {progressResult.daysPassed} days
+                  </div>
+                </div>
+                <div className="scard" style={{ padding: '12px' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '4px', textTransform: 'uppercase' }}>Days Remaining</p>
+                  <p style={{ fontSize: '16px', fontWeight: '700' }}>{progressResult.remainingDays} <span style={{ fontSize: '12px', fontWeight: '400' }}>Days</span></p>
+                  <div style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '4px' }}>In cycle</div>
+                </div>
               </div>
 
               <div style={{ marginTop: '20px', padding: '12px', background: 'var(--surface-3)', borderRadius: '8px', borderLeft: '3px solid var(--amber)' }}>
-                 <div style={{ display: 'flex', gap: '8px' }}>
-                    <FiInfo size={16} color="var(--amber)" style={{ marginTop: '2px' }} />
-                    <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0, lineHeight: '1.5' }}>
-                       {progressResult.isHigher 
-                         ? `You are consuming units faster than last month. Target daily: ${Math.round((service?.lastBilledUnits || 100) / 30)}u.`
-                         : `Great! Saving ${formatInr(Math.abs((service?.billAmount || 0) - progressResult.predictedBill))} vs last month.`}
-                    </p>
-                 </div>
-              </div>
-
-              <div style={{ marginTop: '24px' }}>
-                 <button className="btn btn--outline-primary" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }} onClick={handleSaveReading}>
-                   <FiActivity size={16} /> Save This Reading
-                 </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <FiInfo size={16} color="var(--amber)" style={{ marginTop: '2px' }} />
+                  <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0, lineHeight: '1.5' }}>
+                    {progressResult.isHigher
+                      ? `You are consuming units faster than last month. Target daily: ${Math.round((service?.lastBilledUnits || 100) / 30)}u.`
+                      : `Great! Saving ${formatInr(Math.abs((service?.billAmount || 0) - progressResult.predictedBill))} vs last month.`}
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {readings.length > 0 && (
-            <div style={{ marginTop: '32px' }}>
+            <div style={{ marginBlock: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                 <h3 style={{ fontSize: '14px', margin: 0, color: 'var(--text-1)' }}>Reading History</h3>
-                 {readings.length >= 3 && <span className="paid-tag" style={{ fontSize: '9px' }}>Trend Analysis Active</span>}
+                <h3 style={{ fontSize: '14px', margin: 0, color: 'var(--text-1)' }}>Reading History</h3>
+                {readings.length >= 3 && <span className="paid-tag" style={{ fontSize: '9px' }}>Trend Analysis Active</span>}
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 {readings.map((r) => (
@@ -317,16 +314,25 @@ export function BillCalculator({ open, service, onClose }) {
 
           {mode === 'progress' && !progressResult && currentReading && (
             <div className="state-box" style={{ padding: '20px', marginTop: '20px' }}>
-               <FiAlertCircle size={24} color="var(--red)" />
-               <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '8px' }}>
-                  Invalid reading. Must be greater than last month's reading ({manualLastReading || service?.closingRdg || '—'}).
-               </p>
+              <FiAlertCircle size={24} color="var(--red)" />
+              <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '8px' }}>
+                Invalid reading. Must be greater than last month's reading ({manualLastReading || service?.closingRdg || '—'}).
+              </p>
             </div>
           )}
         </div>
 
-        <div className="dialog__footer" style={{ marginTop: '24px', flexShrink: 0 }}>
-          <button className="btn btn--primary" style={{ width: '100%' }} onClick={onClose}>Done</button>
+        <div className="dialog__footer" style={{ marginTop: '16px', flexShrink: 0, display: 'flex', gap: '10px' }}>
+          {mode === 'progress' && progressResult && (
+            <button
+              className="btn btn--secondary"
+              style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '8px', border: '1px solid var(--primary-hi)', color: 'var(--primary-hi)' }}
+              onClick={handleSaveReading}
+            >
+              <FiActivity size={16} /> Save Reading
+            </button>
+          )}
+          <button className="btn btn--primary" style={{ flex: 1 }} onClick={onClose}>Done</button>
         </div>
       </div>
     </div>

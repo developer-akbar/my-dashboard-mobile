@@ -108,7 +108,7 @@ export function QRCodeDialog({ open, service, onClose, onUpdateTime }) {
           <button className="icon-btn sheet__close" onClick={onClose} style={{ position: 'absolute', right: '-5px', top: '-5px', border: 'none', background: 'none' }}><FiX size={18} /></button>
         </div>
 
-        <div className="dialog__body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', maxHeight: '70vh', overflowY: 'auto', scrollbarGutter: 'stable' }}>
+        <div className="dialog__body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', maxHeight: '70vh', overflowY: 'auto' }}>
 
           <div style={{ 
             background: '#fff', 

@@ -385,6 +385,7 @@ function AppContent() {
       <Toaster
         position="bottom-center"
         containerClassName="toast-container"
+        containerStyle={{ zIndex: 200000 }}
         toastOptions={{
           duration: 3000,
           style: {
