@@ -16,6 +16,7 @@ import { useElectricityServices } from './hooks/useElectricityServices.js';
 import { filterServices } from './utils/filters.js';
 import { formatInr } from '../../shared/utils/index.js';
 import { ConfirmDialog } from '../../shared/components/ConfirmDialog.jsx';
+import { Loader } from '../../shared/components/Loader.jsx';
 import { useTranslation } from 'react-i18next';
 import { usePostHog } from '@posthog/react';
 import { HelpFooter } from './components/CalculationSettings.jsx';
@@ -26,7 +27,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { Share } from '@capacitor/share';
 
-export function ElectricityDashboard({ onOpenCalcSettings }) {
+export function ElectricityDashboard() {
   const isWeb = Capacitor.getPlatform() === 'web';
   const { services, trash, loading, refreshingIds, actions } = useElectricityServices();
   const [filters, setFilters] = useState({ query: '', status: '', sort: 'amount' });
@@ -797,7 +798,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
   return (
     <div className={`page ${isScrolled ? 'page--scrolled' : ''}`}>
       <div className={`ptr ${pullDistance > 0 || isRefreshing ? 'ptr--visible' : ''} ${isRefreshing ? 'ptr--refreshing' : ''} ${pullDistance >= pullThreshold ? 'ptr--ready' : ''}`} style={{ transform: `translateY(${pullDistance - 70}px)` }}>
-        <div className="ptr__icon" style={{ transform: `rotate(${pullDistance * 3}deg)` }}><FiRefreshCw size={18} /></div>
+        <div className="ptr__icon" style={{ transform: `rotate(${pullDistance * 3}deg)` }}><Loader size={18} /></div>
         <span className="ptr__label">{isRefreshing ? 'Refreshing...' : (pullDistance >= pullThreshold ? 'Release to refresh' : 'Pull down to refresh')}</span>
       </div>
 
@@ -815,7 +816,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
             {activeView === 'active' ? (
               <button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('trash')}><FiTrash2 size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Trash</span>}</button>
             ) : (
-              <><button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}><FiRefreshCw size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Restore</span>}</button><button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}><FiTrash2 size={13} />{!isMobile && <span style={{ marginLeft: '4px' }}>Purge</span>}</button></>
+              <><button className="btn btn--ghost btn--sm" onClick={() => handleBulkAction('restore')}><Loader size={16} />{!isMobile && <span style={{ marginLeft: '4px' }}>Restore</span>}</button><button className="btn btn--danger btn--sm" onClick={() => handleBulkAction('purge')}><FiTrash2 size={13} />{!isMobile && <span style={{ marginLeft: '4px' }}>Purge</span>}</button></>
             )}
             <button className="btn btn--ghost btn--sm" onClick={clearSelection} style={{ marginLeft: '4px' }}>Cancel</button>
           </div>
@@ -829,7 +830,6 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
             {!isScrolled && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
-                <button className="icon-btn" onClick={onOpenCalcSettings} title={t('calc_settings', 'Calculation Settings')} style={{ width: '40px', height: '40px' }}><FiSettings size={20} style={{ color: 'var(--text-3)' }} /></button>
               </div>
             )}
           </div>
@@ -848,7 +848,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleImport} />
           </div>
         </div>
-        {refreshProgress && <div className="refresh-progress"><FiRefreshCw size={12} className="spin" /> {refreshProgress.done} / {refreshProgress.total}</div>}
+        {refreshProgress && <div className="refresh-progress"><Loader size={12} /> {refreshProgress.done} / {refreshProgress.total}</div>}
       </header>
 
       <SummaryBar services={services} />
@@ -862,7 +862,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       <NotificationInbox open={inboxOpen} onClose={() => setInboxOpen(false)} onAction={handleNotificationAction} />
 
       {activeView === 'active' && (
-        <>{loading ? <div className="state-box"><FiRefreshCw size={22} className="spin" /><p>{t('loading_services')}</p></div> : visible.length === 0 ? <div className="state-box"><FiZap size={28} /><h3>{t('no_services_found')}</h3><p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>{services.length === 0 && <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>{t('add_service')}</button>}</div> : <div className="grid">
+        <>{loading ? <div className="state-box"><Loader size={22} /><p>{t('loading_services')}</p></div> : visible.length === 0 ? <div className="state-box"><FiZap size={28} /><h3>{t('no_services_found')}</h3><p>{services.length === 0 ? t('add_first_service') : t('no_results_filter')}</p>{services.length === 0 && <button className="btn btn--primary" onClick={() => setDialog({ open: true, service: null })}>{t('add_service')}</button>}</div> : <div className="grid">
           {visible.map(s => (
             <ServiceCard key={s.id} id={`service-${s.id}`} service={s} useAccordion={useAccordion} cardStyle={cardStyle} refreshing={refreshingIds.has(s.id)} isFlashing={flashingId === s.id} selected={selectedIds.has(s.id)} selecting={selectedIds.size > 0} onToggleSelect={toggleSelect} onRefresh={async () => { setProcessingOverlay('Refreshing bill...'); try { const updated = await actions.refresh(s.id); toast.success('Refreshed'); if (updated) await trackBill(s, updated); } catch (e) { if (e?.message !== 'CANCELLED') toast.error(`Refresh failed`); } finally { setProcessingOverlay(null); } }} onEdit={() => setDialog({ open: true, service: s })} onAbout={() => setAboutDialog({ open: true, service: s })} onDelete={() => { setConfirmState({ open: true, title: 'Move to Trash?', description: 'This service will be moved to the Trash.', isDanger: true, onConfirm: async () => { const tst = toast.loading('Moving to trash…'); try { await actions.remove(s.id); toast.success('Moved to trash', { id: tst }); clearSelection(); } catch (e) { toast.error(`Failed to move`, { id: tst }); } } }); }} onTogglePin={() => actions.update(s.id, { pinned: !s.pinned })} onCalculateBill={(svc) => handleCalculateBill(svc)} onShowQR={(svc) => setQrDialog({ open: true, service: svc })} onPay={() => handlePay(s)} onShare={() => handleShare(s)} onShareReport={() => handleShareMonthlyReport(s)} />
           ))}</div>}</>
@@ -881,7 +881,7 @@ export function ElectricityDashboard({ onOpenCalcSettings }) {
       {processingOverlay && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 150000, background: 'rgba(0,0,0,0.15)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ background: 'var(--bg-2)', padding: '40px 24px', borderRadius: '28px', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-hi)', textAlign: 'center', width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-            <FiRefreshCw size={44} className="spin" style={{ color: 'var(--primary)' }} />
+            <Loader size={44} />
             <div>
               <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 6px', color: 'var(--text-1)', letterSpacing: '-0.02em' }}>{processingOverlay}</h3>
               <p style={{ fontSize: '13px', color: 'var(--text-1)', opacity: 0.7, margin: 0, fontWeight: '600' }}>Please wait, this might take a moment...</p>

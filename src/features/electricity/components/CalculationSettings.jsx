@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FiArrowLeft, FiPlus, FiTrash2, FiSave, FiRefreshCw } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiTrash2, FiSave } from 'react-icons/fi';
+import { Loader } from '../../../shared/components/Loader.jsx';
 import { db } from '../../../shared/db/storage.js';
 import { DEFAULT_DOMESTIC_CONFIG, DEFAULT_COMMERCIAL_CONFIG } from '../utils/billing.js';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog.jsx';
@@ -97,7 +98,7 @@ export function CalculationSettings({ onBack }) {
     });
   };
 
-  if (loading) return <div className="state-box"><FiRefreshCw className="spin" /></div>;
+  if (loading) return <div className="state-box"><Loader size={22} /></div>;
 
   return (
     <div className="page">

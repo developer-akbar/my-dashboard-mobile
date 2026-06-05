@@ -95,8 +95,8 @@ export function OverviewTab() {
     }
   };
 
-  if (loading) {
-    return <div className="page"><div className="state-box"><FiZap size={22} className="spin" /><p>Loading Overview...</p></div></div>;
+  if (loading || servicesLoading) {
+    return <div className="page"><div className="state-box"><Loader size={22} /><p>Loading Overview...</p></div></div>;
   }
 
   if (activeServices.length === 0) {
@@ -129,7 +129,7 @@ export function OverviewTab() {
         </div>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
           <div className="scard" style={{ padding: '16px', background: 'var(--primary-dim)', border: '1px solid var(--primary-glow)' }}>
             <p style={{ fontSize: '11px', color: 'var(--primary)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Total Spent ({currentYear})</p>
