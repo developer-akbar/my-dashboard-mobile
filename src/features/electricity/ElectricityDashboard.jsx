@@ -285,65 +285,6 @@ export function ElectricityDashboard() {
 
   const [bulkResult, setBulkResult] = useState(null);
   const [processingOverlay, setProcessingOverlay] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const handleExport = () => {
-    const activeServices = services.filter(s => !s.isDeleted);
-    const data = activeServices.map(s => ({
-      label: s.label,
-      serviceNumber: s.serviceNumber,
-      pinned: s.pinned
-    }));
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const timestamp = new Date().getTime();
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mydashboard_apspdcl_bills_backup_${timestamp}.json`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    if (ph) ph.capture('data_exported', { count: data.length });
-    toast.success(`${data.length} services exported successfully`);
-  };
-
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target.result);
-        if (!Array.isArray(data)) throw new Error('Invalid backup format');
-        
-        const entries = data.map(item => ({
-          label: item.label || '',
-          number: item.serviceNumber,
-          pinned: !!item.pinned
-        })).filter(e => e.number && e.number.length === 13);
-
-        if (entries.length === 0) {
-          toast.error(t('no_valid_services_in_backup', 'No valid service numbers found in backup'));
-          return;
-        }
-
-        toast.success(`Found ${entries.length} services. Starting import...`);
-        await submitService({ isBulk: true, entries });
-        if (ph) ph.capture('data_imported', { count: entries.length });
-      } catch (err) {
-        toast.error(t('import_failed', 'Failed to read backup file'));
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   const trackBill = async (service, snapshot) => {
     if (!ph || !snapshot || !snapshot.billDate) return;
     
@@ -843,9 +784,6 @@ export function ElectricityDashboard() {
                 {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
               </div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><button className="icon-btn" onClick={handleExport} title={t('backup', 'Backup')} style={{ width: '40px', height: '40px' }}><FiDownload size={20} style={{ color: 'var(--text-3)' }} /></button>{!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('backup')}</span>}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><button className="icon-btn" onClick={() => fileInputRef.current?.click()} title={t('restore', 'Restore')} style={{ width: '40px', height: '40px' }}><FiUpload size={20} style={{ color: 'var(--text-3)' }} /></button>{!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>{t('restore')}</span>}</div>
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleImport} />
           </div>
         </div>
         {refreshProgress && <div className="refresh-progress"><Loader size={12} /> {refreshProgress.done} / {refreshProgress.total}</div>}
