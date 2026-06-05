@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FiArrowRight, FiClock, FiAlertTriangle, FiCheckCircle, FiChevronDown, FiChevronUp, FiRefreshCw } from 'react-icons/fi';
+import { FiArrowRight, FiClock, FiAlertTriangle, FiCheckCircle, FiChevronDown, FiChevronUp, FiRefreshCw, FiLayers, FiShuffle } from 'react-icons/fi';
 import { migrateServicePrefix, getMigrationHistory } from '../utils/migration.js';
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
@@ -14,6 +14,7 @@ export function PrefixMigration() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [status, setStatus] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadHistory();
@@ -25,8 +26,9 @@ export function PrefixMigration() {
   };
 
   const handleMigrateClick = () => {
+    setError(null);
     if (oldPrefix.length !== 5 || newPrefix.length !== 5) {
-      toast.error(t('invalid_prefix'));
+      setError(t('invalid_prefix'));
       return;
     }
     setConfirmOpen(true);
@@ -35,6 +37,7 @@ export function PrefixMigration() {
   const proceedWithMigration = async () => {
     setConfirmOpen(false);
     setIsMigrating(true);
+    setError(null);
     setStatus({ key: 'finding_services' });
 
     try {
@@ -48,15 +51,15 @@ export function PrefixMigration() {
         setNewPrefix('');
         loadHistory();
       } else {
-        toast.error(t('no_matching_services', { prefix: oldPrefix }));
+        setError(t('no_matching_services', { prefix: oldPrefix }));
       }
     } catch (err) {
       console.error('[migration] Error:', err);
       if (err.message.startsWith('validation_failed|')) {
         const number = err.message.split('|')[1];
-        toast.error(t('migration_failed_invalid', { number }), { duration: 6000 });
+        setError(t('migration_failed_invalid', { number }));
       } else {
-        toast.error(err.message || 'Migration failed');
+        setError(err.message || 'Migration failed');
       }
     } finally {
       setIsMigrating(false);
@@ -65,9 +68,9 @@ export function PrefixMigration() {
   };
 
   return (
-    <div className="scard" style={{ padding: '20px', marginTop: '20px' }}>
+    <div className="scard" style={{ padding: '20px' }}>
       <h3 style={{ marginBottom: '16px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <FiArrowRight size={18} color="var(--primary)" />
+        <FiLayers size={18} color="var(--primary)" />
         {t('prefix_migration')}
       </h3>
 
@@ -95,7 +98,10 @@ export function PrefixMigration() {
             className="field__input" 
             placeholder="e.g. 12345"
             value={oldPrefix}
-            onChange={e => setOldPrefix(e.target.value.replace(/\D/g, ''))}
+            onChange={e => {
+              setOldPrefix(e.target.value.replace(/\D/g, ''));
+              setError(null);
+            }}
           />
         </div>
         <div className="field">
@@ -108,19 +114,32 @@ export function PrefixMigration() {
             className="field__input" 
             placeholder="e.g. 54321"
             value={newPrefix}
-            onChange={e => setNewPrefix(e.target.value.replace(/\D/g, ''))}
+            onChange={e => {
+              setNewPrefix(e.target.value.replace(/\D/g, ''));
+              setError(null);
+            }}
           />
         </div>
       </div>
 
       <button 
         className="btn btn--primary" 
-        style={{ width: '100%', marginTop: '8px', justifyContent: 'center' }}
+        style={{ width: '100%', marginTop: '8px', justifyContent: 'center', gap: '8px' }}
         onClick={handleMigrateClick}
         disabled={isMigrating || oldPrefix.length < 5 || newPrefix.length < 5}
       >
+        {isMigrating ? <FiRefreshCw size={16} className="spin" /> : <FiShuffle size={16} />}
         {isMigrating ? t('migration_in_progress') : t('migrate_now')}
       </button>
+
+      {error && (
+        <div style={{ marginTop: '12px', padding: '12px', background: 'var(--red-dim)', border: '1px solid var(--red)', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+          <FiAlertTriangle size={16} color="var(--red)" style={{ marginTop: '2px', flexShrink: 0 }} />
+          <p style={{ fontSize: '12px', color: 'var(--red)', margin: 0, fontWeight: '600', lineHeight: '1.4' }}>
+            {error}
+          </p>
+        </div>
+      )}
 
       {history.length > 0 && (
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
