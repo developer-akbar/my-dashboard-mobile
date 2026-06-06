@@ -118,6 +118,26 @@ export function ServiceCard({
   const insights = service.insights;
   const breakup = service.billBreakup;
 
+  const currentYearTotalPaid = useMemo(() => {
+    if (!service.paymentHistory?.length) return null;
+    const currentYear = new Date().getFullYear();
+    const paymentsThisYear = service.paymentHistory.filter(ph => new Date(ph.date).getFullYear() === currentYear);
+    
+    if (!paymentsThisYear.length) return null;
+
+    const total = paymentsThisYear.reduce((sum, ph) => sum + Number(ph.amount || 0), 0);
+    
+    // Find the latest month
+    const months = paymentsThisYear.map(ph => new Date(ph.date).getMonth());
+    const maxMonthIndex = Math.max(...months);
+    const maxMonthName = new Date(currentYear, maxMonthIndex).toLocaleString('en-IN', { month: 'short' });
+
+    return {
+      total,
+      label: `Jan - ${maxMonthName} ${currentYear}`
+    };
+  }, [service.paymentHistory]);
+
   async function copyNum() {
     try {
       await navigator.clipboard.writeText(service.serviceNumber);
@@ -455,6 +475,12 @@ export function ServiceCard({
                     <span className="receipt-row__label">{t('avg_mo')}</span>
                     <b className="receipt-row__val">{formatInr(insights.avgAmount)}</b>
                  </div>
+                 {currentYearTotalPaid && (
+                   <div className="receipt-row">
+                      <span className="receipt-row__label">Total Paid ({currentYearTotalPaid.label})</span>
+                      <b className="receipt-row__val">{formatInr(currentYearTotalPaid.total)}</b>
+                   </div>
+                 )}
                  <div className="receipt-row">
                     <span className="receipt-row__label">Avg Units (Last 6m)</span>
                     <b className="receipt-row__val">{insights.avgUnits6m?.toLocaleString('en-IN') || '—'} u</b>

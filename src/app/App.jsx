@@ -61,16 +61,10 @@ function AppContent() {
   const { t, i18n } = useTranslation();
   const ph = usePostHog();
 
-  const [applianceCalcOpen, setApplianceCalcOpen] = useState(false);
-
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const handleNavClick = (id) => {
-    if (id === 'appliances') {
-      setApplianceCalcOpen(true);
-      return;
-    }
     if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
     setActivePage(id);
   };
@@ -160,18 +154,13 @@ function AppContent() {
     const urlHandler = CapApp.addListener('appUrlOpen', handleUrlOpen);
     
     const onBack = async () => {
-      if (applianceCalcOpen) {
-        setApplianceCalcOpen(false);
-        return;
-      }
-
       const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
       window.dispatchEvent(backEvent);
       
       if (backEvent.detail.handled) return;
 
-      if (['privacy', 'prefix-migration', 'calculation-settings'].includes(activePage)) {
-        setActivePage('settings');
+      if (['privacy', 'prefix-migration', 'calculation-settings', 'appliances'].includes(activePage)) {
+        setActivePage(activePage === 'appliances' ? 'electricity' : 'settings');
         return;
       }
 
@@ -197,7 +186,7 @@ function AppContent() {
       capHandler.then(h => h.remove());
       window.removeEventListener('popstate', popHandler);
     };
-  }, [activePage, applianceCalcOpen]);
+  }, [activePage]);
 
   useEffect(() => {
     if (window.history.state !== 'nav') {
@@ -411,13 +400,6 @@ function AppContent() {
       
       <Analytics />
       <SpeedInsights />
-
-      <Suspense fallback={null}>
-        <ApplianceCalculator 
-          open={applianceCalcOpen} 
-          onClose={() => setApplianceCalcOpen(false)} 
-        />
-      </Suspense>
     </div>
   );
 }
