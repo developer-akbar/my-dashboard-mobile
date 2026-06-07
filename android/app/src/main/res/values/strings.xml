@@ -6,6 +6,8 @@
     <string name="custom_url_scheme">com.akbar.mydashboard</string>
     <string name="shortcut_refresh_short">Refresh</string>
     <string name="shortcut_refresh_long">Refresh all bills</string>
+    <string name="shortcut_pay_short">Pay Home</string>
+    <string name="shortcut_pay_long">Pay home electricity bill</string>
     <string name="shortcut_add_short">Add Service</string>
     <string name="shortcut_add_long">Add a new connection</string>
 </resources>

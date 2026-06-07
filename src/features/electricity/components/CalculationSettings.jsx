@@ -102,7 +102,7 @@ export function CalculationSettings({ onBack }) {
 
   return (
     <div className="page">
-      <header className="page__header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '-8px' }}>
+      <header className="page__header page__header--sticky" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button className="icon-btn" onClick={onBack} style={{ width: '40px', height: '40px' }}><FiArrowLeft size={20} /></button>
         <div style={{ flex: 1 }}>
           <h1 className="page__title" style={{ fontSize: '20px' }}>{t('calc_settings')}</h1>

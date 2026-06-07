@@ -15,7 +15,7 @@ export function PrivacyPolicy({ onBack }) {
       <div style={{ flex: 1, paddingBottom: '40px' }}>
         <div className="scard" style={{ padding: '24px', lineHeight: '1.7', color: 'var(--text-2)' }}>
           <p className="meta" style={{ color: 'var(--text-3)', fontSize: '13px', marginBottom: '24px' }}>
-            <strong>Last updated:</strong> June 2025 • <strong>App:</strong> My Dashboard (com.akbar.mydashboard)
+            <strong>Last updated:</strong> June 2026 • <strong>App:</strong> My Dashboard (com.akbar.mydashboard)
           </p>
 
           <div style={{ background: 'var(--surface-3)', borderLeft: '4px solid var(--primary)', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>

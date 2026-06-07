@@ -96,7 +96,7 @@ export function PrefixMigration({ onBack }) {
 
   return (
     <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-      <header className="page__header">
+      <header className="page__header page__header--sticky">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button className="icon-btn" onClick={onBack} aria-label="Back"><FiArrowLeft size={20} /></button>
           <div>

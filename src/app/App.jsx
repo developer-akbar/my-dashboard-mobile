@@ -141,17 +141,27 @@ function AppContent() {
     const handleUrlOpen = (event) => {
       const url = event.url;
       if (url.includes('mydashboard://action/refresh')) {
-        // We'll dispatch a custom event to trigger refresh-all
         window.dispatchEvent(new CustomEvent('shortcut-refresh-all'));
         if (activePage !== 'electricity') setActivePage('electricity');
       } else if (url.includes('mydashboard://action/add')) {
-        // Dispatch custom event to open add dialog
         window.dispatchEvent(new CustomEvent('shortcut-add-service'));
+        if (activePage !== 'electricity') setActivePage('electricity');
+      } else if (url.includes('mydashboard://action/pay')) {
+        window.dispatchEvent(new CustomEvent('shortcut-pay-home'));
         if (activePage !== 'electricity') setActivePage('electricity');
       }
     };
     
     const urlHandler = CapApp.addListener('appUrlOpen', handleUrlOpen);
+
+    // Esc key: navigate back from sub-pages
+    const handleEsc = (e) => {
+      if (e.key !== 'Escape') return;
+      if (['appliances', 'privacy', 'prefix-migration', 'calculation-settings'].includes(activePage)) {
+        setActivePage(activePage === 'appliances' ? 'electricity' : 'settings');
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
     
     const onBack = async () => {
       const backEvent = new CustomEvent('app-back-button', { detail: { handled: false }, cancelable: true });
@@ -185,6 +195,7 @@ function AppContent() {
       urlHandler.then(h => h.remove());
       capHandler.then(h => h.remove());
       window.removeEventListener('popstate', popHandler);
+      window.removeEventListener('keydown', handleEsc);
     };
   }, [activePage]);
 
@@ -236,13 +247,14 @@ function AppContent() {
           {activePage === 'electricity' && <ElectricityDashboard onOpenCalcSettings={() => handleNavClick('calculation-settings')} />}
           {activePage === 'calculation-settings' && <CalculationSettings onBack={() => setActivePage('settings')} />}
           {activePage === 'prefix-migration' && <PrefixMigration onBack={() => setActivePage('settings')} />}
+          {activePage === 'appliances' && <ApplianceCalculator onBack={() => setActivePage('electricity')} />}
           {activePage === 'home' && <OverviewTab />}
           {activePage === 'privacy' && (
             <PrivacyPolicy onBack={() => setActivePage('settings')} />
           )}
           {activePage === 'settings' && (
             <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: 'var(--bg-1)' }}>
-              <div className="page__header">
+              <div className="page__header page__header--sticky">
                 <div>
                   <h2 className="page__title">{t('settings')}</h2>
                 </div>
@@ -369,7 +381,12 @@ function AppContent() {
         {NAV.map(({ id, icon: Icon }) => (
           <button
             key={id}
-            className={`bottom-nav__item ${(activePage === id || (id === 'settings' && ['prefix-migration', 'calculation-settings', 'privacy'].includes(activePage))) ? 'bottom-nav__item--active' : ''}`}
+            className={`bottom-nav__item ${
+              activePage === id ||
+              (id === 'settings' && ['prefix-migration', 'calculation-settings', 'privacy'].includes(activePage))
+                ? 'bottom-nav__item--active'
+                : ''
+            }`}
             onClick={() => handleNavClick(id)}
             aria-label={t(id)}
           >
