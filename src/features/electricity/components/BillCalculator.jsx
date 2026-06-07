@@ -118,8 +118,8 @@ export function BillCalculator({ open, service, onClose }) {
     const updated = readings.filter(r => r !== readingToDelete);
     setReadings(updated);
     await db.setSetting('readings_' + service.serviceNumber, updated);
-    toast.success('Reading removed');
-  }, [readings, service?.serviceNumber]);
+    toast.success(t('reading_removed'));
+  }, [readings, service?.serviceNumber, t]);
 
   const handleSaveReading = useCallback(async () => {
     if (!currentReading || !progressResult) return;
@@ -134,8 +134,8 @@ export function BillCalculator({ open, service, onClose }) {
     setReadings(updated);
     await db.setSetting('readings_' + service.serviceNumber, updated);
     setCurrentReading('');
-    toast.success('Reading logged successfully');
-  }, [currentReading, progressResult, readings, service?.serviceNumber]);
+    toast.success(t('reading_logged'));
+  }, [currentReading, progressResult, readings, service?.serviceNumber, t]);
 
   const simpleResult = useMemo(() => {
     const u = parseFloat(units);
@@ -157,9 +157,9 @@ export function BillCalculator({ open, service, onClose }) {
             <div className="sidebar__logo" style={{ width: '32px', height: '32px', background: 'var(--primary-dim)', color: 'var(--primary)' }}>
               <LuCalculator size={18} />
             </div>
-            <h2 className="dialog__title" style={{ margin: 0 }}>Bill Predictor</h2>
+            <h2 className="dialog__title" style={{ margin: 0 }}>{t('bill_predictor')}</h2>
           </div>
-          <button className="icon-btn-ghost" onClick={onClose} style={{ position: 'absolute', top: '0', right: '0' }} aria-label="Close"><FiX size={20} /></button>
+          <button className="icon-btn-ghost" onClick={onClose} style={{ position: 'absolute', top: '0', right: '0' }} aria-label={t('close')}><FiX size={20} /></button>
         </header>
 
         <div className="dialog__body" style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
@@ -169,28 +169,28 @@ export function BillCalculator({ open, service, onClose }) {
                 <FiAward size={18} />
               </div>
               <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '11px', color: 'var(--primary-hi)', fontWeight: '800', textTransform: 'uppercase', margin: 0 }}>Final Average Prediction</p>
+                <p style={{ fontSize: '11px', color: 'var(--primary-hi)', fontWeight: '800', textTransform: 'uppercase', margin: 0 }}>{t('final_avg_prediction')}</p>
                 <p style={{ fontSize: '12px', color: 'var(--text-1)', margin: 0 }}>
-                  Based on last <b>{historyPrediction.readingsCount}</b> logs: <b>{formatInr(historyPrediction.amount)}</b> ({historyPrediction.units}u)
+                  {t('based_on_logs', { count: historyPrediction.readingsCount })}: <b>{formatInr(historyPrediction.amount)}</b> ({historyPrediction.units}u)
                 </p>
               </div>
             </div>
           )}
 
           <div className="seg" style={{ marginBottom: '24px' }}>
-            <button className={`seg__btn ${mode === 'progress' ? 'seg__btn--active' : ''}`} onClick={() => setMode('progress')}>Progress Check</button>
-            <button className={`seg__btn ${mode === 'simple' ? 'seg__btn--active' : ''}`} onClick={() => setMode('simple')}>Custom Units</button>
+            <button className={`seg__btn ${mode === 'progress' ? 'seg__btn--active' : ''}`} onClick={() => setMode('progress')}>{t('progress_check')}</button>
+            <button className={`seg__btn ${mode === 'simple' ? 'seg__btn--active' : ''}`} onClick={() => setMode('simple')}>{t('custom_units')}</button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
             <div className="field">
-              <label className="field__label">Service Type</label>
+              <label className="field__label">{t('service_type')}</label>
               <div className="radio-group">
                 <div className={`radio-item ${type === 'domestic' ? 'radio-item--active' : ''}`} onClick={() => setType('domestic')}>
-                  <div className="radio-circle" /><div className="radio-label">Domestic (LT-I)</div>
+                  <div className="radio-circle" /><div className="radio-label">{t('domestic_slabs')}</div>
                 </div>
                 <div className={`radio-item ${type === 'commercial' ? 'radio-item--active' : ''}`} onClick={() => setType('commercial')}>
-                  <div className="radio-circle" /><div className="radio-label">Commercial (LT-II)</div>
+                  <div className="radio-circle" /><div className="radio-label">{t('commercial_slabs')}</div>
                 </div>
               </div>
             </div>
@@ -198,28 +198,28 @@ export function BillCalculator({ open, service, onClose }) {
 
           {mode === 'simple' ? (
             <div className="field">
-              <label className="field__label">Total Units to Calculate</label>
+              <label className="field__label">{t('total_units_calculate')}</label>
               <input type="text" inputMode="numeric" pattern="[0-9]*" className="field__input" placeholder="e.g. 250" autoFocus value={units} onChange={e => setUnits(e.target.value.replace(/\D/g, ''))} />
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {(!service?.closingRdg && !manualLastReading) && (
                 <div className="field">
-                  <label className="field__label">Last Month's Final Reading</label>
+                  <label className="field__label">{t('last_month_final_reading')}</label>
                   <input type="text" inputMode="numeric" pattern="[0-9]*" className="field__input" placeholder="Enter last reading from bill" value={manualLastReading} onChange={e => setManualLastReading(e.target.value.replace(/\D/g, ''))} />
                 </div>
               )}
               <div className="field">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label className="field__label" style={{ marginBottom: 0 }}>Current Meter Reading</label>
+                  <label className="field__label" style={{ marginBottom: 0 }}>{t('current_meter_reading')}</label>
                   {(service?.closingRdg || manualLastReading) && (
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block' }}>Last Reading</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-3)', display: 'block' }}>{t('last_reading')}</span>
                       <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary-hi)' }}>{manualLastReading || service.closingRdg}</span>
                     </div>
                   )}
                 </div>
-                <input type="text" inputMode="numeric" pattern="[0-9]*" className="field__input" placeholder="Reading currently on your meter" autoFocus value={currentReading} onChange={e => setCurrentReading(e.target.value.replace(/\D/g, ''))} />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" className="field__input" placeholder={t('enter_current_reading')} autoFocus value={currentReading} onChange={e => setCurrentReading(e.target.value.replace(/\D/g, ''))} />
               </div>
             </div>
           )}
@@ -260,22 +260,22 @@ export function BillCalculator({ open, service, onClose }) {
               </div>
 
               <div className="scard" style={{ padding: '20px', background: 'var(--surface-2)', textAlign: 'center' }}>
-                <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>Monthly Units Prediction</p>
-                <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{progressResult.predictedUnits} <span style={{ fontSize: '16px', fontWeight: '400' }}>Units</span></h2>
+                <p style={{ fontSize: '13px', color: 'var(--text-3)', marginBottom: '4px' }}>{t('monthly_units_prediction')}</p>
+                <h2 style={{ fontSize: '32px', color: 'var(--primary-hi)' }}>{progressResult.predictedUnits} <span style={{ fontSize: '16px', fontWeight: '400' }}>{t('units')}</span></h2>
                 <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', marginTop: '8px', background: progressResult.isHigher ? 'var(--red-dim)' : 'var(--green-dim)', color: progressResult.isHigher ? 'var(--red)' : 'var(--green)' }}>
                   {progressResult.isHigher ? <FiTrendingUp size={14} /> : <FiTrendingDown size={14} />}
-                  <strong>{Math.abs(progressResult.diffPct)}% {progressResult.isHigher ? 'higher' : 'lower'}</strong> than last month
+                  <strong>{Math.abs(progressResult.diffPct)}% {progressResult.isHigher ? 'higher' : 'lower'}</strong> {t('vs_last_year')}
                 </div>
               </div>
 
               <div style={{ marginBlock: '20px', padding: '0 8px' }}>
-                <p style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: '800', marginBottom: '10px', textAlign: 'center', textDecoration: 'underline' }}>Predicted Bill Breakdown</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: '800', marginBottom: '10px', textAlign: 'center', textDecoration: 'underline' }}>{t('predicted_bill_breakdown')}</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {[
-                    { label: 'Predicted Energy Charges', val: progressResult.predictedDetails.ec },
-                    { label: `Predicted Fixed Charges`, val: progressResult.predictedDetails.fc },
-                    { label: 'Predicted Duty (6%)', val: progressResult.predictedDetails.ed },
-                    { label: 'Customer Charges', val: progressResult.predictedDetails.cc }
+                    { label: `Predicted ${t('energy_charges')}`, val: progressResult.predictedDetails.ec },
+                    { label: `Predicted ${t('fixed_charges')}`, val: progressResult.predictedDetails.fc },
+                    { label: `Predicted ${t('electricity_duty')} (6%)`, val: progressResult.predictedDetails.ed },
+                    { label: t('customer_charges'), val: progressResult.predictedDetails.cc }
                   ].map(r => (
                     <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                       <span style={{ color: 'var(--text-3)' }}>{r.label}</span>
@@ -346,7 +346,7 @@ export function BillCalculator({ open, service, onClose }) {
             <div className="state-box" style={{ padding: '20px', marginTop: '20px' }}>
               <FiAlertCircle size={24} color="var(--red)" />
               <p style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '8px' }}>
-                Invalid reading. Must be greater than last month's reading ({manualLastReading || service?.closingRdg || '—'}).
+                {t('invalid_reading_error', { last: manualLastReading || service?.closingRdg || '—' })}
               </p>
             </div>
           )}
@@ -359,12 +359,12 @@ export function BillCalculator({ open, service, onClose }) {
               style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '8px', border: '1px solid var(--primary-hi)', color: 'var(--primary-hi)' }}
               onClick={handleSaveReading}
             >
-              <FiActivity size={16} /> Save Reading
+              <FiActivity size={16} /> {t('save_reading')}
             </button>
           )}
-          <button className="btn btn--primary" style={{ flex: 1 }} onClick={onClose}>Done</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+          <button className="btn btn--primary" style={{ flex: 1 }} onClick={onClose}>{t('close')}</button>
+          </div>
+          </div>
+          </div>
+          );
+          }

@@ -9,10 +9,12 @@ import { db } from '../../../shared/db/storage.js';
 import { formatInr } from '../../../shared/utils/index.js';
 import { calculateEstimatedBill, DEFAULT_DOMESTIC_CONFIG, DEFAULT_COMMERCIAL_CONFIG } from '../utils/billing.js';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 
 const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function MeterReadingLog({ service }) {
+  const { t } = useTranslation();
   const [readings, setReadings] = useState([]);
   const [adding, setAdding] = useState(false);
   const [newReading, setNewReading] = useState('');
@@ -60,14 +62,14 @@ export function MeterReadingLog({ service }) {
 
   async function addReading() {
     const val = Number(newReading);
-    if (!val || val <= 0) { toast.error('Enter a valid reading'); return; }
+    if (!val || val <= 0) { toast.error(t('enter_valid_reading')); return; }
     
     // Sort recent to find the latest
     const sortedRecent = [...recentReadings].sort((a, b) => new Date(a.date) - new Date(b.date));
     const lastReading = sortedRecent[sortedRecent.length - 1];
     
     if (lastReading && val < lastReading.reading) {
-      toast.error('Reading cannot be less than previous reading');
+      toast.error(t('reading_less_than_prev'));
       return;
     }
 
@@ -102,7 +104,7 @@ export function MeterReadingLog({ service }) {
     setReadings(updated);
     setNewReading('');
     setAdding(false);
-    toast.success('Reading logged');
+    toast.success(t('reading_logged'));
   }
 
   async function removeReading(readingToRemove) {
@@ -121,15 +123,15 @@ export function MeterReadingLog({ service }) {
     <div style={{ marginTop: '8px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-2)', fontWeight: 600 }}>
-          <FiZap size={13} style={{ color: 'var(--primary)' }} /> Meter Reading Log
+          <FiZap size={13} style={{ color: 'var(--primary)' }} /> {t('meter_reading_log')}
         </div>
         <button
           className="icon-btn-micro"
           onClick={() => setAdding(v => !v)}
-          title="Log reading"
+          title={t('log')}
           style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--primary)' }}
         >
-          <FiPlus size={12} /> Log
+          <FiPlus size={12} /> {t('log')}
         </button>
       </div>
 
@@ -140,7 +142,7 @@ export function MeterReadingLog({ service }) {
             value={newReading}
             onChange={e => setNewReading(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addReading(); if (e.key === 'Escape') setAdding(false); }}
-            placeholder="Current meter reading (e.g. 4820)"
+            placeholder={t('enter_current_reading')}
             style={{
               flex: 1, padding: '6px 10px', border: '1px solid var(--primary)',
               borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)',
@@ -148,14 +150,14 @@ export function MeterReadingLog({ service }) {
             }}
             autoFocus
           />
-          <button className="btn btn--pay btn--sm" onClick={addReading} style={{ flexShrink: 0 }}>Save</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setAdding(false)} style={{ flexShrink: 0 }}>Cancel</button>
+          <button className="btn btn--pay btn--sm" onClick={addReading} style={{ flexShrink: 0 }}>{t('save')}</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => setAdding(false)} style={{ flexShrink: 0 }}>{t('cancel')}</button>
         </div>
       )}
 
       {recentReadings.length === 0 && !adding && (
         <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-3)', fontSize: '11px', border: '1px dashed var(--border-md)', borderRadius: 'var(--radius-sm)' }}>
-          Log meter readings to track mid-month usage and project your bill
+          {t('log_hint')}
         </div>
       )}
 
@@ -176,25 +178,25 @@ export function MeterReadingLog({ service }) {
       {projection && (
         <div style={{ padding: '10px', background: 'var(--primary-dim, rgba(99,102,241,0.08))', border: '1px solid var(--primary-glow, rgba(99,102,241,0.3))', borderRadius: 'var(--radius-sm)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--primary)' }}>
-            <FiTrendingUp size={13} /> Month-end Projection
+            <FiTrendingUp size={13} /> {t('month_end_projection')}
           </div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>Projected units</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{t('projected_units')}</div>
               <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)' }}>{projection.projectedUnits} u</div>
             </div>
             <div>
-              <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>Daily usage</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{t('daily_usage')}</div>
               <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)' }}>{projection.unitsPerDay} u/day</div>
             </div>
             {projection.estimatedBill != null && (
               <div>
-                <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>Est. bill</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{t('est_bill')}</div>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)' }}>{formatInr(projection.estimatedBill)}</div>
               </div>
             )}
             <div>
-              <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>Days left</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{t('days_left')}</div>
               <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-1)' }}>{projection.daysLeft}</div>
             </div>
           </div>

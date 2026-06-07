@@ -24,6 +24,10 @@ A modern, privacy-first personal tracking dashboard built with **React 18 + Vite
 - **Service Migration:** Automatically handles the shift from old service numbers to the new unique numbering system.
 - **About Info:** Quick access to service metadata like Circle, Division, and Section.
 - **Light / Dark Mode:** Native support for both themes with a clean, modern SaaS aesthetic.
+- **Payment Streak:** Tracks your on-time payment consistency with motivational badges (🔥) and status icons (✅/🕒/❌) integrated directly into your payment history.
+- **Mid-Month Meter Logging:** Log manual meter readings to track usage in real-time.
+- **Bill Prediction:** Automatically projects your end-of-month bill and units based on logged readings and historical trends.
+- **Sync & History:** Seamlessly synchronizes reading logs between Consumption Insights and Bill Predictor with a detailed 12-month history view.
 - **Privacy-First Storage:** All data is stored locally on your device (IndexedDB for Web, SQLite for Android).
 
 ---

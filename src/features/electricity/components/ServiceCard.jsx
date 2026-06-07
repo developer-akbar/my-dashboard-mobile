@@ -548,13 +548,13 @@ export function ServiceCard({
             {(isHistoryError || !hasPaymentHistory) ? (
               <div className="scard__error" style={{ margin: '8px 10px' }}>
                 <FiAlertTriangle size={12} />
-                APSPDCL payment history is unavailable for this service number
+                {t('history_unavailable')}
               </div>
             ) : service.billHistory?.length > 0 ? (
               <PaymentsPanel service={service} t={t} />
             ) : (
               <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)', fontSize: '13px' }}>
-                No payment records found
+                {t('no_records_found')}
               </div>
             )}
           </Section>
@@ -790,7 +790,7 @@ function PaymentsPanel({ service, t }) {
             <div className="pymt__left">
               {getStatusIcon(status)}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '11px' }}>{b.isPaid ? formatDate(b.paidDate) : 'Unpaid'}</span>
+                <span style={{ fontSize: '11px' }}>{b.isPaid ? formatDate(b.paidDate) : t('status_unpaid')}</span>
                 <span style={{ fontSize: '9px', color: 'var(--text-3)', fontWeight: 500 }}>{monthLabel}</span>
               </div>
             </div>
