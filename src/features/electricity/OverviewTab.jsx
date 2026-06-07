@@ -119,19 +119,22 @@ export function OverviewTab() {
 
   return (
     <div className="page">
-      <div className="page__header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          <div>
-            <h2 className="page__title">Overview</h2>
-            <p>Your electricity at a glance</p>
+      <header className="page__header page__header--sticky">
+        <div className="page__header-content">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="page__header-icon" style={{ background: 'var(--primary-dim)', color: 'var(--primary)' }}>
+              <FiGrid size={18} />
+            </div>
+            <div>
+              <h2 className="page__title">{t('overview')}</h2>
+              <p className="page__eyebrow">Electricity Summary</p>
+            </div>
           </div>
-          <button className="icon-btn-ghost" onClick={handleShareSummary} title="Share Summary">
-            <FiShare2 size={20} />
-          </button>
+          <button className="icon-btn" onClick={handleShareSummary} title="Share Overview"><FiShare2 size={20} /></button>
         </div>
-      </div>
+      </header>
 
-      <div>
+      <div className="page__content">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
           <div className="scard" style={{ padding: '16px', background: 'var(--primary-dim)', border: '1px solid var(--primary-glow)' }}>
             <p style={{ fontSize: '11px', color: 'var(--primary)', marginBottom: '4px', textTransform: 'uppercase', fontWeight: 700 }}>Total Spent ({currentYear})</p>

@@ -382,9 +382,24 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+/* ── Page ───────────────────────────────────────────────────────────────────── */
 .page {
   position: relative;
-  padding: 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.page__content {
+  padding: 16px 12px 24px;
+  flex: 1;
+}
+
+@media (min-width: 701px) {
+  .page__content {
+    padding: 24px;
+  }
 }
 
 .coming-soon { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; min-height: 40vh; color: var(--text-2); }
@@ -393,13 +408,50 @@ input[type="checkbox"] {
 /* ── Page header ────────────────────────────────────────────────────────────── */
 .page__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  transition: all 0.2s ease;
 }
 
-.page__eyebrow {
+.page__header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.page__header--sticky {
+  backdrop-filter: blur(16px);
+  background: rgba(248, 250, 252, 0.9); /* Light theme default */
+}
+
+[data-theme="dark"] .page__header--sticky {
+  background: rgba(12, 14, 20, 0.9);
+}
+
+.page__header--scrolled {
+  padding: 10px 20px;
+  box-shadow: var(--shadow);
+}
+
+/* ── Sticky Summary ─────────────────────────────────────────────────────────── */
+.sticky-summary {
+  position: sticky;
+  top: 64px; /* Adjust based on header height */
+  z-index: 80;
+  background: var(--bg);
+  padding: 16px 0;
+  margin: 0 -16px;
+  padding-inline: 16px;
+  border-bottom: 1px solid var(--border);
+}
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1556,7 +1608,7 @@ input[type="number"] {
   .shell { flex-direction: column; height: 100dvh; }
   .main  { flex: 1; overflow-y: auto; padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 
-  .page { padding: 16px 12px 24px; }
+  .page { padding-inline: 12px; }
 
   .summary { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
   .stat { padding: 12px 12px; }

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import toast from 'react-hot-toast';
-import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell, FiShare2, FiFileText } from 'react-icons/fi';
+import { FiRefreshCw, FiZap, FiArrowDown, FiTrash2, FiCheckSquare, FiSquare, FiCopy, FiSettings, FiDownload, FiUpload, FiClock, FiEye, FiLayout, FiBell, FiShare2, FiFileText, FiPlus } from 'react-icons/fi';
 import { ServiceCard } from './components/ServiceCard.jsx';
 import { ServiceDialog } from './components/ServiceDialog.jsx';
 import { ServiceAboutDialog } from './components/ServiceAboutDialog.jsx';
@@ -815,28 +815,26 @@ export function ElectricityDashboard() {
       )}
 
       <header className="page__header page__header--sticky">
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="page__header-content">
           <div>
-            <p className="page__eyebrow"><FiZap size={12} /> APSPDCL</p>
-            {!isScrolled && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1 className="page__title" style={{ margin: 0 }}>{t('electricity')}</h1>
-              </div>
-            )}
+            <h2 className="page__title">Electricity</h2>
+            <p className="page__eyebrow">APSPDCL Services</p>
           </div>
-          <div style={{ display: 'flex', gap: isScrolled ? '12px' : '16px', alignItems: 'center' }}>
-            {!isWeb && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                <button className="icon-btn" onClick={() => setInboxOpen(true)} title="Notifications" style={{ width: '40px', height: '40px', position: 'relative' }}>
-                  <FiBell size={20} style={{ color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-3)' }} />
-                  {unreadCount > 0 && <span className="header-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-                </button>
-                {!isScrolled && <span style={{ fontSize: '10px', color: 'var(--text-3)', fontWeight: '600', textTransform: 'uppercase' }}>Alerts</span>}
-              </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button className="icon-btn" onClick={handleShare} title="Share Summary"><FiShare2 size={20} /></button>
+            <div style={{ position: 'relative' }}>
+              <button className="icon-btn" onClick={() => setInboxOpen(true)} title="Notifications">
+                <FiBell size={20} />
+                {unreadCount > 0 && <span className="badge-dot" />}
+              </button>
+            </div>
+            {activeView === 'active' && (
+              <button className="btn btn--primary btn--circle btn--sm btn--add" onClick={() => setDialog({ open: true, service: null })} title={t('add_service')}>
+                <FiPlus size={20} />
+              </button>
             )}
           </div>
         </div>
-        {refreshProgress && <div className="refresh-progress"><Loader size={12} /> {refreshProgress.done} / {refreshProgress.total}</div>}
       </header>
 
       <SummaryBar services={services} />

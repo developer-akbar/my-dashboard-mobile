@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FiX, FiInfo, FiZap, FiPlus, FiMinus, FiTrash2 } from 'react-icons/fi';
-import { calculateEstimatedBill, DEFAULT_DOMESTIC_CONFIG } from '../utils/billing';
-import { formatInr } from '../../../shared/utils';
-import { db } from '../../../shared/db/storage';
+import { FiInfo, FiZap, FiPlus, FiMinus, FiTrash2, FiSave } from 'react-icons/fi';
+import { calculateEstimatedBill, DEFAULT_DOMESTIC_CONFIG } from '../utils/billing.js';
+import { formatInr } from '../../../shared/utils/index.js';
+import { db } from '../../../shared/db/storage.js';
+import toast from 'react-hot-toast';
+import { Loader } from '../../../shared/components/Loader.jsx';
 
 const COMMON_APPLIANCES = [
   { name: '1.5 Ton AC', watts: 1500, icon: '❄️' },
@@ -20,27 +22,34 @@ const DEFAULT_SELECTION = [
   { id: 2, name: 'Ceiling Fan', watts: 75, hours: 12, count: 3, icon: '🌀' },
 ];
 
-export function ApplianceCalculator() {
+export function ApplianceCalculator({ onBack }) {
   const [selectedAppliances, setSelectedAppliances] = useState(DEFAULT_SELECTION);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load saved appliances on mount
   useEffect(() => {
     (async () => {
-      const saved = await db.getSetting('saved_appliances');
-      if (saved && Array.isArray(saved)) {
-        setSelectedAppliances(saved);
+      try {
+        const saved = await db.getSetting('saved_appliances');
+        if (saved && Array.isArray(saved)) {
+          setSelectedAppliances(saved);
+        }
+      } catch (e) {
+        console.error('Failed to load appliances', e);
+      } finally {
+        setIsLoaded(true);
       }
-      setIsLoaded(true);
     })();
   }, []);
 
-  // Save appliances when they change
-  useEffect(() => {
-    if (isLoaded) {
-      db.setSetting('saved_appliances', selectedAppliances);
+  const handleSave = async () => {
+    try {
+      await db.setSetting('saved_appliances', selectedAppliances);
+      toast.success('Configuration saved');
+    } catch (e) {
+      toast.error('Failed to save');
     }
-  }, [selectedAppliances, isLoaded]);
+  };
 
   const addAppliance = (app) => {
     setSelectedAppliances(prev => [
@@ -73,22 +82,53 @@ export function ApplianceCalculator() {
     };
   }, [selectedAppliances]);
 
+  // Handle Esc and Back button
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onBack?.();
+    };
+    const handleBack = (e) => {
+      if (e.detail?.handled) return;
+      onBack?.();
+      if (e.detail) e.detail.handled = true;
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('app-back-button', handleBack);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('app-back-button', handleBack);
+    };
+  }, [onBack]);
+
+  if (!isLoaded) {
+    return (
+      <div className="page">
+        <div className="state-box">
+          <Loader size={24} />
+          <p>Loading calculator...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: 'var(--bg-1)' }}>
-      <header className="page__header" style={{ marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div className="sidebar__logo" style={{ background: 'var(--amber-dim)', color: 'var(--amber)', width: '32px', height: '32px' }}>
-            <FiZap size={18} />
-          </div>
-          <div>
-            <h2 className="page__title">Appliance Cost Estimator</h2>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-3)' }}>Calculate your estimated bill</p>
+    <div className="page">
+      <header className="page__header page__header--sticky">
+        <div className="page__header-content">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="page__header-icon" style={{ background: 'var(--amber-dim)', color: 'var(--amber)' }}>
+              <FiZap size={18} />
+            </div>
+            <div>
+              <h2 className="page__title">Appliances</h2>
+              <p className="page__eyebrow"><FiZap size={10} /> Cost Estimator</p>
+            </div>
           </div>
         </div>
       </header>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 80px' }}>
-        <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-1)', paddingTop: '16px', paddingBottom: '16px', margin: '0 -16px', paddingInline: '16px' }}>
+      <div className="page__content" style={{ paddingTop: 0 }}>
+        <div className="sticky-summary">
           <div className="scard" style={{ padding: '20px', background: 'var(--surface-2)', border: '1px solid var(--primary-glow)', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -111,53 +151,59 @@ export function ApplianceCalculator() {
           </div>
         </div>
 
-        <div style={{ marginTop: '8px' }}>
-          <h3 style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--text-1)' }}>Your Appliances</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {selectedAppliances.map(app => (
-              <div key={app.id} className="scard" style={{ padding: '12px', border: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '20px' }}>{app.icon || '🔌'}</span>
-                    <div>
-                      <h4 style={{ fontSize: '14px', margin: 0 }}>{app.name}</h4>
-                      <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0 }}>{app.watts} Watts</p>
-                    </div>
-                  </div>
-                  <button className="icon-btn-ghost" style={{ color: 'var(--red)' }} onClick={() => removeAppliance(app.id)}>
-                    <FiTrash2 size={14} />
-                  </button>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="field" style={{ marginBottom: 0 }}>
-                    <label className="field__label" style={{ fontSize: '11px' }}>Qty</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <button className="icon-btn-ghost icon-btn--sm" onClick={() => updateAppliance(app.id, 'count', Math.max(1, app.count - 1))}><FiMinus size={12} /></button>
-                      <span style={{ fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{app.count}</span>
-                      <button className="icon-btn-ghost icon-btn--sm" onClick={() => updateAppliance(app.id, 'count', app.count + 1)}><FiPlus size={12} /></button>
-                    </div>
-                  </div>
-                  <div className="field" style={{ marginBottom: 0 }}>
-                    <label className="field__label" style={{ fontSize: '11px' }}>Hours/Day</label>
-                    <input 
-                      type="range" min="1" max="24" step="0.5" value={app.hours} 
-                      onChange={(e) => updateAppliance(app.id, 'hours', parseFloat(e.target.value))}
-                      style={{ width: '100%', height: '4px' }}
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-                       <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{app.hours}h</span>
-                       <span style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: '600' }}>{((app.watts * app.hours * app.count) / 1000).toFixed(1)} u</span>
-                    </div>
-                  </div>
-                </div>
+        <div style={{ marginTop: '20px' }}>
+          <h3 style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--text-1)' }}>Your Selection</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {selectedAppliances.length === 0 ? (
+              <div className="state-box" style={{ minHeight: '100px', background: 'var(--surface-2)', borderRadius: '12px' }}>
+                <p>No appliances added</p>
               </div>
-            ))}
+            ) : (
+              selectedAppliances.map(app => (
+                <div key={app.id} className="scard" style={{ padding: '12px', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '20px' }}>{app.icon || '🔌'}</span>
+                      <div>
+                        <h4 style={{ fontSize: '14px', margin: 0 }}>{app.name}</h4>
+                        <p style={{ fontSize: '11px', color: 'var(--text-3)', margin: 0 }}>{app.watts} Watts</p>
+                      </div>
+                    </div>
+                    <button className="icon-btn-ghost" style={{ color: 'var(--red)' }} onClick={() => removeAppliance(app.id)}>
+                      <FiTrash2 size={14} />
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label className="field__label" style={{ fontSize: '11px' }}>Qty</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button className="icon-btn-ghost icon-btn--sm" onClick={() => updateAppliance(app.id, 'count', Math.max(1, app.count - 1))}><FiMinus size={12} /></button>
+                        <span style={{ fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{app.count}</span>
+                        <button className="icon-btn-ghost icon-btn--sm" onClick={() => updateAppliance(app.id, 'count', app.count + 1)}><FiPlus size={12} /></button>
+                      </div>
+                    </div>
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label className="field__label" style={{ fontSize: '11px' }}>Hours/Day</label>
+                      <input 
+                        type="range" min="1" max="24" step="0.5" value={app.hours} 
+                        onChange={(e) => updateAppliance(app.id, 'hours', parseFloat(e.target.value))}
+                        style={{ width: '100%', height: '4px' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                         <span style={{ fontSize: '11px', color: 'var(--text-3)' }}>{app.hours}h</span>
+                         <span style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: '600' }}>{((app.watts * app.hours * app.count) / 1000).toFixed(1)} u</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
         <div style={{ marginTop: '24px' }}>
-          <h3 style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--text-1)' }}>Add Appliance</h3>
+          <h3 style={{ fontSize: '15px', marginBottom: '12px', color: 'var(--text-1)' }}>Add New</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
             {COMMON_APPLIANCES.map(app => (
               <button 
@@ -173,7 +219,14 @@ export function ApplianceCalculator() {
           </div>
         </div>
 
-        <div className="highlight" style={{ marginTop: '30px', background: 'var(--surface-3)', padding: '16px', borderRadius: '8px' }}>
+        <div style={{ marginTop: '32px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+          <button className="btn btn--primary" style={{ width: '100%', height: '48px', gap: '8px' }} onClick={handleSave}>
+            <FiSave size={18} />
+            Save Configuration
+          </button>
+        </div>
+
+        <div className="highlight" style={{ marginTop: '20px', background: 'var(--surface-3)', padding: '16px', borderRadius: '8px' }}>
            <div style={{ display: 'flex', gap: '10px', color: 'var(--primary)' }}>
               <FiInfo size={18} style={{ marginTop: '2px' }} />
               <div>

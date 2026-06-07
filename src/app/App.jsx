@@ -52,8 +52,12 @@ const NAV = [
 
 function AppContent() {
   const [activePage, setActivePage] = useState(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/privacy') {
-      return 'privacy';
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.substring(1);
+      if (path === 'privacy') return 'privacy';
+      if (path === 'appliances') return 'appliances';
+      if (path === 'settings') return 'settings';
+      if (path === 'home') return 'home';
     }
     return 'electricity';
   });
@@ -65,7 +69,7 @@ function AppContent() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const handleNavClick = (id) => {
-    if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
+    window.history.pushState({}, '', `/${id === 'home' ? '' : id}`);
     setActivePage(id);
   };
 
@@ -105,25 +109,19 @@ function AppContent() {
   }, []);
 
   const handleInstallClick = async () => {
-    setShowInstallBanner(false);
-    localStorage.setItem('pwa_installed', 'true');
-
-    if (!deferredPrompt) {
-      toast.success('To add to home screen, use your browser\'s Share > Add to Home Screen menu.');
-      return;
-    }
+    if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-      if (ph) ph.capture('pwa_installed');
+      localStorage.setItem('pwa_installed', 'true');
+      setShowInstallBanner(false);
     }
     setDeferredPrompt(null);
   };
 
   const handleDismissBanner = () => {
-    setShowInstallBanner(false);
     localStorage.setItem('pwa_banner_dismissed_at', Date.now().toString());
-    if (ph) ph.capture('pwa_banner_dismissed');
+    setShowInstallBanner(false);
   };
 
   useEffect(() => {
@@ -131,26 +129,27 @@ function AppContent() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+    localStorage.setItem('i18nextLng', lng);
+  };
+
   useEffect(() => {
-    if (ph) {
-      ph.capture('$pageview', { page: activePage });
-    }
+    if (ph) ph.capture('$pageview', { page: activePage });
   }, [activePage, ph]);
 
   useEffect(() => {
     const handleUrlOpen = (event) => {
       const url = event.url;
       if (url.includes('mydashboard://action/refresh')) {
-        // We'll dispatch a custom event to trigger refresh-all
         window.dispatchEvent(new CustomEvent('shortcut-refresh-all'));
         if (activePage !== 'electricity') setActivePage('electricity');
       } else if (url.includes('mydashboard://action/add')) {
-        // Dispatch custom event to open add dialog
         window.dispatchEvent(new CustomEvent('shortcut-add-service'));
         if (activePage !== 'electricity') setActivePage('electricity');
       }
     };
-    
+
     const urlHandler = CapApp.addListener('appUrlOpen', handleUrlOpen);
     
     const onBack = async () => {
@@ -188,52 +187,12 @@ function AppContent() {
     };
   }, [activePage]);
 
-  useEffect(() => {
-    if (window.history.state !== 'nav') {
-       window.history.pushState('nav', '');
-    }
-  }, [activePage]);
-
-  const changeLanguage = (lng) => {
-    i18n.changeLanguage(lng);
-    if (ph) ph.capture('language_changed', { language: lng });
-  };
-
   return (
-    <div className="shell">
-      {showInstallBanner && (
-        <div className="install-banner">
-          <span className="install-banner__text">Add MyDashboard to your home screen for quick access?</span>
-          <div className="install-banner__actions">
-            <button className="btn btn--white" onClick={handleInstallClick} aria-label="Install app">Yes</button>
-            <button className="btn btn--outline-white" onClick={handleDismissBanner} aria-label="Dismiss install banner">Not now</button>
-          </div>
-        </div>
-      )}
-      <aside className="sidebar">
-        <div className="sidebar__brand">
-          <div className="sidebar__logo"><FiGrid size={16} /></div>
-          <span>MyDashboard</span>
-        </div>
-        <nav className="sidebar__nav">
-          {NAV.map(({ id, icon: Icon }) => (
-            <button
-              key={id}
-              className={`sidebar__item ${activePage === id ? 'sidebar__item--active' : ''}`}
-              onClick={() => handleNavClick(id)}
-              aria-label={t(id)}
-            >
-              <Icon size={17} />
-              {t(id)}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar__footer">v1.0.0</div>
-      </aside>
-
+    <div className="layout">
       <main className="main">
         <Suspense fallback={<PageLoader />}>
-          {activePage === 'electricity' && <ElectricityDashboard onOpenCalcSettings={() => handleNavClick('calculation-settings')} />}
+          {activePage === 'electricity' && <ElectricityDashboard />}
+          {activePage === 'appliances' && <ApplianceCalculator onBack={() => setActivePage('electricity')} />}
           {activePage === 'calculation-settings' && <CalculationSettings onBack={() => setActivePage('settings')} />}
           {activePage === 'prefix-migration' && <PrefixMigration onBack={() => setActivePage('settings')} />}
           {activePage === 'home' && <OverviewTab />}
@@ -241,14 +200,31 @@ function AppContent() {
             <PrivacyPolicy onBack={() => setActivePage('settings')} />
           )}
           {activePage === 'settings' && (
-            <div className="page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: 'var(--bg-1)' }}>
-              <div className="page__header">
-                <div>
-                  <h2 className="page__title">{t('settings')}</h2>
+            <div className="page">
+              <header className="page__header page__header--sticky">
+                <div className="page__header-content">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="page__header-icon">
+                      <FiSettings size={18} />
+                    </div>
+                    <div>
+                      <h2 className="page__title">{t('settings')}</h2>
+                      <p className="page__eyebrow">User Preferences</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </header>
 
-              <div style={{ flex: 1 }}>
+              <div className="page__content">
+                <div style={{ marginBottom: '24px' }}>
+                  <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Data Management
+                  </h3>
+                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
+                    <BackupRestore />
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: '24px' }}>
                   <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Tools & Utilities
@@ -304,15 +280,6 @@ function AppContent() {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Data Management
-                  </h3>
-                  <div className="scard" style={{ padding: '0', overflow: 'hidden' }}>
-                    <BackupRestore />
-                  </div>
-                </div>
-
                 {Capacitor.getPlatform() !== 'web' && (
                   <div style={{ marginBottom: '24px' }}>
                     <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -333,7 +300,7 @@ function AppContent() {
                   </div>
                 )}
 
-                <div>
+                <div style={{ paddingBottom: '40px' }}>
                   <h3 style={{ marginLeft: '4px', marginBottom: '12px', fontSize: '13px', fontWeight: '800', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Support & Legal
                   </h3>
@@ -356,7 +323,7 @@ function AppContent() {
                 </div>
               </div>
 
-              <footer className="dev-footer" style={{ marginTop: '20px', paddingBottom: '32px', textAlign: 'center' }}>
+              <footer className="dev-footer" style={{ marginTop: 'auto', paddingBottom: '32px', textAlign: 'center' }}>
                 <p className="dev-footer__name">{t('developed_by')} Akbar</p>
                 <span className="dev-footer__tag">v1.0.0</span>
               </footer>
@@ -379,14 +346,24 @@ function AppContent() {
         ))}
       </nav>
 
-      <Toaster
+      {showInstallBanner && (
+        <div className="install-banner">
+          <div className="install-banner__text">
+            Install My Dashboard for a better experience!
+          </div>
+          <div className="install-banner__actions">
+            <button className="btn btn--outline-white" onClick={handleDismissBanner}>Later</button>
+            <button className="btn btn--white" onClick={handleInstallClick}>Install</button>
+          </div>
+        </div>
+      )}
+
+      <Toaster 
         position="bottom-center"
-        containerClassName="toast-container"
-        containerStyle={{ zIndex: 200000 }}
         toastOptions={{
           duration: 3000,
           style: {
-            background: 'var(--surface-2)',
+            background: 'var(--surface-3)',
             color: 'var(--text-1)',
             border: '1px solid var(--border)',
             borderRadius: '12px',

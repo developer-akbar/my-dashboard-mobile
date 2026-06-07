@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
+import dayjs from 'dayjs';
 import {
   FiCopy, FiExternalLink, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
@@ -119,22 +120,30 @@ export function ServiceCard({
   const breakup = service.billBreakup;
 
   const currentYearTotalPaid = useMemo(() => {
-    if (!service.paymentHistory?.length) return null;
+    const history = service.paymentHistory;
+    if (!history || !Array.isArray(history) || history.length === 0) return null;
+    
     const currentYear = new Date().getFullYear();
-    const paymentsThisYear = service.paymentHistory.filter(ph => new Date(ph.date).getFullYear() === currentYear);
-    
-    if (!paymentsThisYear.length) return null;
+    let total = 0;
+    let latestMonthIndex = -1;
 
-    const total = paymentsThisYear.reduce((sum, ph) => sum + Number(ph.amount || 0), 0);
+    history.forEach(ph => {
+      if (!ph.date || !ph.amount) return;
+      const d = new Date(ph.date);
+      if (d.getFullYear() === currentYear) {
+        total += Number(ph.amount);
+        if (d.getMonth() > latestMonthIndex) latestMonthIndex = d.getMonth();
+      }
+    });
     
-    // Find the latest month
-    const months = paymentsThisYear.map(ph => new Date(ph.date).getMonth());
-    const maxMonthIndex = Math.max(...months);
-    const maxMonthName = new Date(currentYear, maxMonthIndex).toLocaleString('en-IN', { month: 'short' });
+    if (total === 0) return null;
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const latestMonthName = latestMonthIndex >= 0 ? monthNames[latestMonthIndex] : '';
 
     return {
       total,
-      label: `Jan - ${maxMonthName} ${currentYear}`
+      label: `Jan - ${latestMonthName} ${currentYear}`
     };
   }, [service.paymentHistory]);
 
@@ -440,55 +449,63 @@ export function ServiceCard({
       {/* ── Expanded Body ── */}
       <div className={`scard__body ${isExpanded ? 'scard__body--expanded' : ''}`}>
         <div className="scard__body-inner" key={isExpanded ? 'exp' : 'col'}>
-          {insights && (
+          {(insights || currentYearTotalPaid) && (
             <Section title="Consumption Insights" defaultOpen={false} isExpanded={isExpanded}>
               <div style={{ padding: '0 10px' }}>
-                 {insights.vsLastMonth?.amountPct > 5 && (
+                 {insights && insights.vsLastMonth?.amountPct > 5 && (
                    <div style={{ margin: '0 0 12px', background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber)', padding: '8px', borderRadius: 'var(--radius-sm)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                      <FiZap size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
                      <span style={{ fontSize: '11px', lineHeight: 1.4 }}><b>High bill detected (+{insights.vsLastMonth.amountPct}%).</b> Setting your AC to 24°C instead of 18°C can save up to 24% on cooling costs.</span>
                    </div>
                  )}
-                 <div className="receipt-row">
-                    <span className="receipt-row__label">Units Vs Last Month</span>
-                    <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />        
-                 </div>
-                 {insights.vsLastMonth?.amount != null && (
-                   <div className="receipt-row">
-                      <span className="receipt-row__label">Amount Vs Last Month</span>
-                      <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />    
-                   </div>
-                 )}
-                 {insights.vsSameMonthLastYear && (
+                 {insights && (
                    <>
                      <div className="receipt-row">
-                        <span className="receipt-row__label">Units Vs Last Year</span>
-                        <TrendBadge value={insights.vsSameMonthLastYear.units} unit="u" percent={insights.vsSameMonthLastYear.unitsPct} />
+                        <span className="receipt-row__label">Units Vs Last Month</span>
+                        <TrendBadge value={insights.vsLastMonth?.units} unit="u" percent={insights.vsLastMonth?.unitsPct} />        
                      </div>
+                     {insights.vsLastMonth?.amount != null && (
+                       <div className="receipt-row">
+                          <span className="receipt-row__label">Amount Vs Last Month</span>
+                          <TrendBadge value={insights.vsLastMonth.amount} unit="₹" percent={insights.vsLastMonth.amountPct} />    
+                       </div>
+                     )}
+                     {insights.vsSameMonthLastYear && (
+                       <>
+                         <div className="receipt-row">
+                            <span className="receipt-row__label">Units Vs Last Year</span>
+                            <TrendBadge value={insights.vsSameMonthLastYear.units} unit="u" percent={insights.vsSameMonthLastYear.unitsPct} />
+                         </div>
+                         <div className="receipt-row">
+                            <span className="receipt-row__label">Amount Vs Last Year</span>
+                            <TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} />
+                         </div>
+                       </>
+                     )}
                      <div className="receipt-row">
-                        <span className="receipt-row__label">Amount Vs Last Year</span>
-                        <TrendBadge value={insights.vsSameMonthLastYear.amount} unit="₹" percent={insights.vsSameMonthLastYear.amountPct} />
+                        <span className="receipt-row__label">{t('avg_mo')}</span>
+                        <b className="receipt-row__val">{formatInr(insights.avgAmount)}</b>
                      </div>
                    </>
                  )}
-                 <div className="receipt-row">
-                    <span className="receipt-row__label">{t('avg_mo')}</span>
-                    <b className="receipt-row__val">{formatInr(insights.avgAmount)}</b>
-                 </div>
                  {currentYearTotalPaid && (
                    <div className="receipt-row">
                       <span className="receipt-row__label">Total Paid ({currentYearTotalPaid.label})</span>
                       <b className="receipt-row__val">{formatInr(currentYearTotalPaid.total)}</b>
                    </div>
                  )}
-                 <div className="receipt-row">
-                    <span className="receipt-row__label">Avg Units (Last 6m)</span>
-                    <b className="receipt-row__val">{insights.avgUnits6m?.toLocaleString('en-IN') || '—'} u</b>
-                 </div>
-                 <div className="receipt-row">
-                    <span className="receipt-row__label">Avg Units (Last 12m)</span>
-                    <b className="receipt-row__val">{insights.avgUnits12m?.toLocaleString('en-IN') || '—'} u</b>
-                 </div>
+                 {insights && (
+                   <>
+                     <div className="receipt-row">
+                        <span className="receipt-row__label">Avg Units (Last 6m)</span>
+                        <b className="receipt-row__val">{insights.avgUnits6m?.toLocaleString('en-IN') || '—'} u</b>
+                     </div>
+                     <div className="receipt-row">
+                        <span className="receipt-row__label">Avg Units (Last 12m)</span>
+                        <b className="receipt-row__val">{insights.avgUnits12m?.toLocaleString('en-IN') || '—'} u</b>
+                     </div>
+                   </>
+                 )}
                  {service.lastBilledUnits > 0 && (
                    <div className="receipt-row" style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed var(--border-md)' }}>
                       <span className="receipt-row__label">Effective Rate (This Month)</span>
