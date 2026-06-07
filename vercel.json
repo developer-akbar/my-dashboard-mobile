@@ -78,5 +78,12 @@
       "path": "/api/notifications/check?type=GENERATION",
       "schedule": "30 15 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://ap-vidyuth.vercel.app/$1",
+      "permanent": true
+    }
   ]
 }
