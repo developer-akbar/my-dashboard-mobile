@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { FiX, FiZap, FiInfo, FiTrendingUp, FiTrendingDown, FiClock, FiAlertCircle, FiPlus, FiMinus, FiChevronDown, FiActivity, FiAward, FiCheckCircle } from 'react-icons/fi';
+import { FiX, FiZap, FiInfo, FiTrendingUp, FiTrendingDown, FiClock, FiAlertCircle, FiPlus, FiMinus, FiChevronDown, FiActivity, FiAward, FiCheckCircle, FiTrash2 } from 'react-icons/fi';
 import { LuCalculator } from 'react-icons/lu';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -17,15 +17,25 @@ export function BillCalculator({ open, service, onClose }) {
   const [type, setType] = useState('domestic');
   const [readings, setReadings] = useState([]);
 
+  const loadReadings = useCallback(async () => {
+    if (!service) return;
+    const data = await db.getSetting('readings_' + service.serviceNumber);
+    if (data && Array.isArray(data)) setReadings(data);
+    else setReadings([]);
+  }, [service?.serviceNumber]);
+
+  // Watch for changes in db settings for this key to stay in sync
+  useEffect(() => {
+    if (open && service) {
+      loadReadings();
+      const interval = setInterval(loadReadings, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [open, service?.serviceNumber, loadReadings]);
+
   // Reset state when service changes to ensure individual service isolation
   useEffect(() => {
     if (service && open) {
-      db.getSetting('readings_' + service.serviceNumber).then(data => {
-        if (data && Array.isArray(data)) setReadings(data);
-        else setReadings([]);
-      });
-      setMode('progress');
-
       const cat = (service.category || '').toUpperCase();
       const isCommercial = cat.includes('LT-II') || cat.includes('LT II') || cat.includes('LT-2') || cat.includes('CAT-II') || cat.includes('COMMERCIAL');
       setType(isCommercial ? 'commercial' : 'domestic');
@@ -104,12 +114,19 @@ export function BillCalculator({ open, service, onClose }) {
     };
   }, [readings, service, load, config]);
 
+  const handleDeleteReading = useCallback(async (readingToDelete) => {
+    const updated = readings.filter(r => r !== readingToDelete);
+    setReadings(updated);
+    await db.setSetting('readings_' + service.serviceNumber, updated);
+    toast.success('Reading removed');
+  }, [readings, service?.serviceNumber]);
+
   const handleSaveReading = useCallback(async () => {
     if (!currentReading || !progressResult) return;
     const newReading = {
-      id: Date.now(),
       date: new Date().toISOString(),
-      reading: currentReading,
+      reading: parseFloat(currentReading),
+      // Optional: Add metadata that the predictor might use
       unitsSoFar: progressResult.unitsSoFar,
       predictedBill: progressResult.predictedBill
     };
@@ -125,6 +142,10 @@ export function BillCalculator({ open, service, onClose }) {
     if (isNaN(u) || u < 0) return null;
     return calculateEstimatedBill(u, load, config);
   }, [units, load, config]);
+
+  const sortedReadings = useMemo(() => {
+    return [...readings].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [readings]);
 
   if (!open) return null;
 
@@ -299,13 +320,22 @@ export function BillCalculator({ open, service, onClose }) {
                 {readings.length >= 3 && <span className="paid-tag" style={{ fontSize: '9px' }}>Trend Analysis Active</span>}
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {readings.map((r) => (
-                  <div key={r.id} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center' }}>
+                {sortedReadings.map((r, idx) => (
+                  <div key={idx} className="scard" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'center', position: 'relative', minWidth: '140px' }}>
+                    <button 
+                      className="icon-btn-micro" 
+                      onClick={() => handleDeleteReading(r)}
+                      style={{ position: 'absolute', top: '4px', right: '4px', color: 'var(--text-3)' }}
+                    >
+                      <FiTrash2 size={11} />
+                    </button>
                     <div>
-                      <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px 0' }}>{r.reading} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-3)' }}>({r.unitsSoFar}u)</span></p>
+                      <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 2px 0' }}>{r.reading} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-3)' }}>({r.unitsSoFar ?? '—'}u)</span></p>
                       <p style={{ fontSize: '11px', color: 'var(--text-2)', margin: 0 }}>{new Date(r.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
-                    <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--primary-hi)', margin: 0 }}>{formatInr(r.predictedBill)}</p>
+                    {r.predictedBill != null && (
+                      <p style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--primary-hi)', margin: 0 }}>{formatInr(r.predictedBill)}</p>
+                    )}
                   </div>
                 ))}
               </div>

@@ -122,16 +122,16 @@ export function ServiceCard({
   const breakup = service.billBreakup;
 
   const currentYearTotalPaid = useMemo(() => {
-    if (!service.paymentHistory?.length) return null;
+    if (!service.billHistory?.length) return null;
     const currentYear = new Date().getFullYear();
-    const paymentsThisYear = service.paymentHistory.filter(ph => new Date(ph.date).getFullYear() === currentYear);
+    const paymentsThisYear = service.billHistory.filter(ph => new Date(ph.billDate).getFullYear() === currentYear);
     
     if (!paymentsThisYear.length) return null;
 
-    const total = paymentsThisYear.reduce((sum, ph) => sum + Number(ph.amount || 0), 0);
+    const total = paymentsThisYear.reduce((sum, ph) => sum + Number(ph.billAmount || 0), 0);
     
     // Find the latest month
-    const months = paymentsThisYear.map(ph => new Date(ph.date).getMonth());
+    const months = paymentsThisYear.map(ph => new Date(ph.billDate).getMonth());
     const maxMonthIndex = Math.max(...months);
     const maxMonthName = new Date(currentYear, maxMonthIndex).toLocaleString('en-IN', { month: 'short' });
 
@@ -139,7 +139,7 @@ export function ServiceCard({
       total,
       label: `Jan - ${maxMonthName} ${currentYear}`
     };
-  }, [service.paymentHistory]);
+  }, [service.billHistory]);
 
   const hasPaymentHistory = service.paymentHistory && service.paymentHistory.length > 0;
   const streak = useMemo(() => {

@@ -3,11 +3,11 @@
  * Mid-month tracker: log meter readings → project end-of-month units + cost.
  * Readings stored in db.setSetting(`readings_${serviceNumber}`, [...]).
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FiZap, FiPlus, FiTrash2, FiTrendingUp } from 'react-icons/fi';
 import { db } from '../../../shared/db/storage.js';
 import { formatInr } from '../../../shared/utils/index.js';
-import { calculateEstimatedBill } from '../utils/billing.js';
+import { calculateEstimatedBill, DEFAULT_DOMESTIC_CONFIG, DEFAULT_COMMERCIAL_CONFIG } from '../utils/billing.js';
 import toast from 'react-hot-toast';
 
 const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -18,9 +18,17 @@ export function MeterReadingLog({ service }) {
   const [newReading, setNewReading] = useState('');
   const key = `readings_${service.serviceNumber}`;
 
-  useEffect(() => {
-    db.getSetting(key).then(v => setReadings(Array.isArray(v) ? v : []));
+  const loadReadings = useCallback(async () => {
+    const v = await db.getSetting(key);
+    setReadings(Array.isArray(v) ? v : []);
   }, [key]);
+
+  useEffect(() => {
+    loadReadings();
+    // Watch for changes in db settings for this key to stay in sync
+    const interval = setInterval(loadReadings, 2000); // Simple sync for local db
+    return () => clearInterval(interval);
+  }, [loadReadings]);
 
   // Only keep readings from current billing period (last 35 days)
   const recentReadings = useMemo(() => {
@@ -53,12 +61,43 @@ export function MeterReadingLog({ service }) {
   async function addReading() {
     const val = Number(newReading);
     if (!val || val <= 0) { toast.error('Enter a valid reading'); return; }
-    const lastReading = recentReadings[recentReadings.length - 1];
+    
+    // Sort recent to find the latest
+    const sortedRecent = [...recentReadings].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const lastReading = sortedRecent[sortedRecent.length - 1];
+    
     if (lastReading && val < lastReading.reading) {
       toast.error('Reading cannot be less than previous reading');
       return;
     }
-    const updated = [...readings, { date: new Date().toISOString(), reading: val }];
+
+    // Logic to calculate projected bill for this single reading (compatibility with BillPredictor)
+    const startReading = parseFloat(String(service.closingRdg || 0).replace(/[^0-9.]/g, ''));
+    const unitsSoFar = val - startReading;
+    
+    const billDateStr = service.lastBillDate || service.billDate;
+    let predictedBill = null;
+    if (billDateStr && unitsSoFar > 0) {
+       const startDate = new Date(billDateStr);
+       const now = new Date();
+       const msDiff = now.getTime() - startDate.getTime();
+       const daysPassed = Math.max(1, Math.floor(msDiff / (1000 * 60 * 60 * 24)));
+       const predictedUnits = Math.round((unitsSoFar / daysPassed) * 30);
+       
+       const cat = (service.category || '').toUpperCase();
+       const isCommercial = cat.includes('LT-II') || cat.includes('LT II') || cat.includes('LT-2') || cat.includes('CAT-II') || cat.includes('COMMERCIAL');
+       const config = isCommercial ? DEFAULT_COMMERCIAL_CONFIG : DEFAULT_DOMESTIC_CONFIG;
+       const load = service.ctrLoad || 1;
+       
+       predictedBill = calculateEstimatedBill(predictedUnits, load, config).total;
+    }
+
+    const updated = [...readings, { 
+      date: new Date().toISOString(), 
+      reading: val,
+      unitsSoFar: unitsSoFar > 0 ? unitsSoFar : 0,
+      predictedBill: predictedBill
+    }];
     await db.setSetting(key, updated);
     setReadings(updated);
     setNewReading('');
@@ -66,15 +105,16 @@ export function MeterReadingLog({ service }) {
     toast.success('Reading logged');
   }
 
-  async function removeReading(idx) {
-    const updated = readings.filter((_, i) => i !== idx);
+  async function removeReading(readingToRemove) {
+    const updated = readings.filter(r => r !== readingToRemove);
     await db.setSetting(key, updated);
     setReadings(updated);
   }
 
   const fmtDate = iso => {
     const d = new Date(iso);
-    return `${d.getDate()} ${MO[d.getMonth()]}`;
+    const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${d.getDate()} ${MO[d.getMonth()]} ${time}`;
   };
 
   return (
@@ -123,9 +163,9 @@ export function MeterReadingLog({ service }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px' }}>
           {[...recentReadings].sort((a, b) => new Date(b.date) - new Date(a.date)).map((r, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
-              <span style={{ color: 'var(--text-3)' }}>{fmtDate(r.date)}</span>
+              <span style={{ color: 'var(--text-3)', fontSize: '10px' }}>{fmtDate(r.date)}</span>
               <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{r.reading.toLocaleString('en-IN')} u</span>
-              <button className="icon-btn-micro" onClick={() => removeReading(readings.indexOf(r))} style={{ color: 'var(--text-3)' }}>
+              <button className="icon-btn-micro" onClick={() => removeReading(r)} style={{ color: 'var(--text-3)' }}>
                 <FiTrash2 size={11} />
               </button>
             </div>
