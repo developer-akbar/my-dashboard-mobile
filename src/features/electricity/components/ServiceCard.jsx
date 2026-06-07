@@ -141,7 +141,9 @@ export function ServiceCard({
     };
   }, [service.paymentHistory]);
 
+  const hasPaymentHistory = service.paymentHistory && service.paymentHistory.length > 0;
   const streak = useMemo(() => {
+    if (!hasPaymentHistory) return 0;
     const bh = service.billHistory || [];
     if (bh.length === 0) return 0;
     const sorted = [...bh].sort((a, b) => new Date(b.billDate) - new Date(a.billDate));
@@ -152,9 +154,9 @@ export function ServiceCard({
       else break;
     }
     return s;
-  }, [service.billHistory]);
+  }, [service.billHistory, hasPaymentHistory]);
 
-  const streakEmoji = streak >= 3 ? '🔥' : streak >= 1 ? '✅' : '📊';
+  const streakEmoji = hasPaymentHistory ? (streak >= 3 ? '🔥 ' : streak >= 1 ? '✅ ' : '📊 ') : '';
 
   async function copyNum() {
     try {
@@ -539,19 +541,18 @@ export function ServiceCard({
           )}
 
           <Section
-            title={<span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>{streakEmoji} {t('payment_history')}</span>}
-            badge={isHistoryError ? <span style={{display:'flex', alignItems:'center', gap: '4px'}}><FiAlertTriangle size={12}/> Sync Error</span> : `${service.billHistory?.length || 0}`}
+            title={<span style={{ display: 'flex', alignItems: 'center' }}>{streakEmoji}{t('payment_history')}</span>}
+            badge={(isHistoryError || !hasPaymentHistory) ? <span style={{display:'flex', alignItems:'center', gap: '4px'}}><FiAlertTriangle size={12}/> Sync Error</span> : `${service.billHistory?.length ? Math.min(service.billHistory.length, 12) : 0}`}
             isExpanded={isExpanded}
           >
-            {isHistoryError && (
+            {(isHistoryError || !hasPaymentHistory) ? (
               <div className="scard__error" style={{ margin: '8px 10px' }}>
                 <FiAlertTriangle size={12} />
                 APSPDCL payment history is unavailable for this service number
               </div>
-            )}
-            {service.billHistory?.length > 0 ? (
+            ) : service.billHistory?.length > 0 ? (
               <PaymentsPanel service={service} t={t} />
-            ) : !isHistoryError && (
+            ) : (
               <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)', fontSize: '13px' }}>
                 No payment records found
               </div>
@@ -748,8 +749,12 @@ function TrendPanel({ data, insights, t }) {
 function PaymentsPanel({ service, t }) {
   const history = useMemo(() => {
     const bh = service.billHistory || [];
-    return [...bh].sort((a, b) => new Date(b.billDate) - new Date(a.billDate));
+    // Only show if we actually have history data to avoid false 'Unpaid' entries
+    if (bh.length === 0) return [];
+    return [...bh].sort((a, b) => new Date(b.billDate) - new Date(a.billDate)).slice(0, 12);
   }, [service.billHistory]);
+
+  if (history.length === 0) return null;
 
   const getStatus = (b) => {
     if (!b.isPaid) return 'unpaid';
