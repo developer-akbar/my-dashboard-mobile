@@ -192,6 +192,28 @@ export function ElectricityDashboard() {
       // Check web URL for service number
       const path = window.location.pathname;
       if (path.length > 1 && path !== '/privacy') {
+        // Handle shortcut deep links: /action/pay, /action/refresh, /action/add
+        if (path === '/action/pay' || path.includes('action/pay')) {
+          // Pay the pinned (or first) service with a DUE bill
+          const pinnedDue = services.find(s => s.pinned && s.lastStatus === 'DUE' && s.lastAmountDue > 0);
+          const firstDue = services.find(s => s.lastStatus === 'DUE' && s.lastAmountDue > 0);
+          const target = pinnedDue || firstDue;
+          if (target) {
+            handlePay(target);
+            if (window.history.replaceState) window.history.replaceState({}, '', '/');
+          }
+          return;
+        }
+        if (path === '/action/refresh' || path.includes('action/refresh')) {
+          handleRefreshAll();
+          if (window.history.replaceState) window.history.replaceState({}, '', '/');
+          return;
+        }
+        if (path === '/action/add' || path.includes('action/add')) {
+          setDialog({ open: true, service: null });
+          if (window.history.replaceState) window.history.replaceState({}, '', '/');
+          return;
+        }
         const snFromPath = path.substring(1).replace(/[^0-9]/g, '');
         if (snFromPath.length >= 13) {
           console.log('[dashboard] Web deep link detected:', snFromPath);

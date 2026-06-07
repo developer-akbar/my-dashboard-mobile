@@ -11,7 +11,20 @@
             android:targetPackage="com.akbar.mydashboard"
             android:targetClass="com.akbar.mydashboard.MainActivity" />
     </shortcut>
-    
+
+    <shortcut
+        android:shortcutId="pay_home"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_pay_short"
+        android:shortcutLongLabel="@string/shortcut_pay_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="mydashboard://action/pay"
+            android:targetPackage="com.akbar.mydashboard"
+            android:targetClass="com.akbar.mydashboard.MainActivity" />
+    </shortcut>
+
     <shortcut
         android:shortcutId="add_service"
         android:enabled="true"

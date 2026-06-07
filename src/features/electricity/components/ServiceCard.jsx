@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import {
   FiCopy, FiExternalLink, FiMoreVertical,
   FiEdit2, FiTrash2, FiChevronDown, FiTrendingUp, FiTrendingDown,
@@ -12,6 +12,10 @@ import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
 import { generateAPSPDCLUpiString } from '../utils/qrcode.js';
 import { Loader } from '../../../shared/components/Loader.jsx';
+import { BudgetGoal } from './BudgetGoal.jsx';
+import { PaymentStreak } from './PaymentStreak.jsx';
+import { MeterReadingLog } from './MeterReadingLog.jsx';
+import { CostSplitTracker } from './CostSplitTracker.jsx';
 
 // ── Lazy Components ──────────────────────────────────────────────────────────
 const TrendChart = lazy(() => import('./TrendChart.jsx').then(m => ({ default: m.TrendChart })));
@@ -538,6 +542,36 @@ export function ServiceCard({
                 No payment records found
               </div>
             )}
+          </Section>
+
+          {/* ── Budget Goal (Feature 3) ── */}
+          <Section title="Budget Goal" isExpanded={isExpanded}>
+            <div style={{ padding: '0 10px 10px' }}>
+              <BudgetGoal service={service} />
+            </div>
+          </Section>
+
+          {/* ── Payment Streak (Feature 6) ── */}
+          {(service.billHistory?.length > 0 || service.paymentHistory?.length > 0) && (
+            <Section title="Payment Streak" isExpanded={isExpanded}>
+              <div style={{ padding: '0 10px 10px' }}>
+                <PaymentStreak service={service} />
+              </div>
+            </Section>
+          )}
+
+          {/* ── Meter Reading Log (Feature 7) ── */}
+          <Section title="Meter Reading Log" isExpanded={isExpanded}>
+            <div style={{ padding: '0 10px 10px' }}>
+              <MeterReadingLog service={service} />
+            </div>
+          </Section>
+
+          {/* ── Cost Split Tracker (Feature 8) ── */}
+          <Section title="Split Bill" isExpanded={isExpanded}>
+            <div style={{ padding: '0 10px 10px' }}>
+              <CostSplitTracker service={service} />
+            </div>
           </Section>
         </div>
       </div>
