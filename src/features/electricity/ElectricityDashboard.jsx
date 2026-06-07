@@ -252,6 +252,15 @@ export function ElectricityDashboard() {
 
     window.addEventListener('notification-received', handleNotif);
     window.addEventListener('notification-deep-link', handleDeepLinkSignal);
+
+    // Android home-screen shortcut: "Pay Home"
+    const handleShortcutPay = () => {
+      const pinnedDue = services.find(s => s.pinned && s.lastStatus === 'DUE' && s.lastAmountDue > 0);
+      const firstDue  = services.find(s => s.lastStatus === 'DUE' && s.lastAmountDue > 0);
+      const target = pinnedDue || firstDue;
+      if (target) handlePay(target);
+    };
+    window.addEventListener('shortcut-pay-home', handleShortcutPay);
     
     if (!loading) {
       if (pendingDeepLink.current) {
@@ -266,6 +275,7 @@ export function ElectricityDashboard() {
       appStateListener.then(h => h.remove());
       window.removeEventListener('notification-received', handleNotif);
       window.removeEventListener('notification-deep-link', handleDeepLinkSignal);
+      window.removeEventListener('shortcut-pay-home', handleShortcutPay);
     };
   }, [loading, services]);
 

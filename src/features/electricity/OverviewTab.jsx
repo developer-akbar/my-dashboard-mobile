@@ -120,7 +120,7 @@ export function OverviewTab() {
 
   return (
     <div className="page">
-      <div className="page__header">
+      <div className="page__header page__header--sticky">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
             <h2 className="page__title">Overview</h2>
